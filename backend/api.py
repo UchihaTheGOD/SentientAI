@@ -1,21 +1,17 @@
 from fastapi import FastAPI
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel,EmailStr,conint
 
-app= FastAPI()
+
+
+app = FastAPI()
 
 class User(BaseModel):
     name:str
-    age:int = Field(...,gt=0,le=120)
-
-    @field_validator('name')
-    def name_not_empty(cls,v):
-        if not v:
-            raise ValueError("NOPE U CAN't do that")
-        return v
+    mail:EmailStr
+    age:conint(ge=10)
 
 
-@app.post("/user/")
 
-async def create_user(user:User):
-    u={"name":user.name,"age":user.age}
-    return u
+@app.post("/register/")
+async def reg_user(user:User):
+    return user
