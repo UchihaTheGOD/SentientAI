@@ -1,23 +1,31 @@
-from fastapi import FastAPI, Form, UploadFile, File
-from typing import List
-app = FastAPI()
+from fastapi import FastAPI, HTTPException
+import mysql.connector
+from mysql.connector import Error
+app=FastAPI()
 
-# @app.post("/form/")
-# async def FORM_DATA(name:str=Form(...),age:int=Form(...)):
-#     return {"name": name,"message": "login OK"}
+def sqlconnect():
 
-# @app.post("/file/")
-# async def file(file: UploadFile = File(...)):
-#     return {"filename": file.filename}
+    return mysql.connector.connect(
 
-
-# @app.post("/savefile/")
-# async def save(file: UploadFile = File(...)):
-#     with open(f'uploads/{file.filename}',"wb") as f:
-#         f.write(file.file.read())
-#     return {"message":"FILE UPLOADED"}
+        host="localhost",
+        user="root",
+        password="",
+        database="fastapi-test"
+    )
 
 
-@app.post("/multifile/")
-async def multi_file(files: List[UploadFile]=File(...)):
-    return {"filename": [file.filename for file in files]}
+@app.get("/users")
+def get_user():
+    try:
+        conn=sqlconnect()
+        cursor=conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users")
+        rows=cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return rows
+
+    except Error as e:
+        raise HTTPException(status_code=500,detail=str(e))
+
+    
