@@ -1,31 +1,39 @@
-from fastapi import FastAPI, HTTPException
-import mysql.connector
-from mysql.connector import Error
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
+from fastapi import FastAPI
+
 app=FastAPI()
 
-def sqlconnect():
+DATABASE_URL= "sqlite:///./test.db"
 
-    return mysql.connector.connect(
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-        host="localhost",
-        user="root",
-        password="",
-        database="fastapi-test"
-    )
+SessionLocal = sessionmaker(autocommit=False, autoflush=False,bind=engine)
 
+Base = declarative_base()
 
-@app.get("/users")
-def get_user():
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name= Column(String, index=True)
+    email= Column(String, unique=True, index=True)
+
+Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
     try:
-        conn=sqlconnect()
-        cursor=conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users")
-        rows=cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return rows
+        yield db
+    finally:
+        db.close()
 
-    except Error as e:
-        raise HTTPException(status_code=500,detail=str(e))
+
+@app.post("/users/", response_model=User)
+def create_user(user:UserCreate,db:Session=Depends(get_db))
+
+
 
     
