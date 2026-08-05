@@ -2,7 +2,8 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import Session
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends 
+from pydantic import BaseModel
 
 app=FastAPI()
 
@@ -22,7 +23,7 @@ class User(Base):
     email= Column(String, unique=True, index=True)
 
 Base.metadata.create_all(bind=engine)
-
+#DATABASE SESSION
 def get_db():
     db = SessionLocal()
     try:
@@ -31,9 +32,18 @@ def get_db():
         db.close()
 
 
+# @app.post("/users/", response_model=User)
+# def create_user(user:UserCreate,db:Session=Depends(get_db))
+#pydantic 
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+#api
 @app.post("/users/", response_model=User)
-def create_user(user:UserCreate,db:Session=Depends(get_db))
-
-
-
-    
+def create_user(user: UserCreate, db: Session= Depends(get_db)):
+    db_user = User(name=user.name, email=user.email)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
