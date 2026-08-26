@@ -1,11 +1,13 @@
-{% extends "base.html" %}
-{% block title %}{{ lab.name }} — SentientAI{% endblock %}
+{% extends "base_testing.html" %}
+{% block title %}{{ lab.name }} — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span>
+<a href="/testing/labs">Labs</a> <span class="breadcrumb-sep">›</span>
+<span>{{ lab.name }}</span>
+{% endblock %}
 
 {% block content %}
-<div style="margin-bottom:8px;">
-    <a href="/labs" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Targets</a>
-</div>
-
 <div class="section-header">
     <h1 class="section-title">{{ lab.name }}</h1>
     <div style="display:flex;gap:8px;">
@@ -30,7 +32,7 @@
         <div class="card-header">
             <span class="card-title">Test Input</span>
         </div>
-        <form method="post" action="/api/lab/{{ lab.id }}/submit" class="lab-form">
+        <form method="post" action="/testing/labs/{{ lab.id }}/submit" class="lab-form">
             <div class="form-group">
                 <label for="payload">Enter your payload</label>
                 <textarea id="payload" name="payload" class="form-control" rows="6"

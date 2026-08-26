@@ -80,8 +80,18 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
         return None
 
 
+def require_tester(user: User = Depends(get_current_user)) -> User:
+    """Dependency that ensures current user has tester or admin role."""
+    if user.role not in ("tester", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Testing environment access requires a tester or admin account.",
+        )
+    return user
+
+
 def require_admin(user: User = Depends(get_current_user)) -> User:
     """Dependency that ensures current user is admin."""
-    if not user.is_admin:
+    if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user

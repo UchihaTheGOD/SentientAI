@@ -29,8 +29,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     application = FastAPI(
         title="SentientAI",
-        description="Cybersecurity Training Platform",
-        version="0.1.0",
+        description="Cybersecurity Learning Platform",
+        version="0.2.0",
         docs_url="/api/docs",
         redoc_url=None,
     )
@@ -42,12 +42,12 @@ def create_app() -> FastAPI:
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     # Register routers
-    from app.api import auth, users, labs, attacks, admin, health
+    from app.api import auth, users, blog, testing, admin, health
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
-    application.include_router(labs.router)
-    application.include_router(attacks.router)
+    application.include_router(blog.router)
+    application.include_router(testing.router)
     application.include_router(admin.router)
 
     # Startup: init DB + labs
@@ -64,16 +64,25 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
 
     # Redirect unauthenticated requests to login
-    from fastapi.exceptions import HTTPException as FastAPIHTTPException
-    from fastapi.responses import RedirectResponse
-
     @application.exception_handler(401)
     async def unauthorized_handler(request: Request, exc):
         # API requests get JSON, browser requests get redirect
         if request.url.path.startswith("/api/"):
             from fastapi.responses import JSONResponse
             return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/login", status_code=303)
+
+    # 403 handler — role-denied access
+    @application.exception_handler(403)
+    async def forbidden_handler(request: Request, exc):
+        if request.url.path.startswith("/api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        from fastapi.templating import Jinja2Templates
+        from fastapi.responses import HTMLResponse
+        templates = Jinja2Templates(directory="app/templates")
+        return templates.TemplateResponse("403.html", {"request": request}, status_code=403)
 
     return application
 

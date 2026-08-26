@@ -1,9 +1,13 @@
-{% extends "base.html" %}
-{% block title %}Attack History — SentientAI{% endblock %}
+{% extends "base_testing.html" %}
+{% block title %}Events — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span> <span>Events</span>
+{% endblock %}
 
 {% block content %}
 <div class="section-header">
-    <h1 class="section-title">Attack History</h1>
+    <h1 class="section-title">Security Events</h1>
     <span class="badge badge-blue">{{ events|length }} Events</span>
 </div>
 
@@ -14,7 +18,7 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Target</th>
+                    <th>Lab</th>
                     <th>Category</th>
                     <th>Status</th>
                     <th>Severity</th>
@@ -51,7 +55,7 @@
                         {% endif %}
                     </td>
                     <td style="color:var(--text-muted);font-size:0.85rem;">{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '' }}</td>
-                    <td><a href="/attacks/{{ event.id }}" class="btn btn-outline btn-sm">View</a></td>
+                    <td><a href="/testing/events/{{ event.id }}" class="btn btn-outline btn-sm">View</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -61,8 +65,8 @@
 {% else %}
 <div class="card">
     <div class="empty-state">
-        <div class="icon">📋</div>
-        <p>No attack events logged yet. Execute tests against any target to view telemetry.</p>
+        <div class="icon">▤</div>
+        <p>No security events recorded yet. Execute tests against a lab to generate events.</p>
     </div>
 </div>
 {% endif %}

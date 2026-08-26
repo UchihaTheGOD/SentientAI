@@ -1,0 +1,32 @@
+{% extends "base_public.html" %}
+{% set user = current_user %}
+{% block title %}{{ post.title }} — SentientAI Blog{% endblock %}
+{% block meta_description %}{{ post.summary }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <article class="blog-article">
+        <div class="blog-article-header">
+            <a href="/blog" class="blog-back">← Back to Blog</a>
+            <div class="blog-article-meta">
+                <span class="badge badge-cyan">{{ post.category }}</span>
+                <span class="blog-article-time">{{ post.reading_time }} min read</span>
+            </div>
+            <h1>{{ post.title }}</h1>
+            <div class="blog-article-byline">
+                <span class="blog-article-author">{{ post.author }}</span>
+                <span class="blog-article-date">{{ post.created_at.strftime('%B %d, %Y') if post.created_at else '' }}</span>
+            </div>
+        </div>
+
+        <div class="blog-article-content">
+            {{ post.content | replace('\n\n', '</p><p>') | replace('\n', '<br>') | safe }}
+        </div>
+
+        <div class="blog-article-footer">
+            <a href="/blog" class="btn btn-outline">← All Articles</a>
+            <a href="/blog?category={{ post.category | urlencode }}" class="btn btn-outline">More in {{ post.category }}</a>
+        </div>
+    </article>
+</div>
+{% endblock %}

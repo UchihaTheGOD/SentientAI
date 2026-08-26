@@ -1,73 +1,71 @@
-"""User-facing routes — dashboard, profile."""
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+"""Public-facing routes — homepage, about, contact, profile."""
+from fastapi import APIRouter, Depends, Request, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import get_db
 from app.models.user import User
-from app.models.security_event import SecurityEvent
-from app.services.auth_service import get_current_user
-from app.labs import list_labs
+from app.models.blog_post import BlogPost
+from app.services.auth_service import get_current_user, get_current_user_optional
 
-router = APIRouter(tags=["users"])
+router = APIRouter(tags=["public"])
 templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-@router.get("/dashboard", response_class=HTMLResponse)
-def dashboard(
+def index(
     request: Request,
-    user: User = Depends(get_current_user),
+    user=Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    # User stats
-    total_attacks = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.user_id == user.id
-    ).scalar() or 0
-
-    detected = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.user_id == user.id,
-        SecurityEvent.detection_result == "detected",
-    ).scalar() or 0
-
-    successful = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.user_id == user.id,
-        SecurityEvent.success == True,
-    ).scalar() or 0
-
-    blocked = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.user_id == user.id,
-        SecurityEvent.blocked == True,
-    ).scalar() or 0
-
-    # Recent activity
-    recent_events = (
-        db.query(SecurityEvent)
-        .filter(SecurityEvent.user_id == user.id)
-        .order_by(SecurityEvent.timestamp.desc())
-        .limit(10)
+    # Get latest published blog posts for homepage
+    latest_posts = (
+        db.query(BlogPost)
+        .filter(BlogPost.published == True)
+        .order_by(BlogPost.created_at.desc())
+        .limit(3)
         .all()
     )
 
-    labs = list_labs()
-
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse("index.html", {
         "request": request,
-        "user": user,
-        "stats": {
-            "total_attacks": total_attacks,
-            "detected": detected,
-            "successful": successful,
-            "blocked": blocked,
-        },
-        "recent_events": recent_events,
-        "labs": labs,
+        "current_user": user,
+        "latest_posts": latest_posts,
+    })
+
+
+@router.get("/about", response_class=HTMLResponse)
+def about(request: Request, user=Depends(get_current_user_optional)):
+    return templates.TemplateResponse("about.html", {
+        "request": request,
+        "current_user": user,
+    })
+
+
+@router.get("/contact", response_class=HTMLResponse)
+def contact_page(request: Request, user=Depends(get_current_user_optional)):
+    return templates.TemplateResponse("contact.html", {
+        "request": request,
+        "current_user": user,
+        "submitted": False,
+    })
+
+
+@router.post("/contact", response_class=HTMLResponse)
+def contact_submit(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    subject: str = Form(...),
+    message: str = Form(...),
+    user=Depends(get_current_user_optional),
+):
+    # For now, just acknowledge receipt. Real implementation would store or email.
+    return templates.TemplateResponse("contact.html", {
+        "request": request,
+        "current_user": user,
+        "submitted": True,
     })
 
 
@@ -75,14 +73,9 @@ def dashboard(
 def profile(
     request: Request,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
-    total = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.user_id == user.id
-    ).scalar() or 0
-
     return templates.TemplateResponse("profile.html", {
         "request": request,
+        "current_user": user,
         "user": user,
-        "total_attacks": total,
     })

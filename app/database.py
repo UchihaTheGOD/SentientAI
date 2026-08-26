@@ -27,4 +27,5 @@ def init_db():
     import app.models.user  # noqa: F401
     import app.models.security_event  # noqa: F401
     import app.models.training_example  # noqa: F401
+    import app.models.blog_post  # noqa: F401
     Base.metadata.create_all(bind=engine)

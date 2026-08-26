@@ -14,9 +14,16 @@ class Settings:
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+
+    # Sentinel / CyberLLM model integration
     CYBERLLM_API_URL: str = os.getenv("CYBERLLM_API_URL", "")
     CYBERLLM_API_KEY: str = os.getenv("CYBERLLM_API_KEY", "")
+    SENTINEL_MODEL_NAME: str = os.getenv("SENTINEL_MODEL_NAME", "SentinelSmolLM2-360M-V9")
+
+    # Teacher API (external reviewer model)
+    TEACHER_API_KEY: str = os.getenv("TEACHER_API_KEY", "")
+    TEACHER_BASE_URL: str = os.getenv("TEACHER_BASE_URL", "")
+    TEACHER_MODEL: str = os.getenv("TEACHER_MODEL", "")
 
 
 settings = Settings()

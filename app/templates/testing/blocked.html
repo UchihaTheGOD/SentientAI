@@ -1,5 +1,5 @@
-{% extends "base.html" %}
-{% block title %}Request Blocked — SentientAI{% endblock %}
+{% extends "base_testing.html" %}
+{% block title %}Session Blocked — SentientAI Testing{% endblock %}
 
 {% block content %}
 <div class="blocked-container">
@@ -55,6 +55,12 @@
     </div>
     {% endif %}
 
-    <a href="/dashboard" class="btn btn-primary">Return to Dashboard</a>
+    <div style="display:flex;gap:12px;justify-content:center;">
+        <a href="/testing/events/{{ event.id if event else '' }}" class="btn btn-outline">View Analysis</a>
+        <a href="/testing" class="btn btn-primary">Return to Testing</a>
+        {% if lab_id %}
+        <a href="/testing/labs/{{ lab_id }}" class="btn btn-outline">Restart Lab</a>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

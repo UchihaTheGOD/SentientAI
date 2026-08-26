@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SentientAI — Cybersecurity Learning Platform{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}SentientAI is a hands-on cybersecurity learning platform where security research, attack analysis, and practical defense meet.{% endblock %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="public-site">
+    <nav class="public-nav">
+        <div class="container">
+            <a href="/" class="nav-brand">
+                <span class="brand-icon">S</span>
+                SentientAI
+            </a>
+            <button class="nav-toggle" aria-label="Toggle navigation">☰</button>
+            <ul class="nav-links">
+                <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Home</a></li>
+                <li><a href="/about" class="{% if request.url.path == '/about' %}active{% endif %}">About</a></li>
+                <li><a href="/blog" class="{% if '/blog' in request.url.path %}active{% endif %}">Blog</a></li>
+                <li><a href="/contact" class="{% if request.url.path == '/contact' %}active{% endif %}">Contact</a></li>
+                {% if user %}
+                <li class="nav-separator"></li>
+                <li><a href="/profile" class="{% if request.url.path == '/profile' %}active{% endif %}">{{ user.username }}</a></li>
+                {% if user.is_tester %}
+                <li><a href="/testing" class="nav-link-testing">Testing Lab</a></li>
+                {% endif %}
+                <li><a href="/logout">Logout</a></li>
+                {% else %}
+                <li class="nav-separator"></li>
+                <li><a href="/login">Sign In</a></li>
+                <li><a href="/register" class="btn btn-primary btn-sm nav-cta">Register</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <main class="page-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="public-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-section">
+                    <div class="footer-brand">
+                        <span class="brand-icon">S</span>
+                        SentientAI
+                    </div>
+                    <p>A hands-on cybersecurity learning platform for security research, attack analysis, and practical defense.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Platform</h4>
+                    <ul>
+                        <li><a href="/about">About</a></li>
+                        <li><a href="/blog">Blog</a></li>
+                        <li><a href="/contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="/blog?category=Vulnerability+Research">Vulnerability Research</a></li>
+                        <li><a href="/blog?category=Detection+Engineering">Detection Engineering</a></li>
+                        <li><a href="/blog?category=Web+Security">Web Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>&copy; 2024 SentientAI. Cybersecurity research and education.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

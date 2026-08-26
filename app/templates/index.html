@@ -1,38 +1,87 @@
-{% extends "base.html" %}
-{% set user = None %}
-{% block title %}SentientAI — Cybersecurity Training Platform{% endblock %}
+{% extends "base_public.html" %}
+{% set user = current_user %}
+{% block title %}SentientAI — Cybersecurity Learning Platform{% endblock %}
 
 {% block content %}
-<div class="landing-hero">
-    <h1>Learn Cybersecurity.<br><span>Break Things Safely.</span></h1>
-    <p>SentientAI is an interactive cybersecurity training platform with sandboxed labs,
-       real-time attack detection, and AI-powered analysis.</p>
-    <div class="landing-cta">
-        <a href="/register" class="btn btn-primary">Create Account</a>
-        <a href="/login" class="btn btn-outline">Sign In</a>
+<div class="container">
+    <div class="landing-hero">
+        <h1>Learn how attacks happen.<br><span>Understand how to defend against them.</span></h1>
+        <p>SentientAI is a hands-on cybersecurity learning platform where security research, attack analysis, and practical defense meet.</p>
+        <div class="landing-cta">
+            <a href="/register" class="btn btn-primary">Get Started</a>
+            <a href="/about" class="btn btn-outline">Learn More</a>
+        </div>
     </div>
-</div>
 
-<div class="landing-features">
-    <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(57,210,192,0.12);color:var(--accent-cyan);">🔬</div>
-        <h3>Sandboxed Labs</h3>
-        <p>Practice SQL injection, XSS, path traversal, and more in completely isolated environments with fake data.</p>
+    <!-- What SentientAI Offers -->
+    <div class="landing-features">
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(57,210,192,0.12);color:var(--accent-cyan);">⧫</div>
+            <h3>Isolated Security Labs</h3>
+            <p>Practice against realistic but completely sandboxed targets. Test XSS, SQL injection, and more without any risk to real systems.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">▤</div>
+            <h3>Detection & Analysis</h3>
+            <p>Every test generates structured security telemetry. See exactly how attacks are detected, classified, and what evidence supports each finding.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(188,140,255,0.12);color:var(--accent-purple);">◈</div>
+            <h3>Sentinel AI Analysis</h3>
+            <p>Sentinel, our local cybersecurity model, analyzes events and distinguishes between observed facts, inferences, and unknowns.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(88,166,255,0.12);color:var(--accent-blue);">◇</div>
+            <h3>Knowledge Pipeline</h3>
+            <p>Attacks generate knowledge candidates that go through human review before becoming part of the platform's learning base.</p>
+        </div>
     </div>
-    <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">🛡️</div>
-        <h3>Attack Detection</h3>
-        <p>Every action is analyzed by the detection engine. See exactly how attacks are identified and classified.</p>
-    </div>
-    <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(188,140,255,0.12);color:var(--accent-purple);">📊</div>
-        <h3>Educational Analysis</h3>
-        <p>Get detailed explanations of attack techniques, why they work, and how to defend against them.</p>
-    </div>
-    <div class="feature-card">
-        <div class="feature-icon" style="background:rgba(88,166,255,0.12);color:var(--accent-blue);">🤖</div>
-        <h3>AI-Ready Architecture</h3>
-        <p>Built to integrate with CyberLLM/Sentinel for advanced AI-powered security analysis.</p>
-    </div>
+
+    <!-- Latest Articles -->
+    {% if latest_posts %}
+    <section class="home-section">
+        <div class="section-header">
+            <h2 class="section-title">Latest Research</h2>
+            <a href="/blog" class="btn btn-outline btn-sm">View All</a>
+        </div>
+        <div class="blog-grid">
+            {% for post in latest_posts[:3] %}
+            <a href="/blog/{{ post.slug }}" class="blog-card-link">
+                <article class="blog-card">
+                    <div class="blog-card-meta">
+                        <span class="badge badge-cyan">{{ post.category }}</span>
+                        <span class="blog-card-time">{{ post.reading_time }} min read</span>
+                    </div>
+                    <h3>{{ post.title }}</h3>
+                    <p>{{ post.summary }}</p>
+                    <div class="blog-card-footer">
+                        <span class="blog-card-author">{{ post.author }}</span>
+                        <span class="blog-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
+                    </div>
+                </article>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Why SentientAI -->
+    <section class="home-section home-why">
+        <h2>Why SentientAI exists</h2>
+        <div class="why-grid">
+            <div class="why-item">
+                <h3>Real learning, not theory</h3>
+                <p>Security is learned by doing. SentientAI provides controlled environments where you can safely explore how attacks work and practice building defenses.</p>
+            </div>
+            <div class="why-item">
+                <h3>Transparent detection</h3>
+                <p>Every detection decision is explainable. The platform shows you exactly what was observed, what was inferred, and what remains unknown.</p>
+            </div>
+            <div class="why-item">
+                <h3>Human-verified knowledge</h3>
+                <p>Nothing becomes "knowledge" without human review. AI assists with analysis, but humans approve what the platform learns.</p>
+            </div>
+        </div>
+    </section>
 </div>
 {% endblock %}

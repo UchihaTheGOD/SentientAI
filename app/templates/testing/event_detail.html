@@ -1,11 +1,13 @@
-{% extends "base.html" %}
-{% block title %}Event #{{ event.id }} — SentientAI{% endblock %}
+{% extends "base_testing.html" %}
+{% block title %}Event #{{ event.id }} — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span>
+<a href="/testing/events">Events</a> <span class="breadcrumb-sep">›</span>
+<span>Event #{{ event.id }}</span>
+{% endblock %}
 
 {% block content %}
-<div style="margin-bottom:8px;">
-    <a href="/attacks" style="color:var(--text-secondary);font-size:0.9rem;">← Back to History</a>
-</div>
-
 <div class="section-header">
     <h1 class="section-title">Event #{{ event.id }}</h1>
     <div style="display:flex;gap:8px;">
@@ -27,7 +29,7 @@
             <h3>Details</h3>
             <div class="content">
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;font-size:0.9rem;">
-                    <span style="color:var(--text-muted);">Target:</span> <span>{{ event.lab_id }}</span>
+                    <span style="color:var(--text-muted);">Lab:</span> <span>{{ event.lab_id }}</span>
                     <span style="color:var(--text-muted);">Category:</span> <span>{{ event.attack_category or '—' }}</span>
                     <span style="color:var(--text-muted);">Severity:</span> <span>{{ event.severity }}</span>
                     <span style="color:var(--text-muted);">Method:</span> <span>{{ event.method }}</span>
