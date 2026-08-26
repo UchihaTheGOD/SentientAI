@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Event #{{ event.id }} (Admin) — SentientAI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;">
+    <a href="/admin" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Admin</a>
+</div>
+
+<div class="section-header">
+    <h1 class="section-title">Event #{{ event.id }} — Admin View</h1>
+</div>
+
+<div class="grid-2">
+    <div>
+        <div class="result-section">
+            <h3>Event Details</h3>
+            <div class="content">
+                <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;font-size:0.9rem;">
+                    <span style="color:var(--text-muted);">User ID:</span> <span>{{ event.user_id }}</span>
+                    <span style="color:var(--text-muted);">Lab:</span> <span>{{ event.lab_id }}</span>
+                    <span style="color:var(--text-muted);">Category:</span> <span>{{ event.attack_category or '—' }}</span>
+                    <span style="color:var(--text-muted);">Severity:</span> <span>{{ event.severity }}</span>
+                    <span style="color:var(--text-muted);">Detection:</span> <span>{{ event.detection_result }}</span>
+                    <span style="color:var(--text-muted);">Success:</span> <span>{{ event.success }}</span>
+                    <span style="color:var(--text-muted);">Blocked:</span> <span>{{ event.blocked }}</span>
+                    <span style="color:var(--text-muted);">Method:</span> <span>{{ event.method }}</span>
+                    <span style="color:var(--text-muted);">Endpoint:</span> <span class="mono">{{ event.endpoint }}</span>
+                    <span style="color:var(--text-muted);">Time:</span> <span>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') if event.timestamp else '' }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if event.explanation %}
+        <div class="result-section">
+            <h3>Explanation</h3>
+            <div class="content">{{ event.explanation }}</div>
+        </div>
+        {% endif %}
+
+        {% if event.defense_recommendation %}
+        <div class="result-section">
+            <h3>Defense Recommendation</h3>
+            <div class="content">{{ event.defense_recommendation }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        {% if event.sanitized_payload %}
+        <div class="result-section">
+            <h3>Sanitized Payload</h3>
+            <pre>{{ event.sanitized_payload }}</pre>
+        </div>
+        {% endif %}
+
+        {% if raw_json %}
+        <div class="result-section">
+            <h3>Raw Analysis</h3>
+            <pre>{{ raw_json | tojson(indent=2) }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

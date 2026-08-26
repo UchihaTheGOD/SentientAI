@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Attack Result — SentientAI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:8px;">
+    <a href="/labs/{{ result.lab_id }}" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Lab</a>
+</div>
+
+<!-- Result Header -->
+<div class="result-header">
+    <div class="result-icon {% if result.status == 'BLOCKED' %}blocked{% elif result.status == 'SUCCESSFUL' %}success{% elif result.status == 'DETECTED' %}detected{% else %}clean{% endif %}">
+        {% if result.status == 'BLOCKED' %}🚫
+        {% elif result.status == 'SUCCESSFUL' %}✓
+        {% elif result.status == 'DETECTED' %}⚠
+        {% else %}ℹ{% endif %}
+    </div>
+    <div>
+        <h1 style="font-size:1.5rem;">
+            {% if result.detected %}Attack Detected{% else %}No Attack Detected{% endif %}
+        </h1>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+            {% if result.status == 'BLOCKED' %}
+            <span class="badge badge-red">{{ result.status }}</span>
+            {% elif result.status == 'SUCCESSFUL' %}
+            <span class="badge badge-green">{{ result.status }}</span>
+            {% elif result.status == 'DETECTED' %}
+            <span class="badge badge-orange">{{ result.status }}</span>
+            {% else %}
+            <span class="badge badge-blue">{{ result.status }}</span>
+            {% endif %}
+            <span class="badge badge-purple">Event #{{ result.event_id }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div>
+        <!-- Attack Type -->
+        {% if result.detected %}
+        <div class="result-section">
+            <h3>Attack Type</h3>
+            <div class="content">{{ result.attack_type }}</div>
+        </div>
+
+        <div class="result-section">
+            <h3>Severity</h3>
+            <div class="content">
+                {% if result.severity == 'critical' %}
+                <span class="badge badge-red">{{ result.severity }}</span>
+                {% elif result.severity == 'high' %}
+                <span class="badge badge-orange">{{ result.severity }}</span>
+                {% elif result.severity == 'medium' %}
+                <span class="badge badge-blue">{{ result.severity }}</span>
+                {% else %}
+                <span class="badge badge-cyan">{{ result.severity }}</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- What Happened -->
+        <div class="result-section">
+            <h3>What Happened</h3>
+            <div class="content">{{ result.explanation }}</div>
+        </div>
+
+        <!-- Educational Explanation -->
+        {% if result.technique_description %}
+        <div class="result-section">
+            <h3>Educational Explanation</h3>
+            <div class="content">{{ result.technique_description }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Defense Recommendation -->
+        {% if result.defense_recommendation %}
+        <div class="result-section">
+            <h3>Recommended Defense</h3>
+            <div class="content">{{ result.defense_recommendation }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <!-- Lab Output -->
+        <div class="result-section">
+            <h3>Lab Output</h3>
+            <pre>{{ lab_output }}</pre>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:12px;margin-top:20px;">
+            <a href="/labs/{{ result.lab_id }}" class="btn btn-primary">Try Again</a>
+            <a href="/attacks/{{ result.event_id }}" class="btn btn-outline">View Event Detail</a>
+            <a href="/labs" class="btn btn-outline">All Labs</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

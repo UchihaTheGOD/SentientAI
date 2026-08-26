@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Labs — SentientAI{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Training Labs</h1>
+    <span class="badge badge-cyan">{{ labs|length }} Available</span>
+</div>
+
+<p style="color:var(--text-secondary);margin-bottom:28px;">
+    Practice attack techniques against sandboxed targets. All labs use fake data and isolated environments.
+</p>
+
+<div class="grid-3">
+    {% for lab in labs %}
+    <a href="/labs/{{ lab.id }}" style="text-decoration:none;color:inherit;">
+        <div class="lab-card">
+            <h3>{{ lab.name }}</h3>
+            <p>{{ lab.description.split('\n')[2] if lab.description.split('\n')|length > 2 else lab.description[:100] }}</p>
+            <div class="lab-meta">
+                <span class="badge badge-cyan">{{ lab.category }}</span>
+                <span class="badge badge-blue">{{ lab.difficulty }}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if not labs %}
+<div class="empty-state">
+    <div class="icon">🔬</div>
+    <p>No labs available yet.</p>
+</div>
+{% endif %}
+{% endblock %}

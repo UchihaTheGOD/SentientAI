@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% set user = None %}
+{% block title %}SentientAI — Cybersecurity Training Platform{% endblock %}
+
+{% block content %}
+<div class="landing-hero">
+    <h1>Learn Cybersecurity.<br><span>Break Things Safely.</span></h1>
+    <p>SentientAI is an interactive cybersecurity training platform with sandboxed labs,
+       real-time attack detection, and AI-powered analysis.</p>
+    <div class="landing-cta">
+        <a href="/register" class="btn btn-primary">Create Account</a>
+        <a href="/login" class="btn btn-outline">Sign In</a>
+    </div>
+</div>
+
+<div class="landing-features">
+    <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(57,210,192,0.12);color:var(--accent-cyan);">🔬</div>
+        <h3>Sandboxed Labs</h3>
+        <p>Practice SQL injection, XSS, path traversal, and more in completely isolated environments with fake data.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">🛡️</div>
+        <h3>Attack Detection</h3>
+        <p>Every action is analyzed by the detection engine. See exactly how attacks are identified and classified.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(188,140,255,0.12);color:var(--accent-purple);">📊</div>
+        <h3>Educational Analysis</h3>
+        <p>Get detailed explanations of attack techniques, why they work, and how to defend against them.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon" style="background:rgba(88,166,255,0.12);color:var(--accent-blue);">🤖</div>
+        <h3>AI-Ready Architecture</h3>
+        <p>Built to integrate with CyberLLM/Sentinel for advanced AI-powered security analysis.</p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Attack History — SentientAI{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Attack History</h1>
+    <span class="badge badge-blue">{{ events|length }} Events</span>
+</div>
+
+{% if events %}
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Lab</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Severity</th>
+                    <th>Time</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in events %}
+                <tr>
+                    <td class="mono" style="font-size:0.85rem;">#{{ event.id }}</td>
+                    <td>{{ event.lab_id }}</td>
+                    <td>{{ event.attack_category or '—' }}</td>
+                    <td>
+                        {% if event.blocked %}
+                        <span class="badge badge-red">Blocked</span>
+                        {% elif event.success %}
+                        <span class="badge badge-green">Success</span>
+                        {% elif event.detection_result == 'detected' %}
+                        <span class="badge badge-orange">Detected</span>
+                        {% else %}
+                        <span class="badge badge-blue">Clean</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if event.severity == 'critical' %}
+                        <span class="badge badge-red">{{ event.severity }}</span>
+                        {% elif event.severity == 'high' %}
+                        <span class="badge badge-orange">{{ event.severity }}</span>
+                        {% elif event.severity == 'medium' %}
+                        <span class="badge badge-blue">{{ event.severity }}</span>
+                        {% else %}
+                        <span class="badge badge-cyan">{{ event.severity }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:var(--text-muted);font-size:0.85rem;">{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '' }}</td>
+                    <td><a href="/attacks/{{ event.id }}" class="btn btn-outline btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No attack events yet. Complete a lab to generate events.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
