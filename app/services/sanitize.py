@@ -42,7 +42,10 @@ _HR_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _UL_RE = re.compile(r"^\s*[-*+]\s+(.*)$")
 _OL_RE = re.compile(r"^\s*\d{1,3}[.)]\s+(.*)$")
-_QUOTE_RE = re.compile(r"^\s*>\s?(.*)$")
+# Block grouping runs *after* html.escape (step 2 of `render_content`), so the
+# quote marker arrives as `&gt;`, not `>`. Both spellings are accepted so the
+# regex does not silently stop matching if that order ever changes.
+_QUOTE_RE = re.compile(r"^\s*(?:&gt;|>)\s?(.*)$")
 
 
 def safe_url(raw: str | None, allow_relative: bool = True) -> str:

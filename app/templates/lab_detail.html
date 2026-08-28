@@ -31,6 +31,7 @@
             <span class="card-title">Test Input</span>
         </div>
         <form method="post" action="/api/lab/{{ lab.id }}/submit" class="lab-form">
+          {{ csrf_input() }}
             <div class="form-group">
                 <label for="payload">Enter your payload</label>
                 <textarea id="payload" name="payload" class="form-control" rows="6"

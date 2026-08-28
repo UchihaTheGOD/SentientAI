@@ -978,3 +978,127 @@ a:hover .post-card-title { color: var(--accent); }
   .post-card { flex-direction: column; }
   .post-cover-thumb { width: 100%; height: 160px; }
 }
+
+/* ============================================================
+   Error pages
+   ============================================================ */
+.error-page { padding: var(--space-3xl) var(--space-lg); text-align: center; }
+.error-code {
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: var(--space-md);
+}
+.error-title {
+  font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;
+  line-height: 1.2; margin-bottom: var(--space-md);
+}
+.error-text {
+  color: var(--text-muted); font-size: 1rem; max-width: 44ch;
+  margin: 0 auto var(--space-xl);
+}
+.error-actions { display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap; }
+
+/* ============================================================
+   Rendered user content — extra elements the sanitizer emits
+   ============================================================ */
+.post-body h4 { font-family: var(--font-sans); font-weight: 700; font-size: 1.05rem; margin: 1.75em 0 0.6em; }
+.post-body hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+.post-body pre code { white-space: pre; }
+.post-body img { border-radius: var(--radius); margin: 1.5em 0; }
+
+/* Comment bodies use the same renderer but at UI scale, not article scale. */
+.comment-body { font-size: 0.925rem; line-height: 1.65; color: var(--text-secondary); }
+.comment-body p { margin-bottom: 0.7em; }
+.comment-body p:last-child { margin-bottom: 0; }
+.comment-body ul, .comment-body ol { margin: 0.6em 0 0.6em 1.35em; }
+.comment-body code { font-family: var(--font-mono); background: var(--bg-subtle); padding: 1px 5px; border-radius: 4px; font-size: 0.86em; }
+.comment-body pre { background: var(--bg-subtle); border: 1px solid var(--border); padding: var(--space-md); border-radius: var(--radius-sm); overflow-x: auto; margin: 0.8em 0; }
+.comment-body pre code { background: none; padding: 0; }
+.comment-body blockquote { border-left: 2px solid var(--border); padding-left: var(--space-md); color: var(--text-muted); margin: 0.8em 0; }
+.comment-body a { color: var(--accent); text-decoration: underline; }
+.comment-body h2, .comment-body h3, .comment-body h4 { font-size: 1rem; font-weight: 600; margin: 1em 0 0.4em; }
+
+/* ============================================================
+   Notification badge
+   ============================================================ */
+.notif-btn { position: relative; }
+.notif-badge {
+  position: absolute; top: -2px; right: -2px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff;
+  font-size: 0.66rem; font-weight: 700; line-height: 1;
+  border-radius: var(--radius-pill); border: 2px solid var(--bg);
+}
+
+/* ============================================================
+   Pagination
+   ============================================================ */
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-xs);
+  margin-top: var(--space-2xl); flex-wrap: wrap;
+}
+.page-link {
+  min-width: 36px; height: 36px; padding: 0 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);
+  background: var(--bg); transition: border-color 0.15s, color 0.15s;
+}
+.page-link:hover { border-color: var(--accent); color: var(--accent); }
+.page-link--current {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  pointer-events: none;
+}
+.page-link--disabled { color: var(--text-faint); pointer-events: none; opacity: 0.55; }
+.page-gap { color: var(--text-faint); padding: 0 4px; }
+.page-status { font-size: 0.8rem; color: var(--text-muted); margin-left: var(--space-sm); }
+
+/* ============================================================
+   Notices — draft banner, hidden-post banner, inline callouts
+   ============================================================ */
+.notice {
+  display: flex; align-items: flex-start; gap: var(--space-sm);
+  padding: var(--space-md); border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: var(--radius-sm); background: var(--bg-subtle);
+  font-size: 0.875rem; color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+}
+.notice strong { color: var(--text-primary); }
+.notice--warning { border-left-color: var(--warning); background: #fffbeb; }
+.notice--danger { border-left-color: var(--danger); background: #fef2f2; }
+.notice--info { border-left-color: var(--info); background: #eff6ff; }
+.notice-actions { margin-left: auto; display: flex; gap: var(--space-sm); flex-shrink: 0; }
+
+/* ============================================================
+   Tag editor (write page) + tag pills
+   ============================================================ */
+.tag-field { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: var(--radius-pill);
+  background: var(--bg-subtle); border: 1px solid var(--border);
+  font-size: 0.78rem; color: var(--text-secondary);
+}
+.tag-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============================================================
+   Inline forms (single-button POSTs inside lists)
+   ============================================================ */
+.inline-form { display: inline; }
+.link-btn {
+  background: none; border: none; padding: 0; font: inherit;
+  color: var(--text-muted); cursor: pointer;
+}
+.link-btn:hover { color: var(--accent); }
+.link-btn--danger:hover { color: var(--danger); }
+
+/* ============================================================
+   Breadcrumbs
+   ============================================================ */
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 0.8rem; color: var(--text-muted); margin-bottom: var(--space-md);
+}
+.breadcrumb a:hover { color: var(--accent); }
+.breadcrumb-sep { color: var(--text-faint); }

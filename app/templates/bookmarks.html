@@ -3,35 +3,46 @@
 
 {% block content %}
 <div class="bookmarks-page">
-  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-xl);">Bookmarks</h1>
+
+  <div class="page-head">
+    <h1 class="page-title">Bookmarks</h1>
+    {% if page.total %}
+    <p class="page-lead">{{ page.total }} saved post{{ 's' if page.total != 1 }}</p>
+    {% endif %}
+  </div>
 
   {% if bookmarked_posts %}
-  <p class="text-sm text-muted" style="margin-bottom:var(--space-lg);">{{ bookmarked_posts|length }} saved post{{ 's' if bookmarked_posts|length != 1 }}</p>
   {% for post in bookmarked_posts %}
-  <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-    <div class="post-card">
-      <div class="post-card-body">
-        <div class="post-card-meta">
-          <div class="post-card-author">
-            <div class="author-avatar">{{ post.author[0]|upper }}</div>
-            <span>{{ post.author }}</span>
-          </div>
-          <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
+  {# The remove-bookmark form sits beside the link rather than inside it — a
+     form nested in an anchor is invalid markup and swallows the click. #}
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-meta">
+        <div class="post-card-author">
+          <div class="author-avatar">{{ post.author[0]|upper }}</div>
+          <span>{{ post.author }}</span>
         </div>
-        <h2 class="post-card-title">{{ post.title }}</h2>
-        <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-        <div class="post-card-footer">
-          <span class="post-card-stat">{{ post.reading_time }} min read</span>
-          <form method="POST" action="/blog/{{ post.slug }}/bookmark" style="display:inline;margin-left:auto;" onclick="event.stopPropagation()">
-            <button type="submit" class="comment-action-btn text-accent" title="Remove bookmark">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-            </button>
-          </form>
-        </div>
+        <a href="/explore?category={{ post.category|urlencode }}" class="tag" style="margin-left:auto;">{{ post.category }}</a>
+      </div>
+      <h2 class="post-card-title">
+        <a href="/blog/{{ post.slug }}" style="color:inherit;text-decoration:none;">{{ post.title }}</a>
+      </h2>
+      <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+      <div class="post-card-footer">
+        <span class="post-card-stat">{{ post.reading_time }} min read</span>
+        <form method="POST" action="/blog/{{ post.slug }}/bookmark" style="margin-left:auto;">
+          {{ csrf_input() }}
+          <button type="submit" class="comment-action-btn text-accent" title="Remove bookmark">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Remove
+          </button>
+        </form>
       </div>
     </div>
-  </a>
+  </div>
   {% endfor %}
+
+  {% include "partials/pagination.html" with context %}
   {% else %}
   <div class="empty-state">
     <div class="empty-state-icon">🔖</div>

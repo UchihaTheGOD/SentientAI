@@ -14,6 +14,7 @@
 
         <div class="card">
             <form method="post" action="/contact">
+              {{ csrf_input() }}
                 <div class="form-group">
                     <label for="contact_name">Name</label>
                     <input type="text" id="contact_name" name="name" class="form-control" required maxlength="100">

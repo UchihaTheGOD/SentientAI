@@ -1,8 +1,7 @@
 """Admin panel routes — stats, event review, training example management."""
 import json
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -10,11 +9,13 @@ from app.database import get_db
 from app.models.user import User
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
+from app.services import audit
 from app.services.auth_service import require_admin
+from app.services.sanitize import clean_text
 from app.services import training as training_service
+from app.template_env import templates
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -98,20 +99,44 @@ def admin_event_detail(
 @router.post("/training/{example_id}/approve")
 def approve_training(
     example_id: int,
+    request: Request,
+    note: str = Form(""),
+    label: str = Form(""),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    training_service.approve_example(db, example_id, user.id)
+    example = training_service.approve_example(
+        db, example_id, user.id,
+        note=clean_text(note, 500) or None,
+        human_label=clean_text(label, 80) or None,
+    )
+    if example is None:
+        raise HTTPException(status_code=404, detail="Training example not found.")
+    audit.record(db, "training.candidate_approved", user=user,
+                 target_type="training_example", target_id=str(example_id),
+                 detail=f"status={example.status}", request=request)
     return RedirectResponse(url="/admin", status_code=303)
 
 
 @router.post("/training/{example_id}/reject")
 def reject_training(
     example_id: int,
+    request: Request,
+    reason: str = Form("other"),
+    note: str = Form(""),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    training_service.reject_example(db, example_id)
+    # Rejection keeps the row (see app/services/training.py) so the reason a
+    # candidate was filtered out stays available for error analysis.
+    example = training_service.reject_example(
+        db, example_id, user.id, reason=reason, note=clean_text(note, 500) or None,
+    )
+    if example is None:
+        raise HTTPException(status_code=404, detail="Training example not found.")
+    audit.record(db, "training.candidate_rejected", user=user,
+                 target_type="training_example", target_id=str(example_id),
+                 detail=f"reason={reason}", request=request)
     return RedirectResponse(url="/admin", status_code=303)
 
 

@@ -1,0 +1,33 @@
+{#
+  Shared pager. Callers pass:
+    page   — a services.pagination.Page
+    params — dict of current querystring params to preserve (optional)
+#}
+{% if page.pages > 1 %}
+{% set qs = params or {} %}
+<nav class="pagination" aria-label="Pagination">
+    {% if page.has_prev %}
+    <a class="page-link" href="{{ query_string(qs, page=page.prev_page) or '?' }}" rel="prev" aria-label="Previous page">←</a>
+    {% else %}
+    <span class="page-link page-link--disabled" aria-hidden="true">←</span>
+    {% endif %}
+
+    {% for number in page.window %}
+        {% if number is none %}
+        <span class="page-gap">…</span>
+        {% elif number == page.page %}
+        <span class="page-link page-link--current" aria-current="page">{{ number }}</span>
+        {% else %}
+        <a class="page-link" href="{{ query_string(qs, page=number) or '?' }}">{{ number }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page.has_next %}
+    <a class="page-link" href="{{ query_string(qs, page=page.next_page) or '?' }}" rel="next" aria-label="Next page">→</a>
+    {% else %}
+    <span class="page-link page-link--disabled" aria-hidden="true">→</span>
+    {% endif %}
+
+    <span class="page-status">{{ page.start_index }}–{{ page.end_index }} of {{ page.total }}</span>
+</nav>
+{% endif %}

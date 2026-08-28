@@ -1,26 +1,33 @@
 """Testing environment routes — overview, labs, sessions, events.
 
-All routes require tester or admin role.
+This whole area is private. Every route depends on `require_lab_access`, so
+an anonymous or suspended request never reaches a handler — the gate is the
+dependency, not a hidden nav link. Any authenticated account in good standing
+may use the labs; the labs themselves stay sandboxed (in-memory fixtures, no
+shell, no filesystem, no outbound network) and only ever target this
+application.
 """
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
 from app.models.user import User
 from app.models.lab_session import LabSession
+from app.models.learning import CANDIDATE
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
-from app.services.auth_service import require_tester
+from app.services import audit
+from app.services.auth_service import require_lab_access
 from app.services.analysis import analyze_lab_submission
+from app.services.ratelimit import limit_analysis
 from app.labs import list_labs, get_lab
 from app.config import settings
+from app.template_env import templates
 
 router = APIRouter(prefix="/testing", tags=["testing"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +37,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("", response_class=HTMLResponse)
 def testing_overview(
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     total_events = db.query(func.count(SecurityEvent.id)).filter(
@@ -43,7 +50,7 @@ def testing_overview(
     ).scalar() or 0
 
     pending_knowledge = db.query(func.count(TrainingExample.id)).filter(
-        TrainingExample.approved == False
+        TrainingExample.status == CANDIDATE
     ).scalar() or 0
 
     active_sessions = db.query(func.count(LabSession.id)).filter(
@@ -91,7 +98,7 @@ def testing_overview(
 @router.get("/labs", response_class=HTMLResponse)
 def testing_labs(
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
 ):
     labs = list_labs()
     return templates.TemplateResponse("testing/labs.html", {
@@ -105,7 +112,7 @@ def testing_labs(
 def testing_lab_detail(
     lab_id: str,
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     lab = get_lab(lab_id)
@@ -122,6 +129,9 @@ def testing_lab_detail(
     db.add(session)
     db.commit()
     db.refresh(session)
+    audit.record(db, "testing.session_started", user=user,
+                 target_type="lab_session", target_id=session.session_id,
+                 detail=f"lab={lab_id}", request=request)
 
     # Use the realistic target template for xss_stored; generic form for others
     if lab_id == "xss_stored":
@@ -138,13 +148,14 @@ def testing_lab_detail(
     })
 
 
-@router.post("/labs/{lab_id}/submit", response_class=HTMLResponse)
+@router.post("/labs/{lab_id}/submit", response_class=HTMLResponse,
+             dependencies=[Depends(limit_analysis)])
 def testing_lab_submit(
     lab_id: str,
     request: Request,
     payload: str = Form(...),
     session_id: str = Form(""),
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     lab = get_lab(lab_id)
@@ -206,6 +217,10 @@ def testing_lab_submit(
         db.commit()
 
         if result["blocked"]:
+            audit.record(db, "testing.session_ended", user=user,
+                         target_type="lab_session", target_id=session.session_id,
+                         detail=f"blocked: {result.get('attack_type', 'unknown')}",
+                         request=request)
             return RedirectResponse(
                 url=f"/testing/session-ended/{session.session_id}",
                 status_code=303,
@@ -235,7 +250,7 @@ def testing_lab_submit(
 @router.get("/sessions", response_class=HTMLResponse)
 def testing_sessions_list(
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     sessions = (
@@ -257,7 +272,7 @@ def testing_sessions_list(
 def testing_session_timeline(
     session_id: str,
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     session = (
@@ -294,7 +309,7 @@ def testing_session_timeline(
 def testing_session_ended(
     session_id: str,
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     session = (
@@ -344,7 +359,7 @@ def testing_session_ended(
 @router.get("/events", response_class=HTMLResponse)
 def testing_events(
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     events = (
@@ -366,7 +381,7 @@ def testing_events(
 def testing_event_detail(
     event_id: int,
     request: Request,
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     event = (
@@ -404,7 +419,7 @@ def testing_blocked(
     request: Request,
     event_id: int = Query(0),
     lab_id: str = Query(""),
-    user: User = Depends(require_tester),
+    user: User = Depends(require_lab_access),
     db: Session = Depends(get_db),
 ):
     event = None

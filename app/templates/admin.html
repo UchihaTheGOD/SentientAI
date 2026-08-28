@@ -131,9 +131,11 @@
             </div>
             <div class="admin-actions">
                 <form method="post" action="/admin/training/{{ ex.id }}/approve" style="display:inline;">
+                  {{ csrf_input() }}
                     <button type="submit" class="btn btn-success btn-sm">Approve</button>
                 </form>
                 <form method="post" action="/admin/training/{{ ex.id }}/reject" style="display:inline;">
+                  {{ csrf_input() }}
                     <button type="submit" class="btn btn-danger btn-sm">Reject</button>
                 </form>
             </div>
