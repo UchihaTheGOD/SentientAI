@@ -1,17 +1,20 @@
 {% extends "base_public.html" %}
-{% set user = None %}
-{% block title %}Access Denied — SentientAI{% endblock %}
+{% block title %}Not available — Sentient{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="blocked-container">
-        <div class="blocked-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">⚠</div>
-        <h1>Access Denied</h1>
-        <p>You don't have permission to access this page. The testing environment requires a tester or admin account.</p>
-        <div style="display:flex;gap:12px;justify-content:center;">
-            <a href="/" class="btn btn-primary">Go Home</a>
-            <a href="/login" class="btn btn-outline">Sign In</a>
-        </div>
+<div class="container container--narrow error-page">
+    <p class="error-code">403</p>
+    <h1 class="error-title">You don't have access to this page</h1>
+    <p class="error-text">
+        {{ detail or "Your account doesn't have permission to view this. If you think that's a mistake, sign in with a different account." }}
+    </p>
+    <div class="error-actions">
+        <a href="/" class="btn btn-primary">Back home</a>
+        {% if not current_user %}
+        <a href="/login" class="btn btn-outline">Sign in</a>
+        {% else %}
+        <a href="/dashboard" class="btn btn-outline">Your dashboard</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -463,6 +463,7 @@
             <div class="nb-comment-form">
                 <label for="payload">Add a comment</label>
                 <form method="post" action="/testing/labs/xss_stored/submit">
+                  {{ csrf_input() }}
                     <input type="hidden" name="session_id" value="{{ session.session_id }}">
                     <textarea
                         id="payload"

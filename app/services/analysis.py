@@ -5,8 +5,10 @@ from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.learning import CANDIDATE
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
+from app.services import training
 from app.services.detection import detect, DetectionResult
 from app.services.cyberllm_client import get_cyberllm_client
 
@@ -73,7 +75,10 @@ def analyze_lab_submission(
     db.commit()
     db.refresh(event)
 
-    # 4) Generate training example
+    # 4) Generate training example.
+    #    It is stored as a CANDIDATE only. Nothing here sets `approved` or
+    #    `safe_to_train` — that needs an admin review (app/services/training.py),
+    #    so no user input can put itself into the training set.
     training_data = client.generate_training_example(event_data)
     training_example = TrainingExample(
         event_id=event.id,
@@ -84,6 +89,15 @@ def analyze_lab_submission(
         severity=training_data["severity"],
         source=training_data["source"],
         approved=False,
+        status=CANDIDATE,
+        safe_to_train=False,
+        # What the pipeline thought, kept separate from any human label so the
+        # two can be compared later.
+        model_prediction=detection.attack_category if detection.detected else "none",
+        provenance="lab_submission",
+        dedup_hash=training.dedup_hash(
+            training_data["instruction"], training_data["input"]
+        ),
     )
     db.add(training_example)
     db.commit()

@@ -1,0 +1,91 @@
+{% extends "base_public.html" %}
+{% block title %}Your activity — Sentient{% endblock %}
+
+{#
+  Presentation-only labels. The stored `activity_type` values are the vocabulary
+  in `app.models.activity.ACTIVITY_TYPES`; anything not listed here falls back to
+  the raw type with underscores replaced, so a new type is readable on day one
+  without a template change.
+#}
+{% set labels = {
+  "account_created": "Joined Sentient",
+  "blog_post_created": "Drafted a post",
+  "blog_post_updated": "Updated a post",
+  "blog_post_published": "Published a post",
+  "profile_updated": "Updated profile",
+  "lab_started": "Started a session",
+  "lab_completed": "Completed a session",
+  "lab_attempt": "Ran a test",
+  "attack_detected": "Detection recorded",
+  "attack_blocked": "Session blocked",
+  "session_terminated": "Session ended",
+  "cyberllm_interaction": "Analysis requested",
+  "training_example_generated": "Candidate recorded",
+  "training_example_approved": "Candidate approved",
+  "training_example_rejected": "Candidate rejected"
+} %}
+
+{% block content %}
+<div class="page-wrap page-wrap--narrow activity-page">
+
+  <div class="page-head">
+    <h1 class="page-title">Your activity</h1>
+    <p class="page-lead">
+      Everything on this page is yours alone. Entries marked private are never
+      shown on your public profile.
+    </p>
+  </div>
+
+  {% if used_kinds %}
+  <div class="filter-row" role="group" aria-label="Filter activity by type">
+    <a class="filter-chip {% if not selected_kind %}filter-chip--active{% endif %}"
+       href="/activity">All</a>
+    {% for kind in used_kinds %}
+    <a class="filter-chip {% if selected_kind == kind %}filter-chip--active{% endif %}"
+       href="/activity?kind={{ kind|urlencode }}">
+      {{ labels.get(kind, kind.replace('_', ' ')|capitalize) }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if activities %}
+  <ol class="activity-list">
+    {% for item in activities %}
+    <li class="activity-item">
+      <div class="activity-item-main">
+        <span class="activity-item-label">
+          {{ labels.get(item.activity_type, item.activity_type.replace('_', ' ')|capitalize) }}
+        </span>
+        {% if not item.is_public %}
+        <span class="badge badge--muted" title="Not shown on your public profile">Private</span>
+        {% endif %}
+      </div>
+      {% if item.description %}
+      <p class="activity-item-desc">{{ item.description }}</p>
+      {% endif %}
+      <time class="activity-item-time" datetime="{{ item.created_at.isoformat() }}">
+        {{ item.created_at.strftime('%d %b %Y, %H:%M') }}
+      </time>
+    </li>
+    {% endfor %}
+  </ol>
+
+  {% include "partials/pagination.html" with context %}
+  {% else %}
+  <div class="empty-state">
+    <h3>{% if selected_kind %}Nothing of that kind yet{% else %}No activity yet{% endif %}</h3>
+    <p>
+      {% if selected_kind %}
+      You have no entries of this type. <a href="/activity">Show everything</a>.
+      {% else %}
+      Publishing a post, editing your profile or following someone will show up here.
+      {% endif %}
+    </p>
+    {% if not selected_kind %}
+    <a href="/write" class="btn btn-primary">Write your first post</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

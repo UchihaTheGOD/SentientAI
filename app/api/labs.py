@@ -1,7 +1,6 @@
 """Lab routes — listing, detail pages, and submission endpoint."""
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,9 +8,9 @@ from app.models.user import User
 from app.services.auth_service import get_current_user
 from app.services.analysis import analyze_lab_submission
 from app.labs import list_labs, get_lab
+from app.template_env import templates
 
 router = APIRouter(tags=["labs"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/labs", response_class=HTMLResponse)

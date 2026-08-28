@@ -68,7 +68,7 @@
       <a href="/u/{{ u.username }}" style="text-decoration:none;">
         <div class="author-item card" style="margin-bottom:var(--space-sm);">
           <div class="author-avatar author-avatar--xl">
-            {% if u.avatar_url %}<img src="{{ u.avatar_url }}" alt="">{% else %}{{ u.display[0]|upper }}{% endif %}
+            {% if u.avatar_url | safe_url %}<img src="{{ u.avatar_url | safe_url }}" alt="">{% else %}{{ u.display[0]|upper }}{% endif %}
           </div>
           <div class="author-item-info">
             <div class="author-item-name" style="font-size:1rem;">{{ u.display }}</div>

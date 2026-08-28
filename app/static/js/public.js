@@ -40,12 +40,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---- Prevent double-submit ----
+  // The clicked button is deliberately NOT disabled inside the submit handler:
+  // the browser builds the form data after this event runs, and a disabled
+  // submitter is left out of it — which would silently drop fields like the
+  // publish/draft choice. Mark the form instead, then disable on the next tick.
   document.querySelectorAll('form[data-once]').forEach(form => {
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.submitting === 'true') {
+        event.preventDefault();
+        return;
+      }
+      form.dataset.submitting = 'true';
       form.querySelectorAll('[type=submit]').forEach(btn => {
-        btn.disabled = true;
-        btn.textContent = btn.dataset.loading || 'Saving…';
+        if (btn.dataset.loading) btn.textContent = btn.dataset.loading;
+        btn.classList.add('is-busy');
       });
+      setTimeout(() => {
+        form.querySelectorAll('[type=submit]').forEach(btn => { btn.disabled = true; });
+      }, 0);
     });
   });
 

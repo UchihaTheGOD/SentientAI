@@ -1,16 +1,15 @@
 """Attack history and blocked page routes."""
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.models.security_event import SecurityEvent
 from app.services.auth_service import get_current_user
+from app.template_env import templates
 
 router = APIRouter(tags=["attacks"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/attacks", response_class=HTMLResponse)

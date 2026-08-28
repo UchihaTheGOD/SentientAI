@@ -69,6 +69,17 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if user.is_suspended:
+        # A suspended account is authenticated but must not act. 403 (not 401)
+        # so the user is told why instead of being bounced to a login form they
+        # can complete successfully.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This account has been suspended"
+                + (f": {user.suspension_reason}" if user.suspension_reason else ".")
+            ),
+        )
     return user
 
 
@@ -80,12 +91,24 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
         return None
 
 
+def require_lab_access(user: User = Depends(get_current_user)) -> User:
+    """Gate for the private /testing area.
+
+    Any authenticated, active, non-suspended account may use the labs — the
+    suspension and activity checks live in `get_current_user`, so reaching this
+    dependency already means the account is in good standing. Kept as a named
+    dependency (rather than using `get_current_user` directly) so the policy for
+    the whole testing area can be tightened in exactly one place.
+    """
+    return user
+
+
 def require_tester(user: User = Depends(get_current_user)) -> User:
-    """Dependency that ensures current user has tester or admin role."""
+    """Elevated role gate — for surfaces beyond the ordinary lab experience."""
     if user.role not in ("tester", "admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Testing environment access requires a tester or admin account.",
+            detail="This area requires a tester or admin account.",
         )
     return user
 

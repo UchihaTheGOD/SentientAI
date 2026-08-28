@@ -1,0 +1,65 @@
+{% extends "base_public.html" %}
+{% block title %}Report content — Sentient{% endblock %}
+{% block meta_description %}Report content that breaks the community guidelines.{% endblock %}
+
+{% block content %}
+<div class="form-page">
+  {% if submitted %}
+  <div class="notice notice--info">
+    <h1 class="form-page-title">Thanks — we've got it</h1>
+    <p>
+      A moderator will review this. We don't share who reported what, and we
+      won't email you about the outcome.
+    </p>
+    <div class="notice-actions">
+      <a href="{{ target_url }}" class="btn btn-ghost">Back to the content</a>
+      <a href="/" class="btn btn-primary">Home</a>
+    </div>
+  </div>
+  {% else %}
+  <h1 class="form-page-title">Report this {{ target_type }}</h1>
+  <p class="form-page-lead">
+    Tell us what's wrong and a moderator will take a look. Reports are private.
+  </p>
+
+  {% if target_label %}
+  <div class="notice">
+    <span class="text-muted text-sm">You're reporting</span>
+    <div class="report-target">{{ target_label }}</div>
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/report" data-once>
+    {{ csrf_input() }}
+    <input type="hidden" name="target_type" value="{{ target_type }}">
+    <input type="hidden" name="target_id" value="{{ target_id }}">
+
+    <fieldset class="form-group">
+      <legend class="form-label">Reason</legend>
+      {% for reason in reasons %}
+      <label class="radio-row">
+        <input type="radio" name="reason" value="{{ reason }}" required>
+        <span>{{ reason_labels[reason] }}</span>
+      </label>
+      {% endfor %}
+    </fieldset>
+
+    <div class="form-group">
+      <label class="form-label" for="details">Anything else? <span class="text-muted">(optional)</span></label>
+      <textarea id="details" name="details" class="form-textarea" rows="4"
+                maxlength="1000" placeholder="Add context that would help a moderator."></textarea>
+      <div class="form-hint">Max 1000 characters.</div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ target_url }}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-loading="Sending…">Submit report</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -155,8 +155,8 @@
         {% for author, count in popular_authors %}
         <a href="/u/{{ author.username }}" class="author-item">
           <div class="author-avatar author-avatar--lg">
-            {% if author.avatar_url %}
-            <img src="{{ author.avatar_url }}" alt="{{ author.display }}">
+            {% if author.avatar_url | safe_url %}
+            <img src="{{ author.avatar_url | safe_url }}" alt="{{ author.display }}">
             {% else %}
             {{ author.display[0]|upper }}
             {% endif %}

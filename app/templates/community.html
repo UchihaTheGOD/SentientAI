@@ -77,7 +77,7 @@
         {% for author, count in top_contributors %}
         <a href="/u/{{ author.username }}" class="author-item">
           <div class="author-avatar author-avatar--lg">
-            {% if author.avatar_url %}<img src="{{ author.avatar_url }}" alt="">{% else %}{{ author.display[0]|upper }}{% endif %}
+            {% if author.avatar_url | safe_url %}<img src="{{ author.avatar_url | safe_url }}" alt="">{% else %}{{ author.display[0]|upper }}{% endif %}
           </div>
           <div class="author-item-info">
             <div class="author-item-name">{{ author.display }}</div>

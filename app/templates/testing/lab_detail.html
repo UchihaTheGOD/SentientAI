@@ -46,6 +46,7 @@
             <span class="card-title">Test Input</span>
         </div>
         <form method="post" action="/testing/labs/{{ lab.id }}/submit" class="lab-form">
+          {{ csrf_input() }}
             {% if session %}
             <input type="hidden" name="session_id" value="{{ session.session_id }}">
             {% endif %}
