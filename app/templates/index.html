@@ -1,87 +1,195 @@
 {% extends "base_public.html" %}
 {% set user = current_user %}
-{% block title %}SentientAI — Cybersecurity Learning Platform{% endblock %}
+{% block title %}Sentient — Read. Write. Connect.{% endblock %}
+{% block meta_description %}A community platform for writers, thinkers, and builders. Discover ideas, share your work, and connect with people who care about the same things you do.{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="landing-hero">
-        <h1>Learn how attacks happen.<br><span>Understand how to defend against them.</span></h1>
-        <p>SentientAI is a hands-on cybersecurity learning platform where security research, attack analysis, and practical defense meet.</p>
-        <div class="landing-cta">
-            <a href="/register" class="btn btn-primary">Get Started</a>
-            <a href="/about" class="btn btn-outline">Learn More</a>
-        </div>
+
+{# ---- Hero ---- #}
+<section style="background: var(--bg); padding-bottom: 0;">
+  <div style="max-width:1200px;margin:0 auto;padding:0 var(--space-lg);">
+    <div class="home-hero">
+      <h1>A place for ideas worth reading.</h1>
+      <p>Discover essays, tutorials, projects, and perspectives from a community of curious people. Write something. Read something. Connect with someone.</p>
+      <div class="hero-actions">
+        {% if not current_user %}
+        <a href="/register" class="btn btn-primary btn-lg">Start reading — free</a>
+        <a href="/explore" class="btn btn-ghost btn-lg">Browse posts</a>
+        {% else %}
+        <a href="/write" class="btn btn-primary btn-lg">Write something</a>
+        <a href="/feed" class="btn btn-ghost btn-lg">Your feed</a>
+        {% endif %}
+      </div>
     </div>
 
-    <!-- What SentientAI Offers -->
-    <div class="landing-features">
-        <div class="feature-card">
-            <div class="feature-icon" style="background:rgba(57,210,192,0.12);color:var(--accent-cyan);">⧫</div>
-            <h3>Isolated Security Labs</h3>
-            <p>Practice against realistic but completely sandboxed targets. Test XSS, SQL injection, and more without any risk to real systems.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">▤</div>
-            <h3>Detection & Analysis</h3>
-            <p>Every test generates structured security telemetry. See exactly how attacks are detected, classified, and what evidence supports each finding.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon" style="background:rgba(188,140,255,0.12);color:var(--accent-purple);">◈</div>
-            <h3>Sentinel AI Analysis</h3>
-            <p>Sentinel, our local cybersecurity model, analyzes events and distinguishes between observed facts, inferences, and unknowns.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon" style="background:rgba(88,166,255,0.12);color:var(--accent-blue);">◇</div>
-            <h3>Knowledge Pipeline</h3>
-            <p>Attacks generate knowledge candidates that go through human review before becoming part of the platform's learning base.</p>
-        </div>
+    {# Stats #}
+    {% if total_posts > 0 or total_users > 0 %}
+    <div class="home-stats">
+      <div class="stat-item">
+        <span class="stat-num">{{ total_posts or 0 }}</span>
+        <span class="stat-label">Posts</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">{{ total_users or 0 }}</span>
+        <span class="stat-label">Members</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">{{ categories|length }}</span>
+        <span class="stat-label">Topics</span>
+      </div>
     </div>
+    {% endif %}
+  </div>
+</section>
 
-    <!-- Latest Articles -->
-    {% if latest_posts %}
-    <section class="home-section">
-        <div class="section-header">
-            <h2 class="section-title">Latest Research</h2>
-            <a href="/blog" class="btn btn-outline btn-sm">View All</a>
-        </div>
-        <div class="blog-grid">
-            {% for post in latest_posts[:3] %}
-            <a href="/blog/{{ post.slug }}" class="blog-card-link">
-                <article class="blog-card">
-                    <div class="blog-card-meta">
-                        <span class="badge badge-cyan">{{ post.category }}</span>
-                        <span class="blog-card-time">{{ post.reading_time }} min read</span>
-                    </div>
-                    <h3>{{ post.title }}</h3>
-                    <p>{{ post.summary }}</p>
-                    <div class="blog-card-footer">
-                        <span class="blog-card-author">{{ post.author }}</span>
-                        <span class="blog-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
-                    </div>
-                </article>
-            </a>
-            {% endfor %}
-        </div>
-    </section>
+{# ---- Categories ---- #}
+<section style="padding: var(--space-xl) 0; border-bottom: 1px solid var(--border);">
+  <div style="max-width:1200px;margin:0 auto;padding:0 var(--space-lg);">
+    <div style="overflow-x:auto;">
+      <div style="display:flex;gap:var(--space-sm);white-space:nowrap;padding-bottom:var(--space-xs);">
+        <a href="/explore" class="filter-tab active">All</a>
+        {% for cat in categories %}
+        <a href="/explore?category={{ cat|urlencode }}" class="filter-tab">{{ cat }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Main layout ---- #}
+<div class="home-layout" style="padding-top: var(--space-2xl);">
+
+  {# Main column #}
+  <main>
+
+    {# Featured #}
+    {% if featured_posts %}
+    <div style="margin-bottom:var(--space-2xl);">
+      <div class="section-title">Featured</div>
+      <div class="post-grid">
+        {% for post in featured_posts %}
+        <a href="/blog/{{ post.slug }}" style="text-decoration:none;">
+          <div class="post-grid-card">
+            <div class="post-grid-card-body">
+              <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-sm);">
+                <span class="tag">{{ post.category }}</span>
+                <span class="text-xs text-muted">{{ post.reading_time }} min read</span>
+              </div>
+              <h3 class="post-grid-card-title">{{ post.title }}</h3>
+              <p class="post-grid-card-excerpt">{{ post.display_excerpt }}</p>
+              <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                <div class="author-avatar">
+                  <span>{{ post.author[0]|upper }}</span>
+                </div>
+                <span class="text-sm text-muted">{{ post.author }}</span>
+                <span class="text-xs text-faint" style="margin-left:auto;">{{ post.views or 0 }} views</span>
+              </div>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
     {% endif %}
 
-    <!-- Why SentientAI -->
-    <section class="home-section home-why">
-        <h2>Why SentientAI exists</h2>
-        <div class="why-grid">
-            <div class="why-item">
-                <h3>Real learning, not theory</h3>
-                <p>Security is learned by doing. SentientAI provides controlled environments where you can safely explore how attacks work and practice building defenses.</p>
+    {# Latest posts #}
+    {% if latest_posts %}
+    <div>
+      <div class="section-title">Latest</div>
+      {% for post in latest_posts %}
+      <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
+        <div class="post-card">
+          <div class="post-card-body">
+            <div class="post-card-meta">
+              <div class="post-card-author">
+                <div class="author-avatar">{{ post.author[0]|upper }}</div>
+                <span>{{ post.author }}</span>
+              </div>
+              <span class="post-card-date">{{ post.created_at.strftime('%b %d') if post.created_at else '' }}</span>
+              <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
             </div>
-            <div class="why-item">
-                <h3>Transparent detection</h3>
-                <p>Every detection decision is explainable. The platform shows you exactly what was observed, what was inferred, and what remains unknown.</p>
+            <h3 class="post-card-title">{{ post.title }}</h3>
+            <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+            <div class="post-card-footer">
+              <span class="post-card-stat">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                {{ post.views or 0 }}
+              </span>
+              <span class="post-card-stat">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                0
+              </span>
+              <span class="post-card-stat">{{ post.reading_time }} min read</span>
             </div>
-            <div class="why-item">
-                <h3>Human-verified knowledge</h3>
-                <p>Nothing becomes "knowledge" without human review. AI assists with analysis, but humans approve what the platform learns.</p>
-            </div>
+          </div>
         </div>
-    </section>
+      </a>
+      {% endfor %}
+      <div style="text-align:center;margin-top:var(--space-xl);">
+        <a href="/explore" class="btn btn-ghost">Explore all posts →</a>
+      </div>
+    </div>
+    {% else %}
+    {# Empty state — no posts yet #}
+    <div class="empty-state">
+      <div class="empty-state-icon">✍️</div>
+      <h3>No posts yet</h3>
+      <p>Be the first to share something with the community.</p>
+      {% if current_user %}
+      <a href="/write" class="btn btn-primary">Write a post</a>
+      {% else %}
+      <a href="/register" class="btn btn-primary">Join to write</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </main>
+
+  {# Sidebar #}
+  <aside class="sidebar">
+
+    {% if popular_authors %}
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">People to follow</div>
+      <div class="author-list">
+        {% for author, count in popular_authors %}
+        <a href="/u/{{ author.username }}" class="author-item">
+          <div class="author-avatar author-avatar--lg">
+            {% if author.avatar_url %}
+            <img src="{{ author.avatar_url }}" alt="{{ author.display }}">
+            {% else %}
+            {{ author.display[0]|upper }}
+            {% endif %}
+          </div>
+          <div class="author-item-info">
+            <div class="author-item-name">{{ author.display }}</div>
+            <div class="author-item-meta">{{ count }} post{{ 's' if count != 1 }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">Browse by topic</div>
+      <div class="category-chips">
+        {% for cat in categories %}
+        <a href="/explore?category={{ cat|urlencode }}" class="tag">{{ cat }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if not current_user %}
+    <div class="sidebar-widget card" style="background:linear-gradient(135deg,#ede9fe,#dbeafe);border-color:#c4b5fd;">
+      <p style="font-size:0.9rem;margin-bottom:var(--space-md);line-height:1.6;"><strong>Join the community.</strong><br>Write, read, follow people you find interesting.</p>
+      <a href="/register" class="btn btn-primary" style="width:100%;justify-content:center;">Create account — free</a>
+      <div style="text-align:center;margin-top:var(--space-sm);font-size:0.8rem;color:var(--text-muted);">Already have one? <a href="/login" style="color:var(--accent);">Sign in</a></div>
+    </div>
+    {% endif %}
+
+  </aside>
+
 </div>
+
 {% endblock %}

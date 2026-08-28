@@ -20,6 +20,11 @@
         {% else %}
         <span class="badge badge-blue">Clean</span>
         {% endif %}
+        {% if session %}
+        <a href="/testing/sessions/{{ session.session_id }}" class="badge badge-cyan" style="text-decoration:none;">
+            Session {{ session.session_id[:8] }}
+        </a>
+        {% endif %}
     </div>
 </div>
 
@@ -35,6 +40,10 @@
                     <span style="color:var(--text-muted);">Method:</span> <span>{{ event.method }}</span>
                     <span style="color:var(--text-muted);">Endpoint:</span> <span class="mono" style="font-size:0.85rem;">{{ event.endpoint }}</span>
                     <span style="color:var(--text-muted);">Time:</span> <span>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC') if event.timestamp else '' }}</span>
+                    {% if event.session_id %}
+                    <span style="color:var(--text-muted);">Session:</span>
+                    <span class="mono" style="font-size:0.8rem;">{{ event.session_id }}</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -61,6 +70,14 @@
             <pre>{{ event.sanitized_payload }}</pre>
         </div>
         {% endif %}
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+            {% if session %}
+            <a href="/testing/sessions/{{ session.session_id }}" class="btn btn-outline btn-sm">Session Timeline</a>
+            {% endif %}
+            <a href="/testing/events" class="btn btn-outline btn-sm">All Events</a>
+        </div>
     </div>
 </div>
 {% endblock %}
+

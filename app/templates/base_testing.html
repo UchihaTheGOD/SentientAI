@@ -32,6 +32,9 @@
                     <a href="/testing/events" class="sidebar-link {% if '/testing/events' in request.url.path %}active{% endif %}">
                         <span class="sidebar-icon">▤</span> Events
                     </a>
+                    <a href="/testing/sessions" class="sidebar-link {% if '/testing/sessions' in request.url.path or '/testing/session-ended' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">◎</span> Sessions
+                    </a>
                 </div>
 
                 <div class="sidebar-section">

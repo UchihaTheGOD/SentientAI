@@ -85,9 +85,12 @@
             <pre>{{ lab_output }}</pre>
         </div>
 
-        <div style="display:flex;gap:12px;margin-top:20px;">
-            <a href="/testing/labs/{{ result.lab_id }}" class="btn btn-primary">Retest Target</a>
+        <div style="display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;">
+            <a href="/testing/labs/{{ result.lab_id }}" class="btn btn-primary">Continue Lab</a>
             <a href="/testing/events/{{ result.event_id }}" class="btn btn-outline">View Event</a>
+            {% if session %}
+            <a href="/testing/sessions/{{ session.session_id }}" class="btn btn-outline">Session Timeline</a>
+            {% endif %}
             <a href="/testing/labs" class="btn btn-outline">All Labs</a>
         </div>
     </div>

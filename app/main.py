@@ -42,11 +42,15 @@ def create_app() -> FastAPI:
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     # Register routers
-    from app.api import auth, users, blog, testing, admin, health
+    from app.api import auth, users, blog, community, testing, admin, health
+    from app.api import social, feed
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
     application.include_router(blog.router)
+    application.include_router(community.router)
+    application.include_router(social.router)
+    application.include_router(feed.router)
     application.include_router(testing.router)
     application.include_router(admin.router)
 
