@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Testing — SentientAI{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="testing-env">
+    <div class="testing-layout">
+        <aside class="testing-sidebar">
+            <div class="sidebar-header">
+                <a href="/testing" class="sidebar-brand">
+                    <span class="brand-icon">S</span>
+                    <span class="sidebar-brand-text">SentientAI<span class="sidebar-env-tag">TESTING</span></span>
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-section">
+                    <span class="sidebar-label">Environment</span>
+                    <a href="/testing" class="sidebar-link {% if request.url.path == '/testing' %}active{% endif %}">
+                        <span class="sidebar-icon">◉</span> Overview
+                    </a>
+                    <a href="/testing/labs" class="sidebar-link {% if '/testing/labs' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">⧫</span> Labs
+                    </a>
+                    <a href="/testing/events" class="sidebar-link {% if '/testing/events' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">▤</span> Events
+                    </a>
+                    <a href="/testing/sessions" class="sidebar-link {% if '/testing/sessions' in request.url.path or '/testing/session-ended' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">◎</span> Sessions
+                    </a>
+                </div>
+
+                <div class="sidebar-section">
+                    <span class="sidebar-label">Analysis</span>
+                    <a href="/testing/sentinel" class="sidebar-link {% if '/testing/sentinel' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">◈</span> Sentinel
+                    </a>
+                    <a href="/testing/knowledge" class="sidebar-link {% if '/testing/knowledge' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">◇</span> Knowledge
+                    </a>
+                    <a href="/testing/training" class="sidebar-link {% if '/testing/training' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">▦</span> Training
+                    </a>
+                </div>
+
+                {% if user and user.is_admin %}
+                <div class="sidebar-section">
+                    <span class="sidebar-label">Administration</span>
+                    <a href="/admin" class="sidebar-link {% if '/admin' in request.url.path %}active{% endif %}">
+                        <span class="sidebar-icon">⚙</span> Admin
+                    </a>
+                </div>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <span class="sidebar-user-name">{{ user.username if user else 'Unknown' }}</span>
+                    <span class="sidebar-user-role badge {% if user and user.is_admin %}badge-purple{% else %}badge-cyan{% endif %}">{{ user.role if user else 'N/A' }}</span>
+                </div>
+                <div class="sidebar-actions">
+                    <a href="/" class="sidebar-link-sm">Public Site</a>
+                    <a href="/profile" class="sidebar-link-sm">Profile</a>
+                    <a href="/logout" class="sidebar-link-sm">Logout</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="testing-main">
+            <div class="testing-topbar">
+                <div class="testing-breadcrumb">
+                    {% block breadcrumb %}
+                    <span>Testing Environment</span>
+                    {% endblock %}
+                </div>
+                <div class="testing-topbar-right">
+                    <span class="testing-model-tag mono">{{ sentinel_model or 'SentinelSmolLM2-360M-V9' }}</span>
+                </div>
+            </div>
+            <div class="testing-content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

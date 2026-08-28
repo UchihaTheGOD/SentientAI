@@ -3,7 +3,7 @@
 
 {% block content %}
 <div style="margin-bottom:8px;">
-    <a href="/labs" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Labs</a>
+    <a href="/labs" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Targets</a>
 </div>
 
 <div class="section-header">
@@ -15,10 +15,10 @@
 </div>
 
 <div class="grid-2">
-    <!-- Lab Description -->
+    <!-- Target Overview -->
     <div class="card">
         <div class="card-header">
-            <span class="card-title">Lab Description</span>
+            <span class="card-title">Target Specification</span>
         </div>
         <div style="color:var(--text-secondary);font-size:0.92rem;line-height:1.8;">
             {{ lab.description | replace('\n', '<br>') | safe }}

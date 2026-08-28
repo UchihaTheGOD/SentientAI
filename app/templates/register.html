@@ -1,49 +1,55 @@
-{% extends "base.html" %}
+{% extends "base_public.html" %}
 {% set user = None %}
-{% block title %}Register — SentientAI{% endblock %}
+{% block title %}Create account — Sentient{% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <h1>Create Account</h1>
-    <p class="subtitle">Start your cybersecurity training journey.</p>
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <span style="font-size:2rem;color:var(--accent);">◆</span>
+    </div>
+    <h1 class="auth-title">Join Sentient</h1>
+    <p class="auth-subtitle">A community for writers and curious people.</p>
 
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
 
-    <div class="card">
-        <form method="post" action="/register">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" class="form-control"
-                       required minlength="3" maxlength="50" pattern="[a-zA-Z0-9_]+"
-                       title="Letters, numbers, and underscores only" autocomplete="username">
-            </div>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" class="form-control" required autocomplete="email">
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" class="form-control"
-                       required minlength="8" autocomplete="new-password">
-                <small style="color:var(--text-muted);font-size:0.8rem;">
-                    Min 8 characters, 1 uppercase, 1 number.
-                </small>
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" class="form-control"
-                       required autocomplete="new-password">
-            </div>
-            <div class="form-group">
-                <label for="admin_secret">Admin Secret <span style="color:var(--text-muted);">(optional)</span></label>
-                <input type="password" id="admin_secret" name="admin_secret" class="form-control" autocomplete="off">
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;">Create Account</button>
-        </form>
-    </div>
+    <form method="post" action="/register" data-once>
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input type="text" id="username" name="username" class="form-input"
+               required minlength="3" maxlength="50"
+               pattern="[a-zA-Z0-9_]+"
+               title="Letters, numbers, and underscores only"
+               autocomplete="username" autofocus>
+        <div class="form-hint">Letters, numbers, and underscores only.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input type="email" id="email" name="email" class="form-input"
+               required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-input"
+               required minlength="8" autocomplete="new-password">
+        <div class="form-hint">At least 8 characters, one uppercase, one number.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="confirm_password">Confirm password</label>
+        <input type="password" id="confirm_password" name="confirm_password" class="form-input"
+               required autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:var(--space-sm);" data-loading="Creating account…">
+        Create account
+      </button>
+    </form>
 
-    <p class="auth-footer">Already have an account? <a href="/login">Sign in</a></p>
+    <div class="auth-footer">
+      Already have an account? <a href="/login">Sign in</a>
+    </div>
+  </div>
 </div>
 {% endblock %}

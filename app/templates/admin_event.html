@@ -1,11 +1,12 @@
-{% extends "base.html" %}
+{% extends "base_testing.html" %}
 {% block title %}Event #{{ event.id }} (Admin) — SentientAI{% endblock %}
 
-{% block content %}
-<div style="margin-bottom:8px;">
-    <a href="/admin" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Admin</a>
-</div>
+{% block breadcrumb %}
+<a href="/admin">Administration</a> <span class="breadcrumb-sep">›</span>
+<span>Event #{{ event.id }}</span>
+{% endblock %}
 
+{% block content %}
 <div class="section-header">
     <h1 class="section-title">Event #{{ event.id }} — Admin View</h1>
 </div>
@@ -17,7 +18,7 @@
             <div class="content">
                 <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;font-size:0.9rem;">
                     <span style="color:var(--text-muted);">User ID:</span> <span>{{ event.user_id }}</span>
-                    <span style="color:var(--text-muted);">Lab:</span> <span>{{ event.lab_id }}</span>
+                    <span style="color:var(--text-muted);">Target:</span> <span>{{ event.lab_id }}</span>
                     <span style="color:var(--text-muted);">Category:</span> <span>{{ event.attack_category or '—' }}</span>
                     <span style="color:var(--text-muted);">Severity:</span> <span>{{ event.severity }}</span>
                     <span style="color:var(--text-muted);">Detection:</span> <span>{{ event.detection_result }}</span>

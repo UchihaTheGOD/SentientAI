@@ -5,7 +5,7 @@
 <div class="blocked-container">
     <div class="blocked-icon">🚫</div>
     <h1>Request Blocked</h1>
-    <p>SentientAI detected activity that cannot continue inside this training environment.</p>
+    <p>SentientAI intercepted high-risk payload activity inside this testing sandbox.</p>
 
     {% if event %}
     <div class="blocked-details">
@@ -14,7 +14,7 @@
             <span>#{{ event.id }}</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Lab</span>
+            <span class="detail-label">Target</span>
             <span>{{ event.lab_id }}</span>
         </div>
         <div class="detail-row">
@@ -31,7 +31,7 @@
         </div>
         {% if event.explanation %}
         <div class="detail-row">
-            <span class="detail-label">Reason</span>
+            <span class="detail-label">Interception</span>
             <span>{{ event.explanation }}</span>
         </div>
         {% endif %}
@@ -39,7 +39,7 @@
 
     {% if event.defense_recommendation %}
     <div class="alert alert-info" style="text-align:left;">
-        <strong>Educational Note:</strong> {{ event.defense_recommendation }}
+        <strong>Remediation Notice:</strong> {{ event.defense_recommendation }}
     </div>
     {% endif %}
     {% else %}

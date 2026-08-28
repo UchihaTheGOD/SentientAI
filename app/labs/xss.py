@@ -15,41 +15,37 @@ _stored_comments: List[Dict[str, str]] = [
 ]
 
 XSS_STORED_DESCRIPTION = """
-## Stored XSS Lab
+## Stored XSS Target
 
-This lab simulates a vulnerable comment/guestbook feature. User input is
-stored and displayed back without sanitization — a classic Stored XSS
-vulnerability.
+This target simulates a persistent message/comment input system that stores
+payloads in memory and reflects them in aggregate responses without sanitization.
 
-**Your task:** Try to inject a script that would execute when other users
-view the page.
+**Testing Objective:** Execute payload persistence that triggers execution vectors on target consumption.
 
-**Example inputs to try:**
-- `Hello world` (normal comment)
-- `<script>alert('XSS')</script>` (basic script injection)
-- `<img src=x onerror=alert('XSS')>` (event handler injection)
-- `<svg onload=alert('XSS')>` (SVG-based injection)
+**Test Vectors:**
+- `Hello world` (baseline payload)
+- `<script>alert('XSS')</script>` (direct script injection)
+- `<img src=x onerror=alert('XSS')>` (inline event handler breakout)
+- `<svg onload=alert('XSS')>` (SVG vector execution)
 
-All execution is simulated. No real scripts run in the browser.
+All payload execution is simulated server-side in safe isolation.
 """
 
 XSS_REFLECTED_DESCRIPTION = """
-## Reflected XSS Lab
+## Reflected XSS Target
 
-This lab simulates a vulnerable search feature that reflects user input
-directly in the response without encoding — a classic Reflected XSS
-vulnerability.
+This target simulates an unescaped parameter reflection endpoint, echoing
+request query data directly into response markup.
 
-**Your task:** Craft input that would execute JavaScript if rendered
-unsanitized in a real page.
+**Testing Objective:** Test parameter injection vectors and context breakouts.
 
-**Example inputs to try:**
-- `cybersecurity` (normal search)
-- `<script>document.cookie</script>` (cookie theft attempt)
-- `"><img src=x onerror=alert(1)>` (attribute breakout)
-- `javascript:alert(1)` (URI scheme injection)
+**Test Vectors:**
+- `security_audit` (baseline query)
+- `<script>document.cookie</script>` (token extraction pattern)
+- `"><img src=x onerror=alert(1)>` (attribute escape vector)
+- `javascript:alert(1)` (URI scheme execution)
 
-All execution is simulated server-side.
+All processing is sandboxed and safely analyzed.
 """
 
 
@@ -160,19 +156,19 @@ def handle_reflected_xss(payload: str) -> Dict[str, Any]:
         }
 
 
-# Register both labs
+# Register both targets
 register_lab(
     lab_id="xss_stored",
-    name="Stored XSS Lab",
+    name="Stored XSS Target",
     category="xss",
-    difficulty="Beginner",
+    difficulty="Intermediate",
     description=XSS_STORED_DESCRIPTION,
     handler=handle_stored_xss,
 )
 
 register_lab(
     lab_id="xss_reflected",
-    name="Reflected XSS Lab",
+    name="Reflected XSS Target",
     category="xss",
     difficulty="Beginner",
     description=XSS_REFLECTED_DESCRIPTION,
