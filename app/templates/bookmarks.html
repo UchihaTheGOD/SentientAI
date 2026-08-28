@@ -1,0 +1,44 @@
+{% extends "base_public.html" %}
+{% block title %}Bookmarks — Sentient{% endblock %}
+
+{% block content %}
+<div class="bookmarks-page">
+  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-xl);">Bookmarks</h1>
+
+  {% if bookmarked_posts %}
+  <p class="text-sm text-muted" style="margin-bottom:var(--space-lg);">{{ bookmarked_posts|length }} saved post{{ 's' if bookmarked_posts|length != 1 }}</p>
+  {% for post in bookmarked_posts %}
+  <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
+    <div class="post-card">
+      <div class="post-card-body">
+        <div class="post-card-meta">
+          <div class="post-card-author">
+            <div class="author-avatar">{{ post.author[0]|upper }}</div>
+            <span>{{ post.author }}</span>
+          </div>
+          <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
+        </div>
+        <h2 class="post-card-title">{{ post.title }}</h2>
+        <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+        <div class="post-card-footer">
+          <span class="post-card-stat">{{ post.reading_time }} min read</span>
+          <form method="POST" action="/blog/{{ post.slug }}/bookmark" style="display:inline;margin-left:auto;" onclick="event.stopPropagation()">
+            <button type="submit" class="comment-action-btn text-accent" title="Remove bookmark">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🔖</div>
+    <h3>No bookmarks yet</h3>
+    <p>Save posts you want to read later by clicking the bookmark icon on any post.</p>
+    <a href="/explore" class="btn btn-primary">Find posts to save</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

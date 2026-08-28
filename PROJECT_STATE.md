@@ -1,6 +1,6 @@
 # PROJECT_STATE.md — SentientAI
 
-*Last updated: 2026-08-27 (Phase 1 Refactor Checkpoint)*
+*Last updated: 2026-08-28 (Phase 2 Complete Checkpoint)*
 
 ---
 
@@ -8,13 +8,14 @@
 
 **SentientAI** is a dual-experience cybersecurity education and research platform designed to provide:
 1. **A Public-Facing Website**: A believable, clean, content-first web experience offering security research articles, platform information, and standard user account management without exposing security testing telemetry or internal model dashboards.
-2. **A Protected Testing Lab (`/testing`)**: A separate, technical, analyst-focused security research console where authorized users (testers and administrators) interact with isolated vulnerability labs, view deterministic detection telemetry, inspect event timelines, and review candidate security knowledge.
+2. **A Protected Testing Lab (`/testing`)**: A separate, technical, analyst-focused security research console where authorized users (testers and administrators) interact with isolated vulnerability labs, view deterministic detection telemetry, inspect session event timelines, and review candidate security knowledge.
 
 ### Current Architecture
 - **Web Layer**: FastAPI application rendering server-side Jinja2 templates for both public and testing experiences, with REST API endpoints for data operations.
 - **Security & Sandboxing**: Server-side sandboxed lab simulators running isolated mock data layers with regex-based deterministic detection pipelines.
-- **Data & Persistence**: SQLite database (configured for PostgreSQL migration capability via SQLAlchemy ORM) storing users, security events, training examples, and blog posts.
-- **AI / Model Layer**: Model abstraction interface (`CyberLLMClientInterface`) currently backed by `MockCyberLLMClient`, structured to consume local or remote inference from the `SentinelSmolLM2-360M-V9` model and teacher review APIs.
+- **Session Lifecycle**: `LabSession` model tracking each lab run with UUID-based session IDs, event counters, start/end timestamps, and termination reasons.
+- **Data & Persistence**: SQLite database (configured for PostgreSQL migration capability via SQLAlchemy ORM) storing users, security events, training examples, blog posts, and lab sessions.
+- **AI / Model Layer**: `CyberLLMClientInterface` abstraction backed by `MockCyberLLMClient`, with a fully implemented `RealSentinelClient` HTTP adapter for `SentinelSmolLM2-360M-V9`. Distinguishes OBSERVED / INFERRED / UNKNOWN findings.
 
 ### Technologies Currently in Use
 - **Python 3.12 / 3.x**
@@ -30,62 +31,76 @@
 
 ## 2. COMPLETED WORK
 
-### Architecture & Routing Separation
-- **Dual Template Hierarchy**: Created `app/templates/base_public.html` and `app/templates/base_testing.html` to strictly isolate the public website from the testing lab UI.
-- **Public Routes (`app/api/users.py`, `app/api/blog.py`)**:
-  - `/`: Public homepage with platform mission, features, latest articles, and learning philosophy.
-  - `/about`: Platform explanation, lab isolation model, and Sentinel analysis philosophy.
-  - `/contact`: Public contact form with acknowledgment handler.
-  - `/blog` and `/blog/{slug}`: Technical blog listing with category filters and article view.
-  - `/profile`: Public user profile displaying user role and link to `/testing` for authorized accounts.
-- **Testing Environment Routes (`app/api/testing.py`)**:
-  - `/testing`: Analyst overview displaying event statistics, available labs, and engine status.
-  - `/testing/labs`: Lab browser showing sandboxed challenges.
-  - `/testing/labs/{lab_id}`: Dedicated lab interface.
-  - `POST /testing/labs/{lab_id}/submit`: Lab submission handler running sandboxing, detection, and telemetry capture.
-  - `/testing/events`: Telemetry event log for user sessions.
-  - `/testing/events/{event_id}`: Detailed inspection of individual security events.
-  - `/testing/blocked`: Session interception/termination landing page.
+### Phase 1 — Public Website / Testing Lab Separation & RBAC
+- **Dual Template Hierarchy**: `base_public.html` and `base_testing.html` strictly isolate both surfaces.
+- **Public Routes**: `/`, `/about`, `/contact`, `/blog`, `/blog/{slug}`, `/profile`.
+- **RBAC**: `require_tester` guards all `/testing/*` routes. `require_admin` guards all `/admin/*` routes. All public signups default to `role="user"`.
+- **CLI (`manage.py`)**: `create-admin`, `set-role`, `list-users`, `seed-blog`.
+- **Data Models**: `User` (with `role`), `BlogPost`, `SecurityEvent`, `TrainingExample`.
 
-### Role-Based Access Control (RBAC)
-- **User Roles (`app/models/user.py`)**: Updated `User` model with `role` column (`user`, `tester`, `admin`).
-- **Authorization Dependencies (`app/services/auth_service.py`)**:
-  - `require_tester`: Restricts `/testing/*` routes strictly to accounts with `tester` or `admin` roles.
-  - `require_admin`: Restricts `/admin/*` routes strictly to accounts with `admin` role.
-  - `get_current_user_optional`: Provides safe contextual user extraction for public pages.
-- **Registration Security (`app/api/auth.py`, `app/templates/register.html`)**:
-  - Removed the insecure `admin_secret` field from the registration form.
-  - All public sign-ups default safely to `role="user"`.
-  - Role-based redirect on login: `user` accounts redirect to `/`, `tester`/`admin` accounts redirect to `/testing`.
+### Phase 2 — Lab Session Architecture & Realistic Target UX
 
-### CLI & Management Tooling
-- **`manage.py`**: Created a CLI utility with commands:
-  - `create-admin`: Creates administrative users with secure password hashing.
-  - `set-role`: Safely updates an existing user's role to `user`, `tester`, or `admin`.
-  - `list-users`: Displays all database users and their active roles.
-  - `seed-blog`: Populates realistic technical articles in the `blog_posts` table.
+#### Session Lifecycle (`LabSession` Model)
+- Created `app/models/lab_session.py` with UUID-based `session_id`, status (`active` / `terminated` / `completed`), start/end timestamps, attack/detected/blocked counters, and `termination_reason`.
+- Added `session_id` FK to `SecurityEvent` (nullable for backward compat). Runs idempotent migration on startup via `_run_migrations()` in `app/database.py`.
+- Sessions are created automatically when a user visits a lab page (`GET /testing/labs/{lab_id}`).
+- Every submission updates the session counters and checks for critical-severity blocks.
+- Critical-severity payloads (e.g. Command Injection) terminate the session and redirect to `/testing/session-ended/{session_id}` — a dead-end page that blocks further submissions.
 
-### Data Models & Schema
-- **`BlogPost` (`app/models/blog_post.py`)**: Stores slugs, titles, authors, categories, markdown/text content, reading time estimates, and publication status.
-- **`User` (`app/models/user.py`)**: Updated with `role` field, keeping `is_admin` and `is_tester` helper properties.
-- **`SecurityEvent` (`app/models/security_event.py`)**: Structured telemetry recording payload, detection result, attack category, severity, blocked status, and raw analysis JSON.
-- **`TrainingExample` (`app/models/training_example.py`)**: Records instruction, input, output, attack type, severity, approval status, and reviewer ID.
+#### New Routes (`app/api/testing.py`)
+| Route | Description |
+|---|---|
+| `GET /testing/sessions` | Paginated list of all user sessions |
+| `GET /testing/sessions/{session_id}` | Chronological event timeline for a session |
+| `GET /testing/session-ended/{session_id}` | Dead-end termination page (blocks further submissions) |
+
+#### Realistic Isolated Target Application
+- `xss_stored` lab now loads `testing/target_xss_stored.html` — a standalone NexusBoard community forum with real-looking posts, comments, sidebar stats, and a vulnerable comment form. Completely separate from the SentientAI styling.
+- An **Analyst Observer Bar** is fixed at the bottom of the target page: shows session ID, event count, and links back to Timeline/Events/Console without polluting the target app's UI.
+- All other labs load `testing/lab_detail.html` (generic form).
+
+#### Attack Timeline (`testing/session_timeline.html`)
+- Chronological event list with colored dot markers: GREEN (session start), ORANGE (detected), RED (blocked), CYAN (active), GREEN (completed).
+- Each event shows: timestamp, method, endpoint, attack category badge, severity badge, explanation snippet, and "View Detail" link.
+
+#### Session Ended Dead-End (`testing/session_ended.html`)
+- Shows: termination reason, session stats, **Terminating Event** card with attack category, severity, "What Was Detected", and "Defensive Lesson".
+- Red warning note that further submissions to this session will redirect here.
+- Actions: View Full Timeline, Start New Session, All Events, Overview.
+
+#### Sentinel Adapter Architecture (`app/services/cyberllm_client.py`)
+- `CyberLLMClientInterface` — abstract contract.
+- `MockCyberLLMClient` — deterministic rule-based mock (unchanged behaviour, always available).
+- `RealSentinelClient` — HTTP adapter for `SentinelSmolLM2-360M-V9` inference server. Falls back transparently to mock on any connection failure. Never fabricates telemetry.
+- `SentinelFinding` dataclass with `AnalysisConfidence` enum: `OBSERVED`, `INFERRED`, `UNKNOWN`.
+- `get_cyberllm_client()` factory: uses `RealSentinelClient` when `CYBERLLM_API_URL` is set, otherwise `MockCyberLLMClient`.
+
+#### Detection Engine Update (`app/services/detection.py`)
+- Command Injection is now always checked regardless of lab category (critical severity, must block everywhere).
+- All other categories still scoped to the lab's declared category.
+
+#### CSS Additions (`app/static/css/style.css`)
+- `.timeline-*` classes for the chronological event flow.
+- `.session-ended-*` classes for the dead-end termination page.
+- `.lab-form textarea` monospace font.
+
+#### Sessions List Page (`testing/sessions_list.html`)
+- Table showing all sessions: session ID (truncated), lab, status badge, submission/detected/blocked counts, start time, Timeline or Ended action link.
 
 ---
 
 ## 3. PARTIALLY COMPLETED WORK
 
-1. **Lab Sandboxing Expansion (Phases 2 & 7)**:
-   - Existing labs: Stored XSS (`xss_stored`), Reflected XSS (`xss_reflected`), SQL Injection (`sqli`).
-   - Missing/Planned labs: Authentication Logic, Access Control / IDOR, Path Traversal simulation, Command Injection simulation.
-2. **Dedicated Target Application Simulation UX (Phase 2)**:
-   - Currently, lab pages (`lab_detail.html`) present a specification and test input box. The target application UI and the security console have not yet been split into two distinct visual surfaces (e.g. realistic mini-app target vs. console dock).
-3. **Session & Timeline Tracking (`LabSession`) (Phase 2)**:
-   - `SecurityEvent` currently tracks individual events per user and lab. A formal `LabSession` lifecycle model (with session IDs, start/stop timestamps, attack timeline graph, and dead-end redirects to `/testing/session-ended/{session_id}`) is not yet implemented.
-4. **Live Sentinel / CyberLLM Integration (Phase 3)**:
-   - `MockCyberLLMClient` provides structured mock responses. Real HTTP/client connection to the local `SentinelSmolLM2-360M-V9` inference server is ready for adapter implementation in Phase 3.
-5. **Knowledge Candidate & Teacher Review Pipeline (Phases 4 & 5)**:
-   - Training example queue exists in `/admin`, but the full analyst-facing `/testing/knowledge`, candidate confidence scoring, and teacher verification APIs (`TEACHER_API_KEY`, `TEACHER_BASE_URL`) remain to be wired up.
+1. **Lab Sandboxing Expansion**:
+   - Existing labs: `xss_stored`, `xss_reflected`, `sqli`.
+   - Planned labs: Authentication Logic, Access Control / IDOR, Path Traversal, Command Injection sandboxed simulation.
+   - Command Injection is detected/blocked but has no dedicated sandboxed lab module yet.
+2. **Knowledge Pipeline & Teacher Review (Phase 3)**:
+   - Training example queue exists in `/admin`, but `/testing/knowledge`, `/testing/training`, confidence scoring, and teacher verification APIs remain to be wired up.
+3. **Real Sentinel Integration (Phase 3)**:
+   - `RealSentinelClient` HTTP adapter is fully implemented. Awaits `CYBERLLM_API_URL` in `.env` to activate.
+4. **Sidebar Placeholder Links**:
+   - `/testing/sentinel`, `/testing/knowledge`, `/testing/training` in `base_testing.html` are visual placeholders awaiting dedicated router pages.
 
 ---
 
@@ -94,243 +109,226 @@
 ```
 SentientAI/
 ├── app/
-│   ├── __init__.py               # Package marker
-│   ├── config.py                 # Environment configuration (pydantic/env loader)
-│   ├── database.py               # SQLAlchemy engine, SessionLocal, init_db
-│   ├── main.py                   # FastAPI app factory, middleware, router inclusions
-│   ├── api/                      # Route handlers
-│   │   ├── __init__.py           # API package marker
-│   │   ├── admin.py              # Admin panel, event review, training example review & JSONL export
-│   │   ├── auth.py               # Login, registration, logout, session cookies
-│   │   ├── blog.py               # Public blog listing & article view
-│   │   ├── health.py             # Healthcheck endpoint (/api/health)
-│   │   ├── testing.py            # Protected /testing lab, event, and overview routes
-│   │   └── users.py              # Public site routes (/, /about, /contact, /profile)
-│   ├── labs/                     # Isolated vulnerability simulations
-│   │   ├── __init__.py           # Lab registry (register_lab, get_lab, list_labs)
-│   │   ├── sql_injection.py      # Sandboxed in-memory SQL injection lab
-│   │   └── xss.py                # Sandboxed in-memory Stored and Reflected XSS labs
-│   ├── models/                   # SQLAlchemy database models
-│   │   ├── __init__.py           # Model exports (User, SecurityEvent, TrainingExample, BlogPost)
-│   │   ├── blog_post.py          # BlogPost schema & category constants
-│   │   ├── security_event.py     # SecurityEvent telemetry schema
-│   │   ├── training_example.py   # TrainingExample dataset curation schema
-│   │   └── user.py               # User model with role field
-│   ├── services/                 # Business logic & security engines
-│   │   ├── __init__.py           # Services package marker
-│   │   ├── analysis.py           # Analysis orchestrator (Detection -> Model -> DB logging)
-│   │   ├── auth_service.py       # Password hashing, JWT tokens, RBAC dependencies
-│   │   ├── cyberllm_client.py    # Sentinel/CyberLLM interface & Mock client
-│   │   ├── detection.py          # Rule-based regex detection engine (SQLi, XSS, Cmd, Traversal, Auth)
-│   │   └── training.py           # Training example retrieval, approval, rejection, JSONL export
-│   ├── static/                   # Static web assets
+│   ├── __init__.py
+│   ├── config.py
+│   ├── database.py               # engine, SessionLocal, init_db, _run_migrations
+│   ├── main.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── auth.py
+│   │   ├── blog.py
+│   │   ├── health.py
+│   │   ├── testing.py            # Full session lifecycle, timeline, session-ended routes
+│   │   └── users.py
+│   ├── labs/
+│   │   ├── __init__.py           # register_lab, get_lab, list_labs
+│   │   ├── sql_injection.py
+│   │   └── xss.py
+│   ├── models/
+│   │   ├── __init__.py           # User, SecurityEvent, TrainingExample, BlogPost, LabSession
+│   │   ├── blog_post.py
+│   │   ├── lab_session.py        # NEW: Session tracking model
+│   │   ├── security_event.py     # UPDATED: +session_id FK
+│   │   ├── training_example.py
+│   │   └── user.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── analysis.py           # UPDATED: accepts optional session_id
+│   │   ├── auth_service.py
+│   │   ├── cyberllm_client.py    # UPDATED: RealSentinelClient + OBSERVED/INFERRED/UNKNOWN
+│   │   ├── detection.py          # UPDATED: always checks command_injection
+│   │   └── training.py
+│   ├── static/
 │   │   ├── css/
-│   │   │   └── style.css         # Complete stylesheet for public & testing layouts
+│   │   │   └── style.css         # UPDATED: +timeline, session-ended, lab-form styles
 │   │   └── js/
-│   │       └── main.js           # Client-side helpers (mobile nav toggle, alert dismiss, anti-dblsubmit)
-│   └── templates/                # Jinja2 HTML templates
-│       ├── 403.html              # Access denied page for unauthorized roles
-│       ├── 404.html              # Page not found
-│       ├── about.html            # Public about page
-│       ├── admin.html            # Admin dashboard (extends base_testing.html)
-│       ├── admin_event.html      # Admin detailed event inspector
-│       ├── base_public.html      # Public website base layout
-│       ├── base_testing.html     # Testing lab console sidebar layout
-│       ├── contact.html          # Public contact page
-│       ├── index.html            # Public homepage
-│       ├── login.html            # Public sign-in page
-│       ├── profile.html          # User profile page
-│       ├── register.html         # Public account registration page
+│   │       └── main.js
+│   └── templates/
+│       ├── 403.html
+│       ├── 404.html
+│       ├── about.html
+│       ├── admin.html
+│       ├── admin_event.html
+│       ├── base_public.html
+│       ├── base_testing.html     # UPDATED: +Sessions sidebar link
+│       ├── contact.html
+│       ├── index.html
+│       ├── login.html
+│       ├── profile.html
+│       ├── register.html
 │       ├── blog/
-│       │   ├── index.html        # Blog post listing & category filters
-│       │   └── post.html         # Blog post article reader
+│       │   ├── index.html
+│       │   └── post.html
 │       └── testing/
-│           ├── attack_result.html# Lab attack execution & telemetry breakdown
-│           ├── blocked.html      # Critical payload blocked / interception notice
-│           ├── event_detail.html # Event inspection page
-│           ├── events.html       # Security events table
-│           ├── lab_detail.html   # Lab execution & submission view
-│           ├── labs.html         # Lab challenge catalog
-│           └── overview.html     # Testing environment overview dashboard
+│           ├── attack_result.html      # UPDATED: +Session Timeline button
+│           ├── blocked.html            # Legacy (sessions without session_id)
+│           ├── event_detail.html       # UPDATED: +session FK link
+│           ├── events.html
+│           ├── lab_detail.html         # UPDATED: +session_id hidden field, session banner
+│           ├── labs.html
+│           ├── overview.html
+│           ├── session_ended.html      # NEW: dead-end termination page
+│           ├── session_timeline.html   # NEW: chronological event timeline
+│           ├── sessions_list.html      # NEW: all sessions table
+│           └── target_xss_stored.html  # NEW: NexusBoard realistic forum target
 ├── data/
-│   └── sentientai.db             # Local SQLite database file
-├── .env                          # Local environment settings (git-ignored)
-├── .env.example                  # Environment template
-├── .gitignore                    # Git ignore file
-├── manage.py                     # CLI management script (admin creation, role setting, seeding)
-├── requirements.txt              # Python dependency manifest
-├── run.py                        # Uvicorn entrypoint script
-└── PROJECT_STATE.md              # Current project state checkpoint
+│   └── sentientai.db
+├── .env
+├── .env.example
+├── .gitignore
+├── manage.py
+├── requirements.txt
+├── run.py
+└── PROJECT_STATE.md
 ```
 
 ---
 
 ## 5. BACKEND
 
-- **FastAPI Structure**: Modular application initialized via `create_app()` in `app/main.py`. Includes `SecurityHeadersMiddleware` enforcing strict security headers (`nosniff`, `DENY` frames, XSS protection, Referrer Policy).
+- **FastAPI Structure**: Modular via `create_app()` in `app/main.py`.
 - **Existing Routes**:
   - `GET /api/health`
   - `GET /`, `GET /about`, `GET /contact`, `POST /contact`, `GET /profile`
   - `GET /blog`, `GET /blog/{slug}`
   - `GET /login`, `POST /login`, `GET /register`, `POST /register`, `GET /logout`
-  - `GET /testing`, `GET /testing/labs`, `GET /testing/labs/{lab_id}`, `POST /testing/labs/{lab_id}/submit`, `GET /testing/events`, `GET /testing/events/{event_id}`, `GET /testing/blocked`
+  - `GET /testing`, `GET /testing/labs`, `GET /testing/labs/{lab_id}`, `POST /testing/labs/{lab_id}/submit`
+  - `GET /testing/events`, `GET /testing/events/{event_id}`
+  - `GET /testing/sessions`, `GET /testing/sessions/{session_id}` ← NEW
+  - `GET /testing/session-ended/{session_id}` ← NEW
+  - `GET /testing/blocked` (legacy — sessions without session_id)
   - `GET /admin`, `GET /admin/events/{event_id}`, `POST /admin/training/{id}/approve`, `POST /admin/training/{id}/reject`, `GET /admin/export`
-- **Authentication**: JWT tokens stored in HTTP-only `access_token` cookies with lax SameSite policy. Passwords hashed using bcrypt.
-- **Database**: SQLite (via SQLAlchemy engine) with `check_same_thread=False` and automatic model table generation in `init_db()`.
-- **AI / Sentinel Integration**: Managed in `app/services/cyberllm_client.py` and `app/services/analysis.py`. Calls `analyze_attack()` to format explanations, CWE/MITRE classifications, and generate structured training candidates.
+- **Authentication**: JWT tokens in HTTP-only `access_token` cookies, bcrypt passwords.
+- **Database**: SQLite via SQLAlchemy with safe idempotent migration in `init_db()`.
 
 ---
 
 ## 6. FRONTEND
 
-- **Public Website Pages**:
-  - `index.html`: Hero section, feature breakdown, latest blog posts, platform mission. Fully functional.
-  - `about.html`: Platform overview, lab isolation principles, Sentinel model explanation. Fully functional.
-  - `contact.html`: Clean contact submission form. Functional UI with state acknowledgment.
-  - `blog/index.html` & `blog/post.html`: Technical articles and category filtering. Functional with seed data.
-  - `login.html` & `register.html`: Clean auth pages extending `base_public.html`.
-  - `profile.html`: Displays user account details, role badge, and testing link.
-- **Testing Interface Pages**:
-  - `testing/overview.html`: Live metrics, available labs, and recent activity inside a fixed sidebar console layout.
-  - `testing/labs.html` & `testing/lab_detail.html`: Lab catalog and execution form.
-  - `testing/attack_result.html`: Visual breakdown of attack outcome (Blocked/Success/Detected/Clean) with sanitized payload and detection signals.
-  - `testing/events.html` & `testing/event_detail.html`: Dense event log table and inspector.
-  - `testing/blocked.html`: Interception notice with links to review telemetry or restart lab.
-  - `admin.html` & `admin_event.html`: Administrator overview with training dataset curation controls.
-- **Status (Functional vs Placeholder)**:
-  - Navigation, authentication, role authorization, and lab submissions are completely functional.
-  - Sidebar links for `/testing/sentinel`, `/testing/knowledge`, and `/testing/training` in `base_testing.html` are visual placeholders awaiting their respective dedicated router pages in subsequent phases.
+- **Public**: `index.html`, `about.html`, `contact.html`, `blog/`, `login.html`, `register.html`, `profile.html` — all functional.
+- **Testing**:
+  - `overview.html`: Stats (active sessions counter added), recent sessions panel, recent events, labs catalog.
+  - `labs.html`: Lab catalog.
+  - `lab_detail.html`: Generic form with session_id hidden field and session banner.
+  - `target_xss_stored.html`: Realistic standalone NexusBoard forum target. Not embedded in `base_testing.html`.
+  - `attack_result.html`: Attack outcome breakdown with Session Timeline button.
+  - `events.html` & `event_detail.html`: Telemetry event log and inspector (now shows session FK).
+  - `session_timeline.html`: Chronological timeline with colored event markers. ← NEW
+  - `session_ended.html`: Dead-end termination page with defensive lesson. ← NEW
+  - `sessions_list.html`: All sessions table. ← NEW
+  - `blocked.html`: Legacy interception page (still in use for null-session submits).
+  - `admin.html` & `admin_event.html`: Admin dataset curation.
+- **Status**: All navigation, authentication, RBAC, lab submissions, session tracking, timeline, and session-ended flows are fully functional.
 
 ---
 
 ## 7. SENTINEL / CYBERLLM
 
-- **Connection Architecture**: Sentinel model consumption is abstracted behind `CyberLLMClientInterface` in `app/services/cyberllm_client.py`.
-- **Integration Status**:
-  - Currently uses `MockCyberLLMClient` to format deterministic detection results into structured educational analysis.
-  - Ready to connect to the local inference server (`SentinelSmolLM2-360M-V9`) when `CYBERLLM_API_URL` and `CYBERLLM_API_KEY` are populated in the environment.
-- **Separation of Concerns**:
-  - SentientAI acts purely as an inference consumer and training candidate collector.
-  - Model training itself is handled externally in the dedicated CyberLLM project.
+- **Connection Architecture**: `CyberLLMClientInterface` in `app/services/cyberllm_client.py`.
+- **`MockCyberLLMClient`**: Deterministic. Always available. No external calls.
+- **`RealSentinelClient`**: HTTP adapter with `/analyze`, `/classify`, `/explain` endpoints. Transparent mock fallback on connection failure.
+- **`AnalysisConfidence`**: `OBSERVED` (directly seen in payload), `INFERRED` (logically derived), `UNKNOWN` (cannot determine). Never fabricates findings.
+- **Activation**: Set `CYBERLLM_API_URL` in `.env` to activate real client.
 
 ---
 
 ## 8. TESTING / SECURITY LAB
 
-- **Existing Lab Implementations**:
-  - **Stored XSS (`xss_stored`)**: In-memory comment guestbook simulating unsanitized reflection of stored payload vectors.
-  - **Reflected XSS (`xss_reflected`)**: Unescaped parameter reflection simulation for script injection vectors.
-  - **SQL Injection (`sqli`)**: Simulated user lookup concatenating input into a mock query evaluated against a fake in-memory user dataset (`FAKE_USERS_DB`).
-- **Detection & Security Controls**:
-  - Deterministic detection engine (`app/services/detection.py`) analyzes payloads against categorized regex rules for SQLi, XSS, Path Traversal, Command Injection, and Auth Bypass.
-  - Assigns attack classification, confidence, severity (low, medium, high, critical), and defense recommendations.
-  - Intercepts and blocks critical-severity attacks, redirecting to `/testing/blocked`.
-- **Isolation & Safety Guarantees**:
-  - No database queries execute raw user input on the real SQLite database.
-  - No shell commands or operating system processes are executed.
-  - No real network scanning or external targeting capabilities exist.
-- **Planned / Not Yet Implemented**:
-  - Formal `LabSession` tracking and live attack timeline visualization.
-  - Standalone target web app frames (e.g. realistic mini blog/store UI).
-  - Path traversal and command injection sandboxed simulation modules.
+- **Existing Labs**:
+  - `xss_stored`: NexusBoard forum — realistic comment form target.
+  - `xss_reflected`: Reflected parameter injection simulation.
+  - `sqli`: Fake in-memory user DB with tautology/union/destructive injection paths.
+- **Detection Engine**:
+  - Checks SQLi, XSS, Path Traversal, Command Injection, Auth Bypass patterns.
+  - **Command Injection always checked** regardless of lab category (critical — blocks everywhere).
+  - Critical severity → session terminated → redirect to `/testing/session-ended/`.
+- **Isolation Guarantees**:
+  - No real SQL executed with user input.
+  - No shell commands or OS processes executed.
+  - No real network scanning or external targeting.
+- **Planned**:
+  - Dedicated Command Injection and Path Traversal sandbox modules.
+  - Auth bypass and IDOR lab modules.
 
 ---
 
 ## 9. DATABASE
 
-- **Type**: SQLite (path: `data/sentientai.db`)
-- **Tables / Models**:
-  - `users`: `id`, `username`, `email`, `hashed_password`, `role` (`user`|`tester`|`admin`), `is_active`, `created_at`.
+- **Type**: SQLite (`data/sentientai.db`)
+- **Tables**:
+  - `users`: `id`, `username`, `email`, `hashed_password`, `role`, `is_active`, `created_at`.
   - `blog_posts`: `id`, `slug`, `title`, `author`, `category`, `summary`, `content`, `reading_time`, `published`, `created_at`, `updated_at`.
-  - `security_events`: `id`, `user_id`, `lab_id`, `timestamp`, `method`, `endpoint`, `sanitized_payload`, `detection_result`, `attack_category`, `severity`, `success`, `blocked`, `explanation`, `defense_recommendation`, `raw_analysis_json`.
+  - `lab_sessions`: `id`, `session_id` (UUID str PK-like), `user_id`, `lab_id`, `status`, `started_at`, `ended_at`, `termination_reason`, `attack_count`, `detected_count`, `blocked_count`, `metadata_json`. ← NEW
+  - `security_events`: `id`, `user_id`, `lab_id`, `session_id` (FK → lab_sessions, nullable), `timestamp`, `method`, `endpoint`, `sanitized_payload`, `detection_result`, `attack_category`, `severity`, `success`, `blocked`, `explanation`, `defense_recommendation`, `raw_analysis_json`.
   - `training_examples`: `id`, `event_id`, `instruction`, `input_text`, `output_text`, `attack_type`, `severity`, `source`, `approved`, `reviewed_by`, `created_at`.
 
 ---
 
 ## 10. ENVIRONMENT / CONFIGURATION
 
-Configuration is loaded from `.env` in the root directory via `app/config.py`:
-
 | Variable | Description | Default / Required |
 |---|---|---|
-| `SECRET_KEY` | JWT signature encryption secret | Required (Set to secure random string) |
-| `DATABASE_URL` | SQLAlchemy database connection URI | Default: `sqlite:///./data/sentientai.db` |
-| `ENVIRONMENT` | Deployment mode (`development` or `production`) | Default: `development` |
-| `SENTINEL_MODEL_NAME` | Active Sentinel model identifier | Default: `SentinelSmolLM2-360M-V9` |
-| `CYBERLLM_API_URL` | Endpoint for external/local Sentinel model server | Optional (uses Mock client if blank) |
-| `CYBERLLM_API_KEY` | API authentication key for Sentinel model server | Optional |
-| `TEACHER_API_KEY` | API key for external Teacher reviewer model | Optional |
-| `TEACHER_BASE_URL` | Base URL for Teacher reviewer model API | Optional |
-| `TEACHER_MODEL` | Identifier for Teacher reviewer model | Optional |
-
-*(Note: Never commit `.env` containing sensitive credentials to Git).*
+| `SECRET_KEY` | JWT signature secret | Required |
+| `DATABASE_URL` | SQLAlchemy URI | `sqlite:///./data/sentientai.db` |
+| `ENVIRONMENT` | `development` or `production` | `development` |
+| `SENTINEL_MODEL_NAME` | Active model identifier | `SentinelSmolLM2-360M-V9` |
+| `CYBERLLM_API_URL` | Sentinel inference server endpoint | Optional (mock if blank) |
+| `CYBERLLM_API_KEY` | Sentinel inference API key | Optional |
+| `TEACHER_API_KEY` | Teacher reviewer API key | Optional |
+| `TEACHER_BASE_URL` | Teacher reviewer base URL | Optional |
+| `TEACHER_MODEL` | Teacher reviewer model ID | Optional |
 
 ---
 
 ## 11. HOW TO RUN
 
-### 1. Activate Environment & Install Dependencies
 ```powershell
-# In project root:
+# Activate venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
 
-### 2. Configure Environment
-```powershell
-# Copy template to .env if not already present
-Copy-Item .env.example .env
-```
-
-### 3. Seed Initial Data & Create Admin
-```powershell
-# Seed initial technical blog articles
+# First time: create admin, seed blog
+python manage.py create-admin --username admin --email admin@sentientai.local --password "AdminPassword123!"
 python manage.py seed-blog
 
-# Create an administrator account
-python manage.py create-admin --username admin --email admin@sentientai.local --password "AdminPassword123!"
-
-# Or promote an existing user to tester/admin
-python manage.py set-role --username <username> --role tester
-```
-
-### 4. Start the Application
-```powershell
+# Start app
 python run.py
 ```
-Access the application:
-- Public Website: `http://127.0.0.1:8000/`
-- Testing Environment (Requires tester/admin login): `http://127.0.0.1:8000/testing`
-- API Documentation: `http://127.0.0.1:8000/api/docs`
+
+- Public: `http://127.0.0.1:8000/`
+- Testing (tester/admin): `http://127.0.0.1:8000/testing`
+- API docs: `http://127.0.0.1:8000/api/docs`
 
 ---
 
 ## 12. KNOWN BUGS / PROBLEMS
 
-1. **Legacy Route Cleanliness**: `app/api/attacks.py` and `app/api/labs.py` are superseded by `app/api/testing.py` but still exist in the repository; they should be cleanly deprecated or removed in Phase 2.
-2. **Contact Form Storage**: `POST /contact` acknowledges the user's message but does not currently persist the message to a database table or forward via email.
-3. **Session Lifecycle Tracking**: Attack events are logged independently without a parent `LabSession` entity, meaning multi-step attack state cannot currently be correlated across a single lab attempt.
+1. **Legacy Route Files**: `app/api/attacks.py` and `app/api/labs.py` may still exist; superseded by `testing.py`.
+2. **Contact Form Storage**: `POST /contact` acknowledges but doesn't persist the message.
+3. **Session Duration**: `LabSession.duration_seconds` is a computed property — displayed as `—` on the timeline while a session is active (correct). Only shows once ended.
+4. **Detection Multi-Category**: When a payload matches both XSS and Command Injection patterns in the XSS lab, the first match wins. Category priority logic could be refined.
 
 ---
 
-## 13. NEXT STEPS
+## 13. NEXT STEPS (PHASE 3)
 
-1. **Implement `LabSession` & Session Lifecycle**: Create `LabSession` model to track active user test runs with distinct session tokens and state management.
-2. **Build Realistic Lab Target Sub-Apps**: Separate the lab interface into a believable mock application (e.g. comment service, customer portal) and an adjacent analyst telemetry panel.
-3. **Build Attack Timeline View**: Implement interactive event timelines mapping each request from initial reconnaissance to detection and session termination (`/testing/session-ended/{session_id}`).
-4. **Implement Real Sentinel Service Adapter**: Replace `MockCyberLLMClient` with a robust client connecting to the locally hosted `SentinelSmolLM2-360M-V9` model, formatting observed vs. inferred vs. unknown findings.
-5. **Develop Knowledge Pipeline & Review Workflow**: Build out `/testing/knowledge` and `/testing/training` views for auto-generating and approving knowledge candidates from lab incidents.
+1. **Wire Up Real Sentinel Client**: Set `CYBERLLM_API_URL` in `.env` to point to the local `SentinelSmolLM2-360M-V9` inference server. The adapter is ready.
+2. **Build `/testing/knowledge`**: Analyst-facing knowledge candidate review queue (pending `TrainingExample` items, batch approve/reject, confidence display).
+3. **Build `/testing/training`**: Training data export, JSONL inspection, and dataset health metrics.
+4. **Build `/testing/sentinel`**: Live model status page (connection status, model version, inference latency, queue depth).
+5. **Add Command Injection Lab Module**: A sandboxed `cmd_injection` lab with a realistic target (e.g. fake diagnostic tool UI) that demonstrates the vulnerability without executing real commands.
+6. **Add Path Traversal Lab Module**: Sandboxed file browser simulation.
+7. **Promote Existing Users to Tester**: `python manage.py set-role --username <name> --role tester`.
 
 ---
 
 ## 14. CURRENT CHECKPOINT
 
-- **Current Phase**: Completed Phase 1 (Public Website / Testing Environment Separation & RBAC).
-- **Last Completed Task**: Created `manage.py` CLI, established public content routes/templates, implemented `require_tester` RBAC, and created `PROJECT_STATE.md`.
-- **First Task to Continue With**: Phase 2 — Lab Session & Event Timeline Architecture (defining `LabSession` model, session lifecycle, and target application interface).
+- **Current Phase**: **Phase 2 Complete** — Lab Session Architecture & Realistic Target UX.
+- **Last Completed Task**: Full session lifecycle (create → track → terminate → session-ended dead-end), NexusBoard realistic XSS target, attack event timeline, Sentinel OBSERVED/INFERRED/UNKNOWN adapter, command injection always-blocks cross-lab.
+- **First Task to Continue With**: Phase 3 — Real Sentinel integration, `/testing/knowledge`, `/testing/training`, `/testing/sentinel` pages.
 - **Files Most Likely to be Modified Next**:
-  - `app/models/lab_session.py` (New model)
-  - `app/models/security_event.py` (Adding `session_id` foreign key)
-  - `app/api/testing.py` (Session creation, event timeline, and termination handlers)
-  - `app/templates/testing/session_detail.html` or `timeline.html`
-  - `app/services/analysis.py` (Session-aware analysis orchestration)
+  - `app/api/testing.py` (new sentinel/knowledge/training routes)
+  - `app/services/cyberllm_client.py` (activate `RealSentinelClient` via env)
+  - `app/templates/testing/` (new sentinel status, knowledge, training pages)
+  - `app/labs/` (new cmd_injection.py, path_traversal.py modules)

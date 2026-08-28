@@ -1,7 +1,7 @@
 """Analysis orchestrator — ties lab execution, detection, and logging together."""
 import json
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
 
@@ -18,12 +18,13 @@ def analyze_lab_submission(
     lab_category: str,
     payload: str,
     lab_result: Dict[str, Any],
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Full analysis pipeline for a lab submission.
 
     1. Run detection engine on the payload.
     2. Run CyberLLM analysis (mock for now).
-    3. Log SecurityEvent to DB.
+    3. Log SecurityEvent to DB (with session_id if provided).
     4. Generate + store TrainingExample.
     5. Return full result dict for the response page.
     """
@@ -50,9 +51,10 @@ def analyze_lab_submission(
     event = SecurityEvent(
         user_id=user_id,
         lab_id=lab_id,
+        session_id=session_id,
         timestamp=datetime.now(timezone.utc),
         method="POST",
-        endpoint=f"/api/lab/{lab_id}/submit",
+        endpoint=f"/testing/labs/{lab_id}/submit",
         sanitized_payload=payload[:500],
         detection_result="detected" if detection.detected else "not_detected",
         attack_category=detection.attack_category if detection.detected else "none",
@@ -98,6 +100,7 @@ def analyze_lab_submission(
 
     return {
         "event_id": event.id,
+        "session_id": session_id,
         "detected": detection.detected,
         "blocked": detection.should_block,
         "attack_type": analysis.attack_type,
