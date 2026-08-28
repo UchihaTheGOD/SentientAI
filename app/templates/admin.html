@@ -1,5 +1,9 @@
-{% extends "base.html" %}
+{% extends "base_testing.html" %}
 {% block title %}Admin — SentientAI{% endblock %}
+
+{% block breadcrumb %}
+<span>Administration</span>
+{% endblock %}
 
 {% block content %}
 <div class="section-header">
@@ -15,7 +19,7 @@
     </div>
     <div class="stat-card blue">
         <span class="stat-value">{{ total_attacks }}</span>
-        <span class="stat-label">Total Attacks</span>
+        <span class="stat-label">Total Events</span>
     </div>
     <div class="stat-card green">
         <span class="stat-value">{{ successful }}</span>
@@ -31,7 +35,7 @@
     <!-- Attacks by Category -->
     <div class="card">
         <div class="card-header">
-            <span class="card-title">Attacks by Category</span>
+            <span class="card-title">Events by Category</span>
         </div>
         {% if categories %}
         <div class="table-wrap">
@@ -54,7 +58,7 @@
         </div>
         {% else %}
         <div class="empty-state">
-            <p>No attack data yet.</p>
+            <p>No event data yet.</p>
         </div>
         {% endif %}
     </div>

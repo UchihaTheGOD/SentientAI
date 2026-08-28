@@ -1,0 +1,124 @@
+{% extends "base_public.html" %}
+{% block title %}{{ profile_user.display }} (@{{ profile_user.username }}) — Sentient{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+
+  {# Header #}
+  <div class="profile-header">
+    <div class="author-avatar author-avatar--hero">
+      {% if profile_user.avatar_url %}
+      <img src="{{ profile_user.avatar_url }}" alt="{{ profile_user.display }}">
+      {% else %}
+      {{ profile_user.display[0]|upper }}
+      {% endif %}
+    </div>
+
+    <div class="profile-info">
+      <h1 class="profile-name">{{ profile_user.display }}</h1>
+      <div class="profile-handle">@{{ profile_user.username }}</div>
+
+      {% if profile_user.bio %}
+      <p class="profile-bio">{{ profile_user.bio }}</p>
+      {% endif %}
+
+      {# Stats #}
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <span class="profile-stat-num">{{ user_posts|length }}</span>
+          <span class="profile-stat-label">Posts</span>
+        </div>
+        <div class="profile-stat">
+          <span class="profile-stat-num">{{ followers_count }}</span>
+          <span class="profile-stat-label">Followers</span>
+        </div>
+        <div class="profile-stat">
+          <span class="profile-stat-num">{{ following_count }}</span>
+          <span class="profile-stat-label">Following</span>
+        </div>
+      </div>
+
+      {# Actions #}
+      <div class="profile-actions">
+        {% if current_user and current_user.username == profile_user.username %}
+          <a href="/profile/edit" class="btn btn-ghost btn-sm">Edit profile</a>
+          <a href="/write" class="btn btn-primary btn-sm">Write post</a>
+          <a href="/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
+        {% elif current_user %}
+          <form method="POST" action="/users/{{ profile_user.username }}/follow">
+            <button type="submit" class="btn {% if is_following %}btn-ghost{% else %}btn-primary{% endif %} btn-sm">
+              {% if is_following %}Unfollow{% else %}Follow{% endif %}
+            </button>
+          </form>
+        {% else %}
+          <a href="/login" class="btn btn-primary btn-sm">Follow</a>
+        {% endif %}
+
+        {% if profile_user.website %}
+        <a href="{{ profile_user.website }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Website
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="text-xs text-muted" style="margin-top:var(--space-sm);">
+        Joined {{ profile_user.created_at.strftime('%B %Y') if profile_user.created_at else '' }}
+      </div>
+    </div>
+  </div>
+
+  {# Posts #}
+  <div style="margin-top:var(--space-xl);">
+    <div class="section-title">Posts</div>
+
+    {% if user_posts %}
+    {% for post in user_posts %}
+    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
+      <div class="post-card">
+        <div class="post-card-body">
+          <div class="post-card-meta">
+            <span class="tag">{{ post.category }}</span>
+            <span class="post-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
+          </div>
+          <h2 class="post-card-title">{{ post.title }}</h2>
+          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+          <div class="post-card-footer">
+            <span class="post-card-stat">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              {{ post.views or 0 }}
+            </span>
+            <span class="post-card-stat">{{ post.reading_time }} min read</span>
+          </div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">✍️</div>
+      <h3>No published posts yet</h3>
+      {% if current_user and current_user.username == profile_user.username %}
+      <p>Share something with the community.</p>
+      <a href="/write" class="btn btn-primary">Write your first post</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# Recent activity — subtle, not exposed if empty #}
+  {% if public_activity %}
+  <div style="margin-top:var(--space-2xl);">
+    <div class="section-title">Recent activity</div>
+    {% for act in public_activity[:10] %}
+    <div class="activity-item">
+      <div class="activity-dot"></div>
+      <div class="activity-text">{{ act.description }}</div>
+      <div class="activity-time">{{ act.created_at.strftime('%b %d') if act.created_at else '' }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -81,16 +81,16 @@
         </div>
         {% else %}
         <div class="empty-state">
-            <div class="icon">🔬</div>
-            <p>No activity yet. Start a lab to begin.</p>
+            <div class="icon">🎯</div>
+            <p>No test activity yet. Select a target to begin.</p>
         </div>
         {% endif %}
     </div>
 
-    <!-- Available Labs -->
+    <!-- Available Targets -->
     <div class="card">
         <div class="card-header">
-            <span class="card-title">Available Labs</span>
+            <span class="card-title">Available Targets</span>
             <a href="/labs" class="btn btn-outline btn-sm">View All</a>
         </div>
         {% for lab in labs %}

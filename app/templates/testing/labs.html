@@ -1,0 +1,39 @@
+{% extends "base_testing.html" %}
+{% block title %}Labs — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span> <span>Labs</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Security Labs</h1>
+    <span class="badge badge-cyan">{{ labs|length }} Labs</span>
+</div>
+
+<p style="color:var(--text-secondary);margin-bottom:24px;">
+    Isolated sandbox targets for authorized security testing. All labs use simulated data and sandboxed execution.
+</p>
+
+<div class="grid-3">
+    {% for lab in labs %}
+    <a href="/testing/labs/{{ lab.id }}" style="text-decoration:none;color:inherit;">
+        <div class="lab-card">
+            <h3>{{ lab.name }}</h3>
+            <p>{{ lab.description.split('\n')[2] if lab.description.split('\n')|length > 2 else lab.description[:100] }}</p>
+            <div class="lab-meta">
+                <span class="badge badge-cyan">{{ lab.category }}</span>
+                <span class="badge badge-blue">{{ lab.difficulty }}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if not labs %}
+<div class="empty-state">
+    <div class="icon">⧫</div>
+    <p>No labs configured.</p>
+</div>
+{% endif %}
+{% endblock %}

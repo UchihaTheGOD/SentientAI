@@ -3,7 +3,7 @@
 
 {% block content %}
 <div style="margin-bottom:8px;">
-    <a href="/labs/{{ result.lab_id }}" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Lab</a>
+    <a href="/labs/{{ result.lab_id }}" style="color:var(--text-secondary);font-size:0.9rem;">← Back to Target</a>
 </div>
 
 <!-- Result Header -->
@@ -60,14 +60,14 @@
 
         <!-- What Happened -->
         <div class="result-section">
-            <h3>What Happened</h3>
+            <h3>Detection & Execution Analysis</h3>
             <div class="content">{{ result.explanation }}</div>
         </div>
 
-        <!-- Educational Explanation -->
+        <!-- Technique Details -->
         {% if result.technique_description %}
         <div class="result-section">
-            <h3>Educational Explanation</h3>
+            <h3>Technique & Threat Profile</h3>
             <div class="content">{{ result.technique_description }}</div>
         </div>
         {% endif %}
@@ -75,24 +75,24 @@
         <!-- Defense Recommendation -->
         {% if result.defense_recommendation %}
         <div class="result-section">
-            <h3>Recommended Defense</h3>
+            <h3>Remediation & Hardening</h3>
             <div class="content">{{ result.defense_recommendation }}</div>
         </div>
         {% endif %}
     </div>
 
     <div>
-        <!-- Lab Output -->
+        <!-- Target Output -->
         <div class="result-section">
-            <h3>Lab Output</h3>
+            <h3>Target Response Output</h3>
             <pre>{{ lab_output }}</pre>
         </div>
 
         <!-- Actions -->
         <div style="display:flex;gap:12px;margin-top:20px;">
-            <a href="/labs/{{ result.lab_id }}" class="btn btn-primary">Try Again</a>
-            <a href="/attacks/{{ result.event_id }}" class="btn btn-outline">View Event Detail</a>
-            <a href="/labs" class="btn btn-outline">All Labs</a>
+            <a href="/labs/{{ result.lab_id }}" class="btn btn-primary">Retest Target</a>
+            <a href="/attacks/{{ result.event_id }}" class="btn btn-outline">View Event Telemetry</a>
+            <a href="/labs" class="btn btn-outline">All Targets</a>
         </div>
     </div>
 </div>

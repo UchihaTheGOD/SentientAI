@@ -1,0 +1,74 @@
+{% extends "base_public.html" %}
+{% set user = current_user %}
+{% block title %}About — SentientAI{% endblock %}
+{% block meta_description %}Learn about SentientAI — what it is, how the testing labs work, what Sentinel does, and why lab isolation matters.{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="about-header">
+        <h1>About SentientAI</h1>
+        <p class="about-lead">SentientAI is a cybersecurity learning platform built around isolated labs, structured detection, and a human-verified knowledge pipeline.</p>
+    </div>
+
+    <div class="about-sections">
+        <section class="about-section">
+            <h2>What SentientAI is</h2>
+            <p>SentientAI is a platform for learning cybersecurity through practice. It provides controlled, isolated lab environments where security researchers and learners can safely explore how attacks work — and how to detect and defend against them.</p>
+            <p>The platform is not a scanning tool, not a penetration testing service, and not a way to attack real systems. All activity happens inside sandboxed simulations with no connection to production infrastructure.</p>
+        </section>
+
+        <section class="about-section">
+            <h2>The Testing Environment</h2>
+            <p>The testing environment is a separate area of the platform, accessible only to approved tester accounts. Inside the testing environment, users can:</p>
+            <ul>
+                <li>Browse and launch security labs covering common vulnerability types</li>
+                <li>Submit test inputs against realistic but isolated target applications</li>
+                <li>View structured detection results and telemetry for every interaction</li>
+                <li>Review Sentinel AI analysis that separates observations from inferences</li>
+                <li>Explore the knowledge base that grows from reviewed lab findings</li>
+            </ul>
+            <p>The testing environment looks and feels different from the public website — it is designed for focused, technical security research work.</p>
+        </section>
+
+        <section class="about-section">
+            <h2>What Sentinel is</h2>
+            <p>Sentinel is SentientAI's local cybersecurity analysis model. Currently running <strong>SentinelSmolLM2-360M-V9</strong>, Sentinel analyzes security events from the labs and produces structured assessments.</p>
+            <p>Sentinel's output always distinguishes between three categories:</p>
+            <ul>
+                <li><strong>Observed</strong> — What actually happened, based on telemetry and evidence</li>
+                <li><strong>Inferred</strong> — What the model believes is likely, based on patterns and context</li>
+                <li><strong>Unknown</strong> — What cannot be determined from available evidence</li>
+            </ul>
+            <p>This distinction is fundamental. Sentinel is designed to be honest about what it does and does not know.</p>
+        </section>
+
+        <section class="about-section">
+            <h2>How learning works</h2>
+            <p>When an attack is detected in a lab, the system generates a <em>knowledge candidate</em> — a structured lesson capturing what was observed and analyzed. This candidate goes through a review queue:</p>
+            <ol>
+                <li>Lab event generates telemetry</li>
+                <li>Detection engine and Sentinel analyze the event</li>
+                <li>A knowledge candidate is created with a confidence score</li>
+                <li>A human reviewer approves, edits, or rejects the candidate</li>
+                <li>Approved knowledge enters the platform's learning base</li>
+                <li>Approved examples can be exported for model training</li>
+            </ol>
+            <p>Nothing becomes "knowledge" without human review. The platform never automatically publishes AI-generated content.</p>
+        </section>
+
+        <section class="about-section">
+            <h2>Why labs are isolated</h2>
+            <p>Lab isolation is a hard requirement, not a suggestion. Every lab operates under these constraints:</p>
+            <ul>
+                <li>Labs use simulated data — no real user information, credentials, or system files are involved</li>
+                <li>SQL injection labs query fake in-memory databases, not real database servers</li>
+                <li>XSS labs simulate rendering behavior without executing scripts in real browsers</li>
+                <li>Command injection labs use safe simulators — no real system commands are ever executed</li>
+                <li>Path traversal labs operate on virtual filesystems with no access to real directories</li>
+                <li>No lab can reach the host machine, production databases, or external targets</li>
+            </ul>
+            <p>The goal is education and research, not exploitation.</p>
+        </section>
+    </div>
+</div>
+{% endblock %}

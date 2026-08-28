@@ -39,7 +39,7 @@ def _validate_registration(username: str, email: str, password: str, confirm_pas
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request, user=Depends(get_current_user_optional)):
     if user:
-        return RedirectResponse(url="/dashboard", status_code=303)
+        return RedirectResponse(url=_home_url_for(user), status_code=303)
     return templates.TemplateResponse("register.html", {"request": request, "error": None})
 
 
@@ -50,7 +50,6 @@ def register(
     email: str = Form(...),
     password: str = Form(...),
     confirm_password: str = Form(...),
-    admin_secret: str = Form(""),
     db: Session = Depends(get_db),
 ):
     error = _validate_registration(username, email, password, confirm_password)
@@ -63,13 +62,12 @@ def register(
     if db.query(User).filter(User.email == email).first():
         return templates.TemplateResponse("register.html", {"request": request, "error": "Email already registered."})
 
-    # Create user
-    is_admin = bool(admin_secret and admin_secret == settings.ADMIN_SECRET)
+    # All new registrations are normal users. Admin/tester promotion via manage.py CLI.
     user = User(
         username=username,
         email=email,
         hashed_password=hash_password(password),
-        is_admin=is_admin,
+        role="user",
     )
     db.add(user)
     db.commit()
@@ -77,10 +75,17 @@ def register(
     return RedirectResponse(url="/login?registered=1", status_code=303)
 
 
+def _home_url_for(user: User) -> str:
+    """Return the appropriate home URL based on user role."""
+    if user.role in ("tester", "admin"):
+        return "/testing"
+    return "/"
+
+
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, registered: str = "", user=Depends(get_current_user_optional)):
     if user:
-        return RedirectResponse(url="/dashboard", status_code=303)
+        return RedirectResponse(url=_home_url_for(user), status_code=303)
     msg = "Account created. Please log in." if registered else None
     return templates.TemplateResponse("login.html", {"request": request, "error": None, "message": msg})
 
@@ -104,7 +109,7 @@ def login(
         })
 
     token = create_access_token(data={"sub": str(user.id)})
-    response = RedirectResponse(url="/dashboard", status_code=303)
+    response = RedirectResponse(url=_home_url_for(user), status_code=303)
     response.set_cookie(
         key="access_token",
         value=token,
@@ -117,6 +122,6 @@ def login(
 
 @router.get("/logout")
 def logout():
-    response = RedirectResponse(url="/login", status_code=303)
+    response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("access_token")
     return response

@@ -1,0 +1,66 @@
+{% extends "base_testing.html" %}
+{% block title %}{{ lab.name }} — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span>
+<a href="/testing/labs">Labs</a> <span class="breadcrumb-sep">›</span>
+<span>{{ lab.name }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">{{ lab.name }}</h1>
+    <div style="display:flex;gap:8px;">
+        <span class="badge badge-cyan">{{ lab.category }}</span>
+        <span class="badge badge-blue">{{ lab.difficulty }}</span>
+        {% if session %}
+        <span class="badge badge-green">Session Active</span>
+        {% endif %}
+    </div>
+</div>
+
+{% if session %}
+<div class="alert alert-info" style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <span>
+        Session <span class="mono" style="font-size:0.82rem;">{{ session.session_id[:16] }}…</span>
+        &nbsp;·&nbsp; {{ session.attack_count or 0 }} submission(s)
+    </span>
+    <a href="/testing/sessions/{{ session.session_id }}" style="font-size:0.82rem;">View Timeline →</a>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <!-- Target Overview -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Target Specification</span>
+        </div>
+        <div style="color:var(--text-secondary);font-size:0.92rem;line-height:1.8;">
+            {{ lab.description | replace('\n', '<br>') | safe }}
+        </div>
+    </div>
+
+    <!-- Lab Input -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Test Input</span>
+        </div>
+        <form method="post" action="/testing/labs/{{ lab.id }}/submit" class="lab-form">
+            {% if session %}
+            <input type="hidden" name="session_id" value="{{ session.session_id }}">
+            {% endif %}
+            <div class="form-group">
+                <label for="payload">Enter your payload</label>
+                <textarea id="payload" name="payload" class="form-control" rows="6"
+                          placeholder="Type your test input here..."></textarea>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;">
+                <button type="submit" class="btn btn-primary">Submit & Analyze</button>
+                <span style="color:var(--text-muted);font-size:0.82rem;">
+                    All inputs are logged and analyzed.
+                </span>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

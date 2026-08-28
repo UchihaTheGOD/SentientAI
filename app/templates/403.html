@@ -1,0 +1,17 @@
+{% extends "base_public.html" %}
+{% set user = None %}
+{% block title %}Access Denied — SentientAI{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="blocked-container">
+        <div class="blocked-icon" style="background:rgba(210,153,34,0.12);color:var(--accent-orange);">⚠</div>
+        <h1>Access Denied</h1>
+        <p>You don't have permission to access this page. The testing environment requires a tester or admin account.</p>
+        <div style="display:flex;gap:12px;justify-content:center;">
+            <a href="/" class="btn btn-primary">Go Home</a>
+            <a href="/login" class="btn btn-outline">Sign In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

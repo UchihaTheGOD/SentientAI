@@ -1,0 +1,121 @@
+{% extends "base_public.html" %}
+{% block title %}Search — Sentient{% endblock %}
+
+{% block content %}
+<div class="search-layout">
+  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-lg);">Search</h1>
+
+  {# Search bar #}
+  <div class="search-bar-wrap">
+    <form method="GET" action="/search">
+      <div class="search-bar">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search posts, people, or tags…" autofocus>
+        <button type="submit">Search</button>
+      </div>
+    </form>
+  </div>
+
+  {# Kind tabs #}
+  {% if q %}
+  <div class="search-kind-tabs">
+    <a href="/search?q={{ q|urlencode }}&kind=posts" class="filter-tab {% if kind == 'posts' %}active{% endif %}">Posts</a>
+    <a href="/search?q={{ q|urlencode }}&kind=users" class="filter-tab {% if kind == 'users' %}active{% endif %}">People</a>
+    <a href="/search?q={{ q|urlencode }}&kind=tags" class="filter-tab {% if kind == 'tags' %}active{% endif %}">Tags</a>
+  </div>
+  {% endif %}
+
+  {# Results #}
+  {% if q %}
+    {# Post results #}
+    {% if kind == 'posts' %}
+      {% if results_posts %}
+      <p class="text-sm text-muted" style="margin-bottom:var(--space-md);">{{ results_posts|length }} result{{ 's' if results_posts|length != 1 }} for "{{ q }}"</p>
+      {% for post in results_posts %}
+      <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
+        <div class="post-card">
+          <div class="post-card-body">
+            <div class="post-card-meta">
+              <div class="post-card-author">
+                <div class="author-avatar">{{ post.author[0]|upper }}</div>
+                <span>{{ post.author }}</span>
+              </div>
+              <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
+            </div>
+            <h2 class="post-card-title">{{ post.title }}</h2>
+            <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+            <div class="post-card-footer">
+              <span class="post-card-stat">{{ post.reading_time }} min read</span>
+              <span class="post-card-stat">{{ post.views or 0 }} views</span>
+            </div>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">🔎</div>
+        <h3>No posts found for "{{ q }}"</h3>
+        <p>Try different keywords, or <a href="/search?q={{ q|urlencode }}&kind=users" style="color:var(--accent);">search for people</a>.</p>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    {# User results #}
+    {% if kind == 'users' %}
+      {% if results_users %}
+      <p class="text-sm text-muted" style="margin-bottom:var(--space-md);">{{ results_users|length }} people found</p>
+      {% for u in results_users %}
+      <a href="/u/{{ u.username }}" style="text-decoration:none;">
+        <div class="author-item card" style="margin-bottom:var(--space-sm);">
+          <div class="author-avatar author-avatar--xl">
+            {% if u.avatar_url %}<img src="{{ u.avatar_url }}" alt="">{% else %}{{ u.display[0]|upper }}{% endif %}
+          </div>
+          <div class="author-item-info">
+            <div class="author-item-name" style="font-size:1rem;">{{ u.display }}</div>
+            <div class="author-item-meta">@{{ u.username }}</div>
+            {% if u.bio %}<p class="text-sm text-muted" style="margin-top:4px;">{{ u.bio[:100] }}{% if u.bio|length > 100 %}…{% endif %}</p>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">👤</div>
+        <h3>No people found for "{{ q }}"</h3>
+      </div>
+      {% endif %}
+    {% endif %}
+
+    {# Tag results #}
+    {% if kind == 'tags' %}
+      {% if results_tags %}
+      <p class="text-sm text-muted" style="margin-bottom:var(--space-md);">{{ results_tags|length }} tag{{ 's' if results_tags|length != 1 }} found</p>
+      <div class="category-chips" style="gap:var(--space-sm);">
+        {% for tag in results_tags %}
+        <a href="/explore?tag={{ tag.slug }}" class="tag" style="font-size:1rem;padding:8px 18px;">#{{ tag.name }}</a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">🏷️</div>
+        <h3>No tags found for "{{ q }}"</h3>
+      </div>
+      {% endif %}
+    {% endif %}
+
+  {% else %}
+    {# No query — show trending tags #}
+    <div>
+      <div class="section-title">Trending tags</div>
+      <div class="category-chips" style="gap:var(--space-sm);">
+        {% for tag, cnt in trending_tags %}
+        <a href="/explore?tag={{ tag.slug }}" class="tag">#{{ tag.name }} <span style="opacity:.5;font-size:.8em;">{{ cnt }}</span></a>
+        {% endfor %}
+        {% if not trending_tags %}
+        <p class="text-muted text-sm">No tags yet. Start writing to create some.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

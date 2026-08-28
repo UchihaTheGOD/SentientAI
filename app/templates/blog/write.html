@@ -1,0 +1,82 @@
+{% extends "base_public.html" %}
+{% block title %}{% if post and post.id is defined %}Edit post{% else %}Write a new post{% endif %} — Sentient{% endblock %}
+
+{% block content %}
+<div class="write-page">
+
+  <div class="write-toolbar">
+    <div style="font-size:0.9rem;color:var(--text-muted);">
+      {% if post and post.id is defined %}Editing: <strong>{{ post.title }}</strong>{% else %}New post{% endif %}
+    </div>
+    <div class="write-actions">
+      <a href="{% if post and post.id is defined %}/blog/{{ post.slug }}{% else %}/blog{% endif %}" class="btn btn-ghost btn-sm">Cancel</a>
+    </div>
+  </div>
+
+  {% if errors %}
+  <div class="alert alert-error">
+    <ul style="margin:0;padding-left:1.2em;">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="POST"
+        action="{% if post and post.id is defined %}/blog/{{ post.slug }}/edit{% else %}/write{% endif %}"
+        data-once>
+
+    <div class="form-group">
+      <input type="text" name="title" class="write-title-input"
+             placeholder="Title of your post…"
+             value="{{ post.title if post else '' }}" required minlength="5">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);margin-bottom:var(--space-md);">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="category">Category</label>
+        <select name="category" id="category" class="form-select" required>
+          <option value="">Choose a category…</option>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if post and post.category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="summary">Short summary (optional)</label>
+        <input type="text" name="summary" id="summary" class="form-input"
+               placeholder="One sentence about this post…"
+               value="{{ post.summary if post else '' }}" maxlength="300">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Content</label>
+      <textarea name="content" class="write-body-input"
+                placeholder="Write your post here… Markdown-style formatting is supported. Use double newlines for paragraphs."
+                required minlength="20">{{ post.content if post else '' }}</textarea>
+      <div class="form-hint">Tip: Use two blank lines to separate paragraphs. Code blocks use triple backticks.</div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-md);margin-top:var(--space-lg);">
+      <div style="display:flex;align-items:center;gap:var(--space-sm);">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.9rem;">
+          <input type="checkbox" name="published" value="true"
+                 {% if post and post.published %}checked{% endif %}
+                 style="width:16px;height:16px;accent-color:var(--accent);">
+          Publish now
+        </label>
+        <span class="text-xs text-muted">(uncheck to save as draft)</span>
+      </div>
+      <div class="write-actions">
+        <button type="submit" name="published" value="false" formnovalidate class="btn btn-ghost btn-sm" data-loading="Saving…">
+          Save draft
+        </button>
+        <button type="submit" class="btn btn-primary" data-loading="Publishing…">
+          {% if post and post.id is defined %}Update post{% else %}Publish{% endif %}
+        </button>
+      </div>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

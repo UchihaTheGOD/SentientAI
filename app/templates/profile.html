@@ -1,33 +1,45 @@
-{% extends "base.html" %}
+{% extends "base_public.html" %}
+{% set user = current_user %}
 {% block title %}Profile — SentientAI{% endblock %}
 
 {% block content %}
-<div class="section-header">
-    <h1 class="section-title">Profile</h1>
-</div>
-
-<div class="card" style="max-width:600px;">
-    <div style="display:grid;grid-template-columns:140px 1fr;gap:14px;font-size:0.95rem;">
-        <span style="color:var(--text-muted);font-weight:500;">Username</span>
-        <span>{{ user.username }}</span>
-
-        <span style="color:var(--text-muted);font-weight:500;">Email</span>
-        <span>{{ user.email }}</span>
-
-        <span style="color:var(--text-muted);font-weight:500;">Role</span>
-        <span>
-            {% if user.is_admin %}
-            <span class="badge badge-purple">Admin</span>
-            {% else %}
-            <span class="badge badge-blue">User</span>
-            {% endif %}
-        </span>
-
-        <span style="color:var(--text-muted);font-weight:500;">Member Since</span>
-        <span>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</span>
-
-        <span style="color:var(--text-muted);font-weight:500;">Total Attacks</span>
-        <span class="mono">{{ total_attacks }}</span>
+<div class="container">
+    <div class="section-header">
+        <h1 class="section-title">Profile</h1>
     </div>
+
+    <div class="card" style="max-width:600px;">
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:14px;font-size:0.95rem;">
+            <span style="color:var(--text-muted);font-weight:500;">Username</span>
+            <span>{{ user.username }}</span>
+
+            <span style="color:var(--text-muted);font-weight:500;">Email</span>
+            <span>{{ user.email }}</span>
+
+            <span style="color:var(--text-muted);font-weight:500;">Role</span>
+            <span>
+                {% if user.role == 'admin' %}
+                <span class="badge badge-purple">Admin</span>
+                {% elif user.role == 'tester' %}
+                <span class="badge badge-cyan">Tester</span>
+                {% else %}
+                <span class="badge badge-blue">User</span>
+                {% endif %}
+            </span>
+
+            <span style="color:var(--text-muted);font-weight:500;">Member Since</span>
+            <span>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</span>
+        </div>
+    </div>
+
+    {% if user.is_tester %}
+    <div class="card" style="max-width:600px;margin-top:20px;">
+        <div class="card-header">
+            <span class="card-title">Testing Environment</span>
+        </div>
+        <p style="color:var(--text-secondary);margin-bottom:16px;">Your account has access to the security testing lab.</p>
+        <a href="/testing" class="btn btn-primary">Open Testing Environment</a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

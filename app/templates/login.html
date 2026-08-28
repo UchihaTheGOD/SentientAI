@@ -1,34 +1,44 @@
-{% extends "base.html" %}
+{% extends "base_public.html" %}
 {% set user = None %}
-{% block title %}Login — SentientAI{% endblock %}
+{% block title %}Sign in — Sentient{% endblock %}
 
 {% block content %}
-<div class="auth-container">
-    <h1>Sign In</h1>
-    <p class="subtitle">Access your cybersecurity training dashboard.</p>
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <span style="font-size:2rem;color:var(--accent);">◆</span>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to your Sentient account.</p>
 
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
 
     {% if message %}
-    <div class="alert alert-success" data-dismiss>{{ message }}</div>
+    <div class="alert alert-success" data-autodismiss>{{ message }}</div>
     {% endif %}
 
-    <div class="card">
-        <form method="post" action="/login">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" class="form-control" required autocomplete="username">
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password">
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%;">Sign In</button>
-        </form>
-    </div>
+    <form method="post" action="/login" data-once>
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input type="text" id="username" name="username" class="form-input"
+               required autocomplete="username" autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-input"
+               required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:var(--space-sm);" data-loading="Signing in…">
+        Sign in
+      </button>
+    </form>
 
-    <p class="auth-footer">Don't have an account? <a href="/register">Register</a></p>
+    <div class="auth-footer">
+      Don't have an account? <a href="/register">Create one — free</a>
+    </div>
+  </div>
 </div>
 {% endblock %}

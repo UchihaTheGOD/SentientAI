@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Labs — SentientAI{% endblock %}
+{% block title %}Targets — SentientAI{% endblock %}
 
 {% block content %}
 <div class="section-header">
-    <h1 class="section-title">Training Labs</h1>
-    <span class="badge badge-cyan">{{ labs|length }} Available</span>
+    <h1 class="section-title">Attack Targets</h1>
+    <span class="badge badge-cyan">{{ labs|length }} Targets</span>
 </div>
 
 <p style="color:var(--text-secondary);margin-bottom:28px;">
-    Practice attack techniques against sandboxed targets. All labs use fake data and isolated environments.
+    Execute and test attack vectors against isolated sandbox targets. All targets run on mock architectures with telemetry detection.
 </p>
 
 <div class="grid-3">
@@ -28,8 +28,8 @@
 
 {% if not labs %}
 <div class="empty-state">
-    <div class="icon">🔬</div>
-    <p>No labs available yet.</p>
+    <div class="icon">🎯</div>
+    <p>No attack targets configured.</p>
 </div>
 {% endif %}
 {% endblock %}

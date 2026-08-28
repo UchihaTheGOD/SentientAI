@@ -1,0 +1,100 @@
+{% extends "base_public.html" %}
+{% block title %}Community — Sentient{% endblock %}
+
+{% block content %}
+<div class="community-layout">
+  <main>
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-xl);">Community</h1>
+
+    {# Recent posts #}
+    {% if recent_posts %}
+    <div class="section-title">Recent posts</div>
+    {% for post in recent_posts %}
+    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
+      <div class="post-card">
+        <div class="post-card-body">
+          <div class="post-card-meta">
+            <div class="post-card-author">
+              <div class="author-avatar">{{ post.author[0]|upper }}</div>
+              <span>{{ post.author }}</span>
+            </div>
+            <span class="post-card-date">{{ post.created_at.strftime('%b %d') if post.created_at else '' }}</span>
+            <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
+          </div>
+          <h2 class="post-card-title">{{ post.title }}</h2>
+          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
+          <div class="post-card-footer">
+            <span class="post-card-stat">{{ post.reading_time }} min read</span>
+          </div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+    <div style="text-align:center;margin-top:var(--space-lg);">
+      <a href="/explore" class="btn btn-ghost">Explore more posts →</a>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">✨</div>
+      <h3>Nothing posted yet</h3>
+      <p>Be the first to share something with the community.</p>
+      {% if current_user %}
+      <a href="/write" class="btn btn-primary">Write a post</a>
+      {% else %}
+      <a href="/register" class="btn btn-primary">Join to write</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# Activity stream #}
+    {% if recent_activities %}
+    <div style="margin-top:var(--space-2xl);">
+      <div class="section-title">Recent activity</div>
+      {% for act in recent_activities %}
+      {% set act_user = users_map.get(act.user_id) %}
+      <div class="activity-item">
+        <div class="activity-dot"></div>
+        <div class="activity-text">
+          {% if act_user %}
+          <a href="/u/{{ act_user.username }}" style="font-weight:500;color:var(--text-primary);">{{ act_user.display }}</a>
+          {% endif %}
+          {{ act.description }}
+        </div>
+        <div class="activity-time">{{ act.created_at.strftime('%b %d') if act.created_at else '' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </main>
+
+  <aside class="sidebar">
+    {# Top contributors #}
+    {% if top_contributors %}
+    <div class="sidebar-widget">
+      <div class="sidebar-widget-title">Top contributors</div>
+      <div class="author-list">
+        {% for author, count in top_contributors %}
+        <a href="/u/{{ author.username }}" class="author-item">
+          <div class="author-avatar author-avatar--lg">
+            {% if author.avatar_url %}<img src="{{ author.avatar_url }}" alt="">{% else %}{{ author.display[0]|upper }}{% endif %}
+          </div>
+          <div class="author-item-info">
+            <div class="author-item-name">{{ author.display }}</div>
+            <div class="author-item-meta">{{ count }} post{{ 's' if count != 1 }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not current_user %}
+    <div class="sidebar-widget card" style="background:linear-gradient(135deg,#ede9fe,#dbeafe);border-color:#c4b5fd;">
+      <p style="font-size:0.9rem;margin-bottom:var(--space-md);line-height:1.6;"><strong>Join the community.</strong><br>Write posts, follow people you like, leave comments.</p>
+      <a href="/register" class="btn btn-primary" style="width:100%;justify-content:center;">Create free account</a>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

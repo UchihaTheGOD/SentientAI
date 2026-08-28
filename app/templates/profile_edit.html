@@ -1,0 +1,81 @@
+{% extends "base_public.html" %}
+{% block title %}Edit profile — Sentient{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;padding:var(--space-2xl) var(--space-lg);">
+  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-xl);">Edit profile</h1>
+
+  {% if success %}
+  <div class="alert alert-success" data-autodismiss>Profile updated successfully.</div>
+  {% endif %}
+
+  {% if errors %}
+  <div class="alert alert-error">
+    <ul style="margin:0;padding-left:1.2em;">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/profile/edit" data-once>
+    <div class="form-group">
+      <label class="form-label" for="display_name">Display name</label>
+      <input type="text" id="display_name" name="display_name" class="form-input"
+             value="{{ current_user.display_name or '' }}"
+             placeholder="{{ current_user.username }}" maxlength="100">
+      <div class="form-hint">How your name appears on posts and comments.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="bio">Bio</label>
+      <textarea id="bio" name="bio" class="form-textarea" rows="3"
+                placeholder="Tell people a bit about yourself…"
+                maxlength="500">{{ current_user.bio or '' }}</textarea>
+      <div class="form-hint">Max 500 characters.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="website">Website</label>
+      <input type="url" id="website" name="website" class="form-input"
+             value="{{ current_user.website or '' }}"
+             placeholder="https://yoursite.com">
+    </div>
+
+    <div style="display:flex;gap:var(--space-sm);justify-content:flex-end;padding-top:var(--space-md);border-top:1px solid var(--border);">
+      <a href="/u/{{ current_user.username }}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-loading="Saving…">Save changes</button>
+    </div>
+  </form>
+
+  <hr class="divider">
+
+  {# Account section #}
+  <div>
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:var(--space-md);">Account</h2>
+    <div class="card" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+      <div class="flex-between">
+        <div>
+          <div class="text-sm font-weight:500;">Username</div>
+          <div class="text-sm text-muted">@{{ current_user.username }}</div>
+        </div>
+      </div>
+      <div class="flex-between">
+        <div>
+          <div class="text-sm">Email</div>
+          <div class="text-sm text-muted">{{ current_user.email }}</div>
+        </div>
+      </div>
+      <div class="flex-between">
+        <div>
+          <div class="text-sm">Role</div>
+          <div class="text-sm text-muted">{{ current_user.role }}</div>
+        </div>
+      </div>
+      <div class="flex-between">
+        <div>
+          <div class="text-sm">Joined</div>
+          <div class="text-sm text-muted">{{ current_user.created_at.strftime('%B %Y') if current_user.created_at else '—' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

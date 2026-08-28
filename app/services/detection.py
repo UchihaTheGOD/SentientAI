@@ -69,6 +69,10 @@ AUTH_BYPASS_PATTERNS = [
     (r"(password|123456|qwerty|letmein)", "Common weak password"),
 ]
 
+# Severity ranking — higher value = more dangerous. Used to ensure the most
+# severe classification wins when multiple categories match a single payload.
+SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
 CATEGORY_CONFIG = {
     "sqli": {
         "patterns": SQL_INJECTION_PATTERNS,
@@ -132,6 +136,10 @@ def detect(payload: str, lab_category: str) -> DetectionResult:
 
     Returns:
         DetectionResult with findings.
+
+    Note:
+        Command injection is always checked regardless of lab_category, because
+        it is critical severity and should always be blocked across all labs.
     """
     result = DetectionResult()
 
@@ -139,17 +147,26 @@ def detect(payload: str, lab_category: str) -> DetectionResult:
         # Run all categories
         categories_to_check = list(CATEGORY_CONFIG.keys())
     else:
+        # Always include command_injection — critical, must block everywhere.
+        # Use a deterministic list (not a set) so iteration order is stable.
         categories_to_check = [lab_category]
+        if lab_category != "command_injection":
+            categories_to_check.append("command_injection")
 
     for cat_key in categories_to_check:
         config = CATEGORY_CONFIG[cat_key]
         for pattern, description in config["patterns"]:
             if re.search(pattern, payload, re.IGNORECASE):
                 result.detected = True
-                result.attack_category = config["name"]
-                result.severity = config["severity"]
                 result.patterns_matched.append(description)
-                result.defense_recommendation = config["defense"]
+
+                # Keep the most severe classification — never downgrade.
+                current_sev = SEVERITY_ORDER.get(config["severity"], 0)
+                best_sev = SEVERITY_ORDER.get(result.severity, 0)
+                if current_sev >= best_sev:
+                    result.attack_category = config["name"]
+                    result.severity = config["severity"]
+                    result.defense_recommendation = config["defense"]
 
     if result.detected:
         matched_str = "; ".join(result.patterns_matched)
@@ -162,3 +179,4 @@ def detect(payload: str, lab_category: str) -> DetectionResult:
             result.should_block = True
 
     return result
+

@@ -17,22 +17,20 @@ FAKE_USERS_DB = [
 ]
 
 SQLI_DESCRIPTION = """
-## SQL Injection Lab
+## SQL Injection Target
 
-This lab simulates a vulnerable user lookup feature. The application builds
-a SQL query by directly concatenating user input — a classic SQL injection
-vulnerability.
+This target simulates a vulnerable user query endpoint. The service constructs
+an unparameterized query string by directly concatenating user-supplied input.
 
-**Your task:** Try to extract data you shouldn't have access to, or bypass
-the intended query logic.
+**Testing Objective:** Attempt authentication/query logic bypass or unauthorized data exfiltration.
 
-**Example inputs to try:**
-- `alice` (normal lookup)
-- `' OR '1'='1` (tautology injection)
-- `' UNION SELECT * FROM users --` (union injection)
-- `'; DROP TABLE users --` (destructive injection)
+**Test Vectors:**
+- `alice` (baseline query)
+- `' OR '1'='1` (boolean tautology bypass)
+- `' UNION SELECT * FROM users --` (union schema extraction)
+- `'; DROP TABLE users --` (destructive query simulation)
 
-All data is fake. No real database is affected.
+All operations are strictly contained within an isolated mock data layer.
 """
 
 
@@ -149,12 +147,12 @@ def handle_sqli_lab(payload: str) -> Dict[str, Any]:
             }
 
 
-# Register the lab
+# Register the target
 register_lab(
     lab_id="sqli",
-    name="SQL Injection Lab",
+    name="SQL Injection Target",
     category="sqli",
-    difficulty="Beginner",
+    difficulty="Intermediate",
     description=SQLI_DESCRIPTION,
     handler=handle_sqli_lab,
 )
