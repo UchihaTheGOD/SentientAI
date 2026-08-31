@@ -101,12 +101,13 @@ def contact_submit(
 
 
 @router.get("/profile", response_class=HTMLResponse)
-def profile(
-    request: Request,
-    user: User = Depends(get_current_user),
-):
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
-        "current_user": user,
-        "user": user,
-    })
+def profile(user: User = Depends(get_current_user)):
+    """Kept as a redirect because the testing-area sidebar still links here.
+
+    The page this used to render predated the public/private split: it showed the
+    account's e-mail in a bare grid and advertised the testing environment, both
+    on a public route and in the testing area's visual language. Everything it
+    offered now lives on the public profile, `/profile/edit` and
+    `/account/password`.
+    """
+    return RedirectResponse(f"/u/{user.username}", status_code=303)

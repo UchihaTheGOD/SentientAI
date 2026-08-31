@@ -1,39 +1,61 @@
 {% extends "base_public.html" %}
-{% set user = current_user %}
-{% block title %}Contact — SentientAI{% endblock %}
+{% block title %}Contact — Sentient{% endblock %}
+{% block meta_description %}Get in touch with the people who run Sentient.{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="auth-container" style="max-width:560px;">
-        <h1>Contact</h1>
-        <p class="subtitle">Have a question, suggestion, or want to get involved? Reach out below.</p>
+<div class="form-page">
+  <h1 class="form-page-title">Get in touch</h1>
+  <p class="form-page-lead">
+    A question, a suggestion, or something that looks broken — this reaches the
+    people who run the site.
+  </p>
 
-        {% if submitted %}
-        <div class="alert alert-success">Thank you for your message. We'll review it and respond if needed.</div>
-        {% endif %}
+  {% if submitted %}
+  <div class="alert alert-success" data-autodismiss>
+    Thanks — your message is with us. We'll reply if it needs one.
+  </div>
+  {% endif %}
 
-        <div class="card">
-            <form method="post" action="/contact">
-              {{ csrf_input() }}
-                <div class="form-group">
-                    <label for="contact_name">Name</label>
-                    <input type="text" id="contact_name" name="name" class="form-control" required maxlength="100">
-                </div>
-                <div class="form-group">
-                    <label for="contact_email">Email</label>
-                    <input type="email" id="contact_email" name="email" class="form-control" required maxlength="255">
-                </div>
-                <div class="form-group">
-                    <label for="contact_subject">Subject</label>
-                    <input type="text" id="contact_subject" name="subject" class="form-control" required maxlength="200">
-                </div>
-                <div class="form-group">
-                    <label for="contact_message">Message</label>
-                    <textarea id="contact_message" name="message" class="form-control" rows="6" required maxlength="2000" style="font-family:var(--font-sans);"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width:100%;">Send Message</button>
-            </form>
-        </div>
+  {% if errors %}
+  <div class="alert alert-error">
+    <ul class="alert-list">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/contact" data-once>
+    {{ csrf_input() }}
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="contact_name">Your name</label>
+        <input type="text" id="contact_name" name="name" class="form-input"
+               required maxlength="100" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="contact_email">Email</label>
+        <input type="email" id="contact_email" name="email" class="form-input"
+               required maxlength="255" autocomplete="email">
+        <div class="form-hint">Only used to reply to this message.</div>
+      </div>
     </div>
+
+    <div class="form-group">
+      <label class="form-label" for="contact_subject">Subject</label>
+      <input type="text" id="contact_subject" name="subject" class="form-input"
+             required maxlength="200">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="contact_message">Message</label>
+      <textarea id="contact_message" name="message" class="form-textarea" rows="7"
+                required maxlength="2000"></textarea>
+      <div class="form-hint">Max 2000 characters.</div>
+    </div>
+
+    <div class="form-actions">
+      <a href="/" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary" data-loading="Sending…">Send message</button>
+    </div>
+  </form>
 </div>
 {% endblock %}
