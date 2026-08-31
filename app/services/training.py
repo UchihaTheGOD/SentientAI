@@ -27,6 +27,7 @@ from app.models.learning import (
     APPROVED, CANDIDATE, DUPLICATE, EXAMPLE_STATUSES, NEEDS_EDIT, REJECTED,
     REJECTION_REASONS, SPLIT_EVAL, SPLIT_TRAIN,
 )
+from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 
 PENDING_STATUSES = (CANDIDATE, NEEDS_EDIT)
@@ -112,6 +113,41 @@ def status_counts(db: Session) -> dict[str, int]:
         key = status if status in counts else CANDIDATE
         counts[key] += count or 0
     return counts
+
+
+def band_counts(db: Session) -> dict[str, int]:
+    """Triage-band distribution across the pending queue.
+
+    Read straight off `quality_band`, the advisory label the scorer wrote at
+    collection time. Only pending rows are counted: once a human has ruled, the
+    band is history, not a to-do.
+    """
+    counts: dict[str, int] = {}
+    rows = (
+        db.query(TrainingExample.quality_band, func.count(TrainingExample.id))
+        .filter(TrainingExample.status.in_(PENDING_STATUSES))
+        .group_by(TrainingExample.quality_band)
+        .all()
+    )
+    for band, count in rows:
+        counts[band or "unscored"] = count or 0
+    return counts
+
+
+def examples_for_user(db: Session, user_id: int, limit: int = 50) -> List[TrainingExample]:
+    """Candidates derived from one account's own lab submissions.
+
+    Joined through `SecurityEvent` so a user only ever sees knowledge collected
+    from their own activity — never another account's observations.
+    """
+    return (
+        db.query(TrainingExample)
+        .join(SecurityEvent, TrainingExample.event_id == SecurityEvent.id)
+        .filter(SecurityEvent.user_id == user_id)
+        .order_by(TrainingExample.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 # ---------------------------------------------------------------------------

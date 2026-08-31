@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.learning import CANDIDATE
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
-from app.services import training
+from app.services import scoring, training
 from app.services.detection import detect, DetectionResult
 from app.services.cyberllm_client import get_cyberllm_client
 
@@ -80,6 +80,26 @@ def analyze_lab_submission(
     #    `safe_to_train` — that needs an admin review (app/services/training.py),
     #    so no user input can put itself into the training set.
     training_data = client.generate_training_example(event_data)
+    digest = training.dedup_hash(
+        training_data["instruction"], training_data["input"]
+    )
+
+    # Score the candidate for triage. This is advisory only: it decides queue
+    # order and a band label, never whether the row can train. A candidate that
+    # already has a twin in the store is flagged so a reviewer sees the overlap
+    # before spending time on a second copy.
+    is_duplicate = training.find_duplicate(db, digest) is not None
+    score = scoring.score_candidate(
+        detected=detection.detected,
+        attack_category=detection.attack_category,
+        severity=detection.severity,
+        patterns_matched=detection.patterns_matched,
+        instruction=training_data["instruction"],
+        input_text=training_data["input"],
+        output_text=training_data["output"],
+        is_duplicate=is_duplicate,
+    )
+
     training_example = TrainingExample(
         event_id=event.id,
         instruction=training_data["instruction"],
@@ -95,9 +115,10 @@ def analyze_lab_submission(
         # two can be compared later.
         model_prediction=detection.attack_category if detection.detected else "none",
         provenance="lab_submission",
-        dedup_hash=training.dedup_hash(
-            training_data["instruction"], training_data["input"]
-        ),
+        dedup_hash=digest,
+        quality_score=score.score,
+        quality_band=score.band,
+        quality_notes=score.notes_text or None,
     )
     db.add(training_example)
     db.commit()
