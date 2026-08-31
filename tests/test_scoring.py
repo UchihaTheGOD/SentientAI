@@ -118,3 +118,24 @@ def test_a_second_identical_submission_is_flagged_duplicate_at_collection(db, us
     assert rows[0].quality_band == BAND_USEFUL
     assert rows[1].quality_band == BAND_REVIEW
     assert "uplicate" in (rows[1].quality_notes or "")
+
+
+# ---------------------------------------------------------------------------
+# band_for_score: the score-only mapping used to backfill legacy rows
+# ---------------------------------------------------------------------------
+
+def test_band_for_score_pins_the_thresholds():
+    # Boundaries match score_candidate: >=65 useful, >=35 review, else noisy.
+    assert scoring.band_for_score(scoring._USEFUL_AT) == BAND_USEFUL
+    assert scoring.band_for_score(scoring._USEFUL_AT - 1) == BAND_REVIEW
+    assert scoring.band_for_score(scoring._REVIEW_AT) == BAND_REVIEW
+    assert scoring.band_for_score(scoring._REVIEW_AT - 1) == BAND_NOISY
+    assert scoring.band_for_score(0) == BAND_NOISY
+    assert scoring.band_for_score(100) == BAND_USEFUL
+
+
+def test_band_for_score_agrees_with_score_candidate_on_clean_input():
+    # With no hard-noise or duplicate override, the full scorer and the
+    # score-only mapping must land in the same band.
+    result = _score()
+    assert scoring.band_for_score(result.score) == result.band
