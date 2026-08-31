@@ -8,7 +8,7 @@ shell, no filesystem, no outbound network) and only ever target this
 application.
 """
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request, Form, Query
+from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -17,15 +17,17 @@ from app.database import get_db
 from app.models.user import User
 from app.models.lab_session import LabSession
 from app.models.learning import (
-    CANDIDATE, EXAMPLE_STATUS_LABELS, FEEDBACK_VERDICT_LABELS,
+    CANDIDATE, EXAMPLE_STATUS_LABELS, FEEDBACK_VERDICTS, FEEDBACK_VERDICT_LABELS,
+    AnalysisFeedback,
 )
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 from app.services import audit
 from app.services import training as training_service
 from app.services.auth_service import require_lab_access
-from app.services.analysis import analyze_lab_submission
-from app.services.ratelimit import limit_analysis
+from app.services.analysis import analyze_lab_submission, record_analysis_feedback
+from app.services.ratelimit import limit_analysis, limit_feedback
+from app.services.sanitize import clean_text
 from app.services.scoring import BAND_LABELS
 from app.labs import list_labs, get_lab
 from app.config import settings
@@ -497,13 +499,62 @@ def testing_event_detail(
             .first()
         )
 
+    # This account's own verdict on the explanation, if it has given one.
+    feedback = (
+        db.query(AnalysisFeedback)
+        .filter(
+            AnalysisFeedback.event_id == event.id,
+            AnalysisFeedback.user_id == user.id,
+        )
+        .first()
+    )
+
     return templates.TemplateResponse("testing/event_detail.html", {
         "request": request,
         "user": user,
         "event": event,
         "session": session,
+        "feedback": feedback,
+        "feedback_verdicts": FEEDBACK_VERDICTS,
+        "feedback_verdict_labels": FEEDBACK_VERDICT_LABELS,
         "sentinel_model": settings.SENTINEL_MODEL_NAME,
     })
+
+
+@router.post("/events/{event_id}/feedback",
+             dependencies=[Depends(limit_feedback)])
+def testing_event_feedback(
+    event_id: int,
+    request: Request,
+    verdict: str = Form(...),
+    note: str = Form(""),
+    user: User = Depends(require_lab_access),
+    db: Session = Depends(get_db),
+):
+    """Record this user's verdict on an event's analysis.
+
+    Scoped to the caller's own event (an unknown or someone else's event is a
+    404, never a silent write), one verdict per (event, user). The verdict is a
+    signal for reviewers; it cannot approve, reject, or train anything.
+    """
+    if verdict not in FEEDBACK_VERDICTS:
+        raise HTTPException(status_code=400, detail="Unknown feedback verdict.")
+
+    event = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.id == event_id, SecurityEvent.user_id == user.id)
+        .first()
+    )
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found.")
+
+    record_analysis_feedback(
+        db, event, user.id, verdict, note=clean_text(note, 500) or None,
+    )
+    audit.record(db, "analysis.feedback", user=user,
+                 target_type="security_event", target_id=str(event_id),
+                 detail=f"verdict={verdict}", request=request)
+    return RedirectResponse(url=f"/testing/events/{event_id}", status_code=303)
 
 
 # ---------------------------------------------------------------------------

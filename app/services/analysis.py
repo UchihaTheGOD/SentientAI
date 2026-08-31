@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.learning import CANDIDATE
+from app.models.learning import CANDIDATE, AnalysisFeedback
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 from app.services import scoring, training
@@ -148,3 +148,58 @@ def analyze_lab_submission(
         "lab_id": lab_id,
         "timestamp": event.timestamp.isoformat(),
     }
+
+
+def record_analysis_feedback(
+    db: Session,
+    event: SecurityEvent,
+    user_id: int,
+    verdict: str,
+    note: Optional[str] = None,
+) -> AnalysisFeedback:
+    """Record one user's verdict on an event's CyberLLM explanation.
+
+    Stored once per (event, user): a repeat vote updates the existing row rather
+    than inserting a second, so a single account cannot stack feedback on one
+    event. The caller is responsible for validating `verdict` against
+    `FEEDBACK_VERDICTS` and for scoping `event` to the requesting user.
+
+    An "incorrect" verdict is a *hint*, not a control. If the linked candidate is
+    still pending and the scorer had triaged it "useful", it is dropped to
+    "review" so an admin looks manually before it could ever be approved. It
+    never changes `approved` or `safe_to_train` — only a human review does that.
+    """
+    feedback = (
+        db.query(AnalysisFeedback)
+        .filter(
+            AnalysisFeedback.event_id == event.id,
+            AnalysisFeedback.user_id == user_id,
+        )
+        .first()
+    )
+    if feedback is None:
+        feedback = AnalysisFeedback(event_id=event.id, user_id=user_id, verdict=verdict)
+        db.add(feedback)
+    feedback.verdict = verdict
+    feedback.note = note or None
+
+    if verdict == "incorrect":
+        candidate = (
+            db.query(TrainingExample)
+            .filter(TrainingExample.event_id == event.id)
+            .first()
+        )
+        if (
+            candidate is not None
+            and candidate.is_pending
+            and candidate.quality_band == scoring.BAND_USEFUL
+        ):
+            candidate.quality_band = scoring.BAND_REVIEW
+            marker = "User feedback flagged the analysis as incorrect."
+            candidate.quality_notes = (
+                f"{candidate.quality_notes}\n{marker}" if candidate.quality_notes else marker
+            )
+
+    db.commit()
+    db.refresh(feedback)
+    return feedback
