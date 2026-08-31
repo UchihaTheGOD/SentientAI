@@ -363,3 +363,86 @@ def test_a_legacy_row_with_no_status_is_treated_as_a_candidate(db):
     assert example.state == CANDIDATE
     assert example.is_trainable is False
     assert training_service.status_counts(db)[CANDIDATE] == 1
+
+
+# ---------------------------------------------------------------------------
+# The admin review-queue pages and the needs-edit action
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("path", ["/admin/training", "/admin/training/rejected"])
+def test_the_queue_pages_are_admin_only(client, auth_client, admin_client, path):
+    assert client.get(path).status_code in (303, 401, 403)   # anonymous
+    assert auth_client.get(path).status_code == 403            # ordinary user
+    assert admin_client.get(path).status_code == 200           # admin
+
+
+def test_the_queue_lists_a_pending_candidate(admin_client, db):
+    example = _candidate(db)
+    body = admin_client.get("/admin/training").text
+    assert f"/admin/training/{example.id}/approve" in body
+
+
+def test_the_rejected_page_lists_a_rejected_candidate(admin_client, db):
+    example = _candidate(db)
+    admin_client.post(f"/admin/training/{example.id}/reject", {"reason": "noisy"})
+    body = admin_client.get("/admin/training/rejected").text
+    assert f"#{example.id}" in body
+
+
+def test_needs_edit_action_parks_a_candidate_without_making_it_trainable(admin_client, db):
+    example = _candidate(db)
+    response = admin_client.post(f"/admin/training/{example.id}/needs-edit", {})
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/training"
+
+    db.expire_all()
+    row = db.query(TrainingExample).filter(TrainingExample.id == example.id).first()
+    assert row.state == NEEDS_EDIT
+    assert row.is_pending is True
+    assert row.is_trainable is False
+
+
+def test_the_needs_edit_action_is_admin_only(auth_client, db):
+    example = _candidate(db)
+    assert auth_client.post(
+        f"/admin/training/{example.id}/needs-edit", {},
+    ).status_code == 403
+    db.expire_all()
+    assert db.query(TrainingExample).filter(
+        TrainingExample.id == example.id,
+    ).first().state == CANDIDATE
+
+
+def test_needs_edit_is_audited(admin_client, db):
+    example = _candidate(db)
+    admin_client.post(f"/admin/training/{example.id}/needs-edit", {})
+    types = {
+        e.event_type for e in db.query(AuditEvent).filter(
+            AuditEvent.event_type.like("training.%"),
+        ).all()
+    }
+    assert "training.candidate_needs_edit" in types
+
+
+# ---------------------------------------------------------------------------
+# The review `next` field cannot be turned into an open redirect
+# ---------------------------------------------------------------------------
+
+def test_a_review_returns_to_an_allow_listed_destination(admin_client, db):
+    example = _candidate(db)
+    response = admin_client.post(
+        f"/admin/training/{example.id}/approve", {"next": "/admin/training"},
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/training"
+
+
+def test_a_review_rejects_an_off_site_next_and_falls_back(admin_client, db):
+    example = _candidate(db)
+    response = admin_client.post(
+        f"/admin/training/{example.id}/reject",
+        {"reason": "noisy", "next": "https://evil.example/phish"},
+    )
+    assert response.status_code == 303
+    # The off-site target is discarded for the safe default, not honoured.
+    assert response.headers["location"] == "/admin"

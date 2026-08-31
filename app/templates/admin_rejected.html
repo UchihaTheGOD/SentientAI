@@ -1,0 +1,59 @@
+{% extends "base_testing.html" %}
+{% block title %}Rejected Examples — SentientAI Admin{% endblock %}
+
+{% block breadcrumb %}
+<a href="/admin">Administration</a> <span class="breadcrumb-sep">›</span>
+<a href="/admin/training">Review Queue</a> <span class="breadcrumb-sep">›</span>
+<span>Rejected</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Rejected &amp; Duplicate Examples</h1>
+    <a href="/admin/training" class="btn btn-outline btn-sm">Back to queue</a>
+</div>
+
+<p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:16px;max-width:72ch;">
+    Retained on purpose: this is the record of what the pipeline got wrong and why. These rows
+    are never exported and never train — they exist for error analysis.
+</p>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Filtered out</span>
+        <span class="badge badge-red">{{ rejected_examples|length }}</span>
+    </div>
+    {% if rejected_examples %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Type</th><th>Status</th><th>Reason / note</th><th>Reviewed</th></tr>
+            </thead>
+            <tbody>
+                {% for ex in rejected_examples %}
+                <tr>
+                    <td class="mono" style="font-size:0.85rem;">#{{ ex.id }}</td>
+                    <td>{{ ex.attack_type or '—' }}</td>
+                    <td>
+                        {% if ex.state == 'duplicate' %}
+                        <span class="badge badge-orange">Duplicate</span>
+                        {% else %}
+                        <span class="badge badge-red">Rejected</span>
+                        {% endif %}
+                    </td>
+                    <td style="max-width:420px;font-size:0.85rem;">{{ ex.review_note or '—' }}</td>
+                    <td style="font-size:0.82rem;color:var(--text-muted);">
+                        {{ ex.reviewed_at.strftime('%Y-%m-%d %H:%M') if ex.reviewed_at else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Nothing has been rejected yet.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

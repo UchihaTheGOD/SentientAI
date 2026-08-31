@@ -16,13 +16,17 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.user import User
 from app.models.lab_session import LabSession
-from app.models.learning import CANDIDATE
+from app.models.learning import (
+    CANDIDATE, EXAMPLE_STATUS_LABELS, FEEDBACK_VERDICT_LABELS,
+)
 from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 from app.services import audit
+from app.services import training as training_service
 from app.services.auth_service import require_lab_access
 from app.services.analysis import analyze_lab_submission
 from app.services.ratelimit import limit_analysis
+from app.services.scoring import BAND_LABELS
 from app.labs import list_labs, get_lab
 from app.config import settings
 from app.template_env import templates
@@ -88,6 +92,98 @@ def testing_overview(
         "recent_events": recent_events,
         "recent_sessions": recent_sessions,
         "labs": labs,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Analysis layer — Sentinel status, collected knowledge, dataset/training state
+#
+# All three are read-only and scoped to the requesting account. Promotion,
+# export, and cross-user views live behind `require_admin` in app/api/admin.py;
+# nothing here can change a candidate's status.
+# ---------------------------------------------------------------------------
+
+@router.get("/sentinel", response_class=HTMLResponse)
+def testing_sentinel(
+    request: Request,
+    user: User = Depends(require_lab_access),
+    db: Session = Depends(get_db),
+):
+    """What the CyberLLM analysis layer is, and what it just said about your
+    own submissions.
+
+    Deliberately honest about capability: with no inference endpoint configured
+    the analysis is the deterministic local analyzer built from the detection
+    engine's own findings, not a served neural model.
+    """
+    recent_events = (
+        db.query(SecurityEvent)
+        .filter(
+            SecurityEvent.user_id == user.id,
+            SecurityEvent.detection_result == "detected",
+        )
+        .order_by(SecurityEvent.timestamp.desc())
+        .limit(15)
+        .all()
+    )
+    return templates.TemplateResponse("testing/sentinel.html", {
+        "request": request,
+        "user": user,
+        "sentinel_model": settings.SENTINEL_MODEL_NAME,
+        "endpoint_configured": bool(settings.CYBERLLM_API_URL),
+        "recent_events": recent_events,
+    })
+
+
+@router.get("/knowledge", response_class=HTMLResponse)
+def testing_knowledge(
+    request: Request,
+    user: User = Depends(require_lab_access),
+    db: Session = Depends(get_db),
+):
+    """Training candidates collected from *this* account's own lab activity.
+
+    Read-only: a user sees what their submissions produced and how the scorer
+    triaged it, but only an admin can approve, reject, or export.
+    """
+    examples = training_service.examples_for_user(db, user.id, limit=50)
+    return templates.TemplateResponse("testing/knowledge.html", {
+        "request": request,
+        "user": user,
+        "sentinel_model": settings.SENTINEL_MODEL_NAME,
+        "examples": examples,
+        "band_labels": BAND_LABELS,
+        "status_labels": EXAMPLE_STATUS_LABELS,
+    })
+
+
+@router.get("/training", response_class=HTMLResponse)
+def testing_training(
+    request: Request,
+    user: User = Depends(require_lab_access),
+    db: Session = Depends(get_db),
+):
+    """Dataset/training state: how the pipeline stands overall.
+
+    Counts are global (the dataset is a shared asset) but every mutating action
+    — approve, export, freeze — stays admin-only. The page states plainly that
+    nothing trains automatically and the eval split never trains.
+    """
+    status_counts = training_service.status_counts(db)
+    band_counts = training_service.band_counts(db)
+    train_ready = len(training_service.get_approved_examples(db, split="train"))
+    eval_ready = len(training_service.get_approved_examples(db, split="eval"))
+    return templates.TemplateResponse("testing/training.html", {
+        "request": request,
+        "user": user,
+        "sentinel_model": settings.SENTINEL_MODEL_NAME,
+        "status_counts": status_counts,
+        "status_labels": EXAMPLE_STATUS_LABELS,
+        "band_counts": band_counts,
+        "band_labels": BAND_LABELS,
+        "train_ready": train_ready,
+        "eval_ready": eval_ready,
+        "is_admin": user.is_admin,
     })
 
 
