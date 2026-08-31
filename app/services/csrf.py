@@ -86,6 +86,15 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     ("application/x-www-form-urlencoded", "multipart/form-data")
                 ):
                     try:
+                        # Buffer the body before parsing the form. Under
+                        # Starlette's BaseHTTPMiddleware, calling request.body()
+                        # here caches the bytes so the very same body is
+                        # replayed to the downstream endpoint; calling
+                        # request.form() *without* this only drains the receive
+                        # stream, and the route then parses an empty body — so
+                        # every real browser form POST (token in a hidden field
+                        # rather than the X-CSRF-Token header) would 422.
+                        await request.body()
                         form = await request.form()
                         raw = form.get(FORM_FIELD)
                         submitted = raw if isinstance(raw, str) else None

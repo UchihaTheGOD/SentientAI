@@ -114,6 +114,19 @@ class Client:
             headers.setdefault("X-CSRF-Token", self._csrf())
         return self._client.post(url, data=data or {}, headers=headers, **kwargs)
 
+    def post_form(self, url, data=None, *, csrf: bool = True, **kwargs):
+        """POST the way a real browser does: the CSRF token rides in a hidden
+        form *field*, not the X-CSRF-Token header.
+
+        This exercises a different branch of CSRFMiddleware than post() — the one
+        that has to read request.form() without eating the body the endpoint
+        still needs. Regression cover for exactly that.
+        """
+        payload = dict(data or {})
+        if csrf:
+            payload.setdefault("csrf_token", self._csrf())
+        return self._client.post(url, data=payload, **kwargs)
+
     # -- convenience -------------------------------------------------------
     def login(self, username: str, password: str = PASSWORD, next_url: str = ""):
         payload = {"username": username, "password": password}
