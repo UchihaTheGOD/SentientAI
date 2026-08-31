@@ -206,8 +206,9 @@ def my_activity(
     """
     query = db.query(Activity).filter(Activity.user_id == user.id)
 
-    # An unknown `kind` narrows to nothing rather than being ignored, so a typo
-    # in the querystring cannot silently widen the result.
+    # An unknown `kind` is dropped rather than filtered on, so a typo or a
+    # crafted querystring falls back to the full log instead of a SQL filter on
+    # attacker-controlled text.
     selected_kind = kind if kind in ACTIVITY_TYPES else ""
     if selected_kind:
         query = query.filter(Activity.activity_type == selected_kind)
