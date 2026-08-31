@@ -1617,3 +1617,19 @@ textarea.form-control {
     font-family: var(--font-mono);
 }
 
+
+/* Nav bar container + testing-area body (children styled above) */
+.nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--border, #1f2937);
+    background: var(--surface, #0f172a);
+}
+.nav .container {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    height: 56px;
+}
+body.testing-env { min-height: 100vh; }
