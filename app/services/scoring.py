@@ -179,3 +179,19 @@ def score_candidate(
         band = BAND_NOISY
 
     return ScoreResult(score=score, band=band, notes=notes)
+
+
+def band_for_score(score: int) -> str:
+    """Map a bare score to a band using the same thresholds as `score_candidate`.
+
+    Used to backfill legacy rows that carry a `quality_score` but no
+    `quality_band` (they predate the scorer writing the band). It can only see
+    the number, so it cannot reconstruct the hard-noise or duplicate overrides —
+    it assigns the band the score alone implies, which is deliberately the
+    softer classification.
+    """
+    if score >= _USEFUL_AT:
+        return BAND_USEFUL
+    if score >= _REVIEW_AT:
+        return BAND_REVIEW
+    return BAND_NOISY

@@ -1,6 +1,6 @@
 # PROJECT_CHECKPOINT.md — SentientAI
 
-*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3), analysis-feedback loop (F4).*
+*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3), analysis-feedback loop (F4), Windows automation + maintenance CLI (F5).*
 *Branch: `redesign/public-site-and-security-foundation` (not merged, no PR).*
 
 ---
@@ -129,6 +129,18 @@ names is a bug.
     Every decision is audited (`training.candidate_approved|rejected|needs_edit`).
 - **Moderation/admin**: `/admin`, `/admin/moderation` (auditable actions),
   training approve/reject/needs-edit, JSONL export.
+- **Project automation**: `run.bat` (Windows task runner) + `app/cli.py`
+  (argparse maintenance CLI over the existing training service — no new deps).
+  `run <task>`: `start` (run the app), `test [args]` (pytest passthrough),
+  `status` (lifecycle + triage-band counts), `export` / `export-eval` (approved
+  train/eval JSONL to `data/`), `backfill [--apply]` (band scored-but-unbanded
+  legacy candidates; dry-run without `--apply`). The CLI calls `init_db()` first
+  like every other standalone entrypoint, so it syncs the schema (idempotent,
+  no data loss) and works against a DB the app hasn't opened since the
+  training-pipeline columns were added. `score-backfill` only fills a *band* —
+  it never invents a score and never sets `safe_to_train`; rows with the
+  default-0 (never-scored) score are reported as `unscored` and left alone.
+  `.bat` files pinned to CRLF via `.gitattributes` (cmd.exe GOTO parsing).
 
 ---
 
@@ -138,13 +150,14 @@ names is a bug.
   builds a throwaway SQLite DB and sets `DATABASE_URL` before `app.database`
   imports). `pytest.ini` sets `testpaths = tests`.
 - **Run**: `./venv/Scripts/python.exe -m pytest`
-- **Last result: 378 passed, 1 skipped, 476 warnings (~101s).** The warnings are
+- **Last result: 390 passed, 1 skipped, 476 warnings (~122s).** The warnings are
   Starlette `TemplateResponse(name, {...})` deprecations, deliberately not
   suppressed.
 - Modules: auth, public_routes, blog_lifecycle, social, sanitization,
   moderation, training_pipeline, cyberllm, scoring, analysis_feedback,
-  testing_area, lab_sessions, templates (compiles every template + checks nav
-  links resolve), activity, csrf (real browser form-field POST path — see §3).
+  testing_area, lab_sessions, cli (maintenance CLI: status/export/backfill),
+  templates (compiles every template + checks nav links resolve), activity,
+  csrf (real browser form-field POST path — see §3).
 - `requirements-dev.txt` pins `pytest` + `httpx` (TestClient only).
 - The old root `test_phase2.py` (live-server script) and `_verify_tmp.py` were
   ported into the suite and deleted.
@@ -171,10 +184,12 @@ system-health pages. *(Rejected-example view — done: `/admin/training/rejected
   "incorrect" verdict re-triages a still-pending "useful" candidate down to
   "review" (advisory: `record_analysis_feedback` in `app/services/analysis.py`
   never touches `approved`/`safe_to_train`).
-- ⏳ **F5** Windows automation: `run.bat` (start app / run tests / run CyberLLM
-  + training-data tasks) plus a small `app/cli.py` (argparse: export-training,
-  score/backfill candidates, training-status) built on existing services. No new
-  deps; use `venv\Scripts\python.exe`.
+- ✅ **F5** Windows automation: `run.bat` (start / test / status / export /
+  export-eval / backfill) + `app/cli.py` (argparse: training-status,
+  export-training, export-eval, score-backfill) over existing services. No new
+  deps; uses `venv\Scripts\python.exe`. CLI syncs the schema via `init_db()`
+  before querying; `score-backfill` fills a band only (never a score, never
+  `safe_to_train`). `.gitattributes` pins `*.bat` to CRLF.
 
 **Consistency:** route `explore.html`, `search.html`, `feed.html`,
 `profile_public.html` onto `partials/post_card.html` +
@@ -214,6 +229,17 @@ legacy, `labs.html`, …) are candidates for removal.
 ./venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-dev.txt
 ./venv/Scripts/python.exe run.py            # http://127.0.0.1:8000
 ./venv/Scripts/python.exe -m pytest         # full suite
+```
+
+On Windows, `run.bat` wraps the common tasks:
+
+```bat
+run start                 REM run the app
+run test [args]           REM pytest (extra args passed through)
+run status                REM training lifecycle + triage-band counts
+run export                REM approved train split -> data\training_data.jsonl
+run export-eval           REM approved eval split  -> data\eval_data.jsonl
+run backfill [--apply]    REM band scored-but-unbanded candidates (dry run w/o --apply)
 ```
 
 Env vars: `SECRET_KEY` (required), `DATABASE_URL` (default
