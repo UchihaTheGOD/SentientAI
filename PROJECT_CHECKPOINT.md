@@ -1,6 +1,6 @@
 # PROJECT_CHECKPOINT.md — SentientAI
 
-*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3).*
+*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3), analysis-feedback loop (F4).*
 *Branch: `redesign/public-site-and-security-foundation` (not merged, no PR).*
 
 ---
@@ -58,9 +58,10 @@ names is a bug.
   (`public_posts_query` = published & not hidden, `visible_comments_query`,
   ownership checks `can_view_post`/`can_edit_post`). IDOR is prevented by
   scoping every lookup to `user_id`, not by filtering after the fetch.
-- **Rate limiting**: in-process sliding window (`app/services/rate_limit.py`):
+- **Rate limiting**: in-process sliding window (`app/services/ratelimit.py`):
   `limit_login/register/password/comment/reaction/post_write/report/search/
-  analysis/feedback`. `limit_feedback` is defined but not yet applied.
+  analysis/feedback`. `limit_analysis` guards lab submit; `limit_feedback`
+  guards the analysis-feedback POST.
 - **Detection engine is the enforcement layer** (`app/services/detection.py`):
   `SEVERITY_ORDER`, never-downgrade, `command_injection` always critical,
   `should_block=True` only on critical. **CyberLLM can explain but can NEVER
@@ -137,13 +138,13 @@ names is a bug.
   builds a throwaway SQLite DB and sets `DATABASE_URL` before `app.database`
   imports). `pytest.ini` sets `testpaths = tests`.
 - **Run**: `./venv/Scripts/python.exe -m pytest`
-- **Last result: 368 passed, 1 skipped, 464 warnings (~119s).** The warnings are
+- **Last result: 378 passed, 1 skipped, 476 warnings (~101s).** The warnings are
   Starlette `TemplateResponse(name, {...})` deprecations, deliberately not
   suppressed.
 - Modules: auth, public_routes, blog_lifecycle, social, sanitization,
-  moderation, training_pipeline, cyberllm, scoring, testing_area,
-  lab_sessions, templates (compiles every template + checks nav links resolve),
-  activity, csrf (real browser form-field POST path — see §3).
+  moderation, training_pipeline, cyberllm, scoring, analysis_feedback,
+  testing_area, lab_sessions, templates (compiles every template + checks nav
+  links resolve), activity, csrf (real browser form-field POST path — see §3).
 - `requirements-dev.txt` pins `pytest` + `httpx` (TestClient only).
 - The old root `test_phase2.py` (live-server script) and `_verify_tmp.py` were
   ported into the suite and deleted.
@@ -163,12 +164,13 @@ system-health pages. *(Rejected-example view — done: `/admin/training/rejected
 - ✅ **F2** admin review queue + rejected view (`/admin/training`,
   `/admin/training/rejected`, needs-edit action, allow-listed `next`).
 - ✅ **F3** read-only testing analysis pages (`/testing/sentinel|knowledge|training`).
-- ⏳ **F4** analysis-feedback route `/testing/events/{event_id}/feedback` (POST)
-  backed by `AnalysisFeedback`: apply `limit_feedback`, validate against
-  `FEEDBACK_VERDICTS`, scope to own event only, upsert unique per (event, user),
-  surface the control on `event_detail.html`. Optionally re-score the linked
-  candidate to band `review` on an "incorrect" verdict (advisory only).
-  `FEEDBACK_VERDICT_LABELS` is already imported in `app/api/testing.py`.
+- ✅ **F4** analysis-feedback route `/testing/events/{event_id}/feedback` (POST)
+  backed by `AnalysisFeedback`: `limit_feedback` applied, verdict validated
+  against `FEEDBACK_VERDICTS`, scoped to the caller's own event (404 otherwise),
+  upsert unique per (event, user). Control lives on `event_detail.html`. An
+  "incorrect" verdict re-triages a still-pending "useful" candidate down to
+  "review" (advisory: `record_analysis_feedback` in `app/services/analysis.py`
+  never touches `approved`/`safe_to_train`).
 - ⏳ **F5** Windows automation: `run.bat` (start app / run tests / run CyberLLM
   + training-data tasks) plus a small `app/cli.py` (argparse: export-training,
   score/backfill candidates, training-status) built on existing services. No new
@@ -180,8 +182,7 @@ system-health pages. *(Rejected-example view — done: `/admin/training/rejected
 
 **Housekeeping:** `RESEARCH_CATEGORIES` is referenced by nothing except the test
 asserting its absence from the public form — remove if truly dead.
-`TemplateResponse` deprecations remain app-wide. `limit_feedback` unapplied
-(until F4).
+`TemplateResponse` deprecations remain app-wide.
 
 **Legacy dead code:** `app/api/attacks.py` and `app/api/labs.py` are not mounted;
 their `base.html` templates (`attacks.html`, `blocked.html`, `dashboard.html`

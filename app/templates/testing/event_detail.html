@@ -61,6 +61,42 @@
             <div class="content">{{ event.defense_recommendation }}</div>
         </div>
         {% endif %}
+
+        {% if event.explanation %}
+        <div class="result-section">
+            <h3>Was this analysis useful?</h3>
+            <div class="content">
+                {% if feedback %}
+                <p style="font-size:0.88rem;">
+                    You marked this
+                    <span class="badge badge-cyan">{{ feedback_verdict_labels.get(feedback.verdict, feedback.verdict) }}</span>.
+                    You can change your answer below.
+                </p>
+                {% else %}
+                <p style="color:var(--text-muted);font-size:0.85rem;">
+                    Your verdict helps a reviewer triage what the model learns from. It never
+                    approves or trains anything on its own.
+                </p>
+                {% endif %}
+                <form method="post" action="/testing/events/{{ event.id }}/feedback"
+                      style="display:flex;flex-direction:column;gap:8px;max-width:420px;">
+                    {{ csrf_input() }}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        {% for v in feedback_verdicts %}
+                        <button type="submit" name="verdict" value="{{ v }}"
+                                class="btn btn-sm {% if feedback and feedback.verdict == v %}btn-success{% else %}btn-outline{% endif %}">
+                            {{ feedback_verdict_labels.get(v, v) }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="text" name="note" maxlength="500"
+                           placeholder="Optional: what was wrong or missing?"
+                           value="{{ feedback.note or '' if feedback else '' }}"
+                           style="padding:6px 8px;font-size:0.85rem;">
+                </form>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div>
