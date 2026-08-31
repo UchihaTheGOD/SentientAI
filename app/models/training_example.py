@@ -48,6 +48,9 @@ class TrainingExample(Base):
     # ---- Automated scoring (advisory only — never auto-approves) ----------
     quality_score = Column(Integer, default=0, nullable=False, index=True)
     quality_notes = Column(Text, nullable=True)    # newline-separated reasons
+    # Triage band from app/services/scoring.py: useful / review / noisy. A hint
+    # for the reviewer's eye and for dataset filtering — not a promotion gate.
+    quality_band = Column(String(10), nullable=True, index=True)
 
     # ---- Labels: what the pipeline thought vs what a human decided --------
     model_prediction = Column(String(80), nullable=True)

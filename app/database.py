@@ -82,6 +82,7 @@ def _run_migrations():
             ("status", "VARCHAR(20) DEFAULT 'candidate'"),
             ("quality_score", "INTEGER DEFAULT 0"),
             ("quality_notes", "TEXT"),
+            ("quality_band", "VARCHAR(10)"),
             ("model_prediction", "VARCHAR(80)"),
             ("human_label", "VARCHAR(80)"),
             ("safe_to_train", "BOOLEAN DEFAULT 0"),
