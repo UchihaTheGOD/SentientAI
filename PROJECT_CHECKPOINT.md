@@ -46,7 +46,10 @@ names is a bug.
   is never the control.
 - **CSRF**: signed double-submit (`app/services/csrf.py`) — cookie
   `csrf_token` + form field or `X-CSRF-Token`. Middleware order
-  SecurityHeaders → CSRF → routes.
+  SecurityHeaders → CSRF → routes. The middleware buffers the body
+  (`await request.body()`) before reading `request.form()`; without it
+  BaseHTTPMiddleware drains the stream and every browser form POST 422s.
+  Regression-covered in `tests/test_csrf.py`.
 - **Output sanitization**: escape-first `app/services/sanitize.py`
   (`render_content`, `clean_text`, `strip_formatting`, `safe_url`). No template
   uses `| safe` on user text. All user-generated content — article bodies,
@@ -111,12 +114,13 @@ names is a bug.
   builds a throwaway SQLite DB and sets `DATABASE_URL` before `app.database`
   imports). `pytest.ini` sets `testpaths = tests`.
 - **Run**: `./venv/Scripts/python.exe -m pytest`
-- **Last result: 331 passed, 1 skipped, 415 warnings (~88s).** The 415 warnings
-  are Starlette `TemplateResponse(name, {...})` deprecations, deliberately not
+- **Last result: 336 passed, 1 skipped, 423 warnings (~111s).** The warnings are
+  Starlette `TemplateResponse(name, {...})` deprecations, deliberately not
   suppressed.
 - Modules: auth, public_routes, blog_lifecycle, social, sanitization,
   moderation, training_pipeline, cyberllm, testing_area, lab_sessions,
-  templates (compiles every template + checks nav links resolve), activity.
+  templates (compiles every template + checks nav links resolve), activity,
+  csrf (real browser form-field POST path — see §3).
 - `requirements-dev.txt` pins `pytest` + `httpx` (TestClient only).
 - The old root `test_phase2.py` (live-server script) and `_verify_tmp.py` were
   ported into the suite and deleted.
