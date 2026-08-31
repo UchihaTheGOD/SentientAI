@@ -115,16 +115,27 @@
 <div class="card" style="margin-top:24px;">
     <div class="card-header">
         <span class="card-title">Training Examples Awaiting Review</span>
-        <span class="badge badge-orange">{{ pending_count }} Pending</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-orange">{{ pending_count }} Pending</span>
+            <a href="/admin/training" class="btn btn-outline btn-sm">Full queue</a>
+        </div>
     </div>
 
     {% if pending_examples %}
-    {% for ex in pending_examples %}
+    {% for ex in pending_examples[:10] %}
     <div class="pending-card">
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
                 <span class="badge badge-purple">{{ ex.attack_type }}</span>
                 <span class="badge badge-blue">{{ ex.severity }}</span>
+                {% if ex.quality_band == 'useful' %}
+                <span class="badge badge-green">useful</span>
+                {% elif ex.quality_band == 'noisy' %}
+                <span class="badge badge-red">noisy</span>
+                {% elif ex.quality_band %}
+                <span class="badge badge-orange">review</span>
+                {% endif %}
+                <span class="mono" style="font-size:0.8rem;">score {{ ex.quality_score }}</span>
                 <span style="color:var(--text-muted);font-size:0.82rem;margin-left:8px;">
                     Event #{{ ex.event_id }}
                 </span>

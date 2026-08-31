@@ -1,6 +1,6 @@
 # PROJECT_CHECKPOINT.md — SentientAI
 
-*Last updated: 2026-08-31 — public/testing split, community layer, security hardening, in-process test suite.*
+*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3).*
 *Branch: `redesign/public-site-and-security-foundation` (not merged, no PR).*
 
 ---
@@ -97,14 +97,37 @@ names is a bug.
 - **Learning lifecycle** (`app/models/learning.py`): CANDIDATE / NEEDS_EDIT /
   APPROVED / REJECTED / DUPLICATE, `DatasetVersion`, `ModelCheckpoint`,
   `EvaluationRun`, `AnalysisFeedback`; services in `app/services/training.py`
-  (dedup, review, approve/reject, JSONL export with train/eval split).
+  (dedup, review, approve/reject, JSONL export with train/eval split,
+  `band_counts`, `examples_for_user`).
+- **Candidate scoring** (`app/services/scoring.py`): deterministic, rule-based,
+  **advisory only** — `score_candidate(...) -> ScoreResult` (0–100 score + band
+  useful/review/noisy + human-readable notes). Wired into
+  `app/services/analysis.py`: every lab detection writes a scored candidate
+  (`quality_score`, `quality_band`, `quality_notes`) at collection time, still
+  `approved=False`/`safe_to_train=False`. The score never promotes a row — only
+  `apply_review()` does.
 - **CyberLLM** (`app/services/cyberllm_client.py`): `MockCyberLLMClient`
   (deterministic) + `RealSentinelClient` (HTTP adapter, lazy `import httpx`,
-  falls back to mock). **No local model artifacts exist in the repo** — there is
-  no checkpoint, tokenizer, training script or dataset committed. CyberLLM is an
-  HTTP adapter plus a deterministic mock; nothing here trains or serves a model.
+  falls back to mock). **No local neural-model artifacts exist in the repo** —
+  no checkpoint, tokenizer, training script, or committed dataset. "CyberLLM" is
+  the deterministic local analyzer (built from the detection engine's findings)
+  plus an HTTP adapter to a future inference endpoint, plus the DB-backed dataset
+  pipeline that assembles training data *toward* a future local checkpoint. It
+  does not train or serve a model today, and the UI says so.
+- **CyberLLM/dataset UI**:
+  - Read-only, user-scoped testing pages (`app/api/testing.py`):
+    `/testing/sentinel` (what the analysis layer is; states local-analyzer vs
+    configured endpoint honestly, and that the detection engine — not Sentinel —
+    decides blocking), `/testing/knowledge` (this account's own scored
+    candidates), `/testing/training` (global lifecycle/band counts + governance
+    note; admin-only links to promote/export).
+  - Admin review queue (`app/api/admin.py`): `/admin/training` (pending
+    candidates, best-scoring first, approve / reject-with-reason / needs-edit),
+    `/admin/training/rejected` (retained rejects for error analysis). The `next`
+    return field is allow-listed (`_REVIEW_DESTINATIONS`) against open redirect.
+    Every decision is audited (`training.candidate_approved|rejected|needs_edit`).
 - **Moderation/admin**: `/admin`, `/admin/moderation` (auditable actions),
-  training approve/reject, JSONL export.
+  training approve/reject/needs-edit, JSONL export.
 
 ---
 
@@ -114,13 +137,13 @@ names is a bug.
   builds a throwaway SQLite DB and sets `DATABASE_URL` before `app.database`
   imports). `pytest.ini` sets `testpaths = tests`.
 - **Run**: `./venv/Scripts/python.exe -m pytest`
-- **Last result: 336 passed, 1 skipped, 423 warnings (~111s).** The warnings are
+- **Last result: 368 passed, 1 skipped, 464 warnings (~119s).** The warnings are
   Starlette `TemplateResponse(name, {...})` deprecations, deliberately not
   suppressed.
 - Modules: auth, public_routes, blog_lifecycle, social, sanitization,
-  moderation, training_pipeline, cyberllm, testing_area, lab_sessions,
-  templates (compiles every template + checks nav links resolve), activity,
-  csrf (real browser form-field POST path — see §3).
+  moderation, training_pipeline, cyberllm, scoring, testing_area,
+  lab_sessions, templates (compiles every template + checks nav links resolve),
+  activity, csrf (real browser form-field POST path — see §3).
 - `requirements-dev.txt` pins `pytest` + `httpx` (TestClient only).
 - The old root `test_phase2.py` (live-server script) and `_verify_tmp.py` were
   ported into the suite and deleted.
@@ -133,21 +156,32 @@ names is a bug.
 on save, as the website field already is).
 
 **Batch E — admin depth:** admin users/posts/comments/tags/activity/
-system-health pages; surface the retained *rejected*-example view.
+system-health pages. *(Rejected-example view — done: `/admin/training/rejected`.)*
 
-**Batch F — CyberLLM + learning UI:** quality-scoring service that writes scored
-candidates from `analysis.py`; human-review UI; dataset versioning/export UI
-with train/eval split + contamination check; wire the placeholder sidebar
-routes `/testing/sentinel|knowledge|training`; analysis-feedback UI backed by
-`AnalysisFeedback` (apply `limit_feedback`).
+**Batch F — CyberLLM + learning UI:**
+- ✅ **F1** candidate scoring (`app/services/scoring.py`) wired into `analysis.py`.
+- ✅ **F2** admin review queue + rejected view (`/admin/training`,
+  `/admin/training/rejected`, needs-edit action, allow-listed `next`).
+- ✅ **F3** read-only testing analysis pages (`/testing/sentinel|knowledge|training`).
+- ⏳ **F4** analysis-feedback route `/testing/events/{event_id}/feedback` (POST)
+  backed by `AnalysisFeedback`: apply `limit_feedback`, validate against
+  `FEEDBACK_VERDICTS`, scope to own event only, upsert unique per (event, user),
+  surface the control on `event_detail.html`. Optionally re-score the linked
+  candidate to band `review` on an "incorrect" verdict (advisory only).
+  `FEEDBACK_VERDICT_LABELS` is already imported in `app/api/testing.py`.
+- ⏳ **F5** Windows automation: `run.bat` (start app / run tests / run CyberLLM
+  + training-data tasks) plus a small `app/cli.py` (argparse: export-training,
+  score/backfill candidates, training-status) built on existing services. No new
+  deps; use `venv\Scripts\python.exe`.
 
 **Consistency:** route `explore.html`, `search.html`, `feed.html`,
 `profile_public.html` onto `partials/post_card.html` +
 `content.post_card_context` (queries were unified; rendering was not).
 
 **Housekeeping:** `RESEARCH_CATEGORIES` is referenced by nothing except the test
-asserting its absence from the public form — remove if truly dead. 415
-`TemplateResponse` deprecations remain app-wide. `limit_feedback` unapplied.
+asserting its absence from the public form — remove if truly dead.
+`TemplateResponse` deprecations remain app-wide. `limit_feedback` unapplied
+(until F4).
 
 **Legacy dead code:** `app/api/attacks.py` and `app/api/labs.py` are not mounted;
 their `base.html` templates (`attacks.html`, `blocked.html`, `dashboard.html`

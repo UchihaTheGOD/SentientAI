@@ -23,6 +23,9 @@ TESTING_PATHS = [
     "/testing/sessions",
     "/testing/events",
     "/testing/blocked",
+    "/testing/sentinel",
+    "/testing/knowledge",
+    "/testing/training",
 ]
 
 
@@ -73,6 +76,55 @@ def test_signed_in_user_reaches_the_testing_overview(auth_client):
 
 def test_unknown_lab_is_a_404(auth_client):
     assert auth_client.get("/testing/labs/not-a-lab").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Analysis layer pages (sentinel / knowledge / training) — read-only, scoped
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("path", ["/testing/sentinel", "/testing/knowledge", "/testing/training"])
+def test_analysis_pages_load_for_a_signed_in_user(auth_client, path):
+    assert auth_client.get(path).status_code == 200
+
+
+def test_sentinel_page_states_the_local_analyzer_when_no_endpoint(auth_client):
+    # conftest sets CYBERLLM_API_URL="", so the honest state is local-analyzer,
+    # not a served neural model. The page must not claim otherwise.
+    body = auth_client.get("/testing/sentinel").text.lower()
+    assert "local" in body
+    assert "detection engine" in body
+
+
+def test_knowledge_page_shows_only_the_owners_candidates(app, db, user, other_user):
+    from tests.conftest import Client
+
+    owner = Client(app)
+    owner.login(user.username)
+    owner.get("/testing/labs/xss_reflected")
+    session = _latest_session(db, user.id)
+    owner.post("/testing/labs/xss_reflected/submit", {
+        "payload": "<script>alert(1)</script>", "session_id": session.session_id,
+    })
+    event = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.user_id == user.id)
+        .order_by(SecurityEvent.id.desc())
+        .first()
+    )
+
+    # The owner sees a link to their own event; a second account does not.
+    link = f'/testing/events/{event.id}"'
+    assert link in owner.get("/testing/knowledge").text
+
+    intruder = Client(app)
+    intruder.login(other_user.username)
+    assert link not in intruder.get("/testing/knowledge").text
+
+
+def test_training_page_hides_admin_actions_from_ordinary_users(auth_client, admin_client):
+    # The dataset counts are shared, but the promotion/export controls are not.
+    assert "/admin/training" not in auth_client.get("/testing/training").text
+    assert "/admin/training" in admin_client.get("/testing/training").text
 
 
 # ---------------------------------------------------------------------------

@@ -43,6 +43,7 @@ AUDIT_EVENT_TYPES = (
     "training.candidate_created",
     "training.candidate_approved",
     "training.candidate_rejected",
+    "training.candidate_needs_edit",
     "training.dataset_version_created",
     "training.evaluation_run",
     "checkpoint.registered",

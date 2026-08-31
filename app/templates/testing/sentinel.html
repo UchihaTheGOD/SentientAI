@@ -1,0 +1,81 @@
+{% extends "base_testing.html" %}
+{% block title %}Sentinel — SentientAI Testing{% endblock %}
+
+{% block breadcrumb %}
+<span>Testing Environment</span> <span class="breadcrumb-sep">›</span>
+<span>Sentinel</span>
+{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <h1 class="section-title">Sentinel Analysis</h1>
+    <span class="badge {% if endpoint_configured %}badge-green{% else %}badge-cyan{% endif %}">
+        {% if endpoint_configured %}Remote endpoint{% else %}Local analyzer{% endif %}
+    </span>
+</div>
+
+<div class="grid-2">
+    <div class="result-section">
+        <h3>Model</h3>
+        <div class="content">
+            <div style="display:grid;grid-template-columns:150px 1fr;gap:8px;font-size:0.9rem;">
+                <span style="color:var(--text-muted);">Name</span>
+                <span class="mono">{{ sentinel_model }}</span>
+                <span style="color:var(--text-muted);">Mode</span>
+                <span>
+                    {% if endpoint_configured %}
+                    Inference endpoint configured — falls back to the local analyzer if unreachable.
+                    {% else %}
+                    Deterministic local analyzer, built from the detection engine's own findings.
+                    No neural checkpoint is served.
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="result-section">
+        <h3>How to read a finding</h3>
+        <div class="content">
+            <p><span class="badge badge-green">OBSERVED</span> Directly seen in the payload — concrete evidence.</p>
+            <p><span class="badge badge-orange">INFERRED</span> Logically derived from what was observed.</p>
+            <p><span class="badge badge-blue">UNKNOWN</span> Cannot be settled from the telemetry — stated honestly, never guessed.</p>
+            <p style="margin-top:12px;color:var(--text-muted);font-size:0.85rem;">
+                The detection engine — not Sentinel — decides whether a request is blocked.
+                Analysis explains a result; it can never override one.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        <span class="card-title">Your recent analysed detections</span>
+    </div>
+    {% if recent_events %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Lab</th><th>Category</th><th>Severity</th><th>Analysis</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for ev in recent_events %}
+                <tr>
+                    <td class="mono" style="font-size:0.85rem;">#{{ ev.id }}</td>
+                    <td>{{ ev.lab_id }}</td>
+                    <td>{{ ev.attack_category or '—' }}</td>
+                    <td>{{ ev.severity }}</td>
+                    <td style="max-width:360px;">{{ (ev.explanation or '')[:160] }}{% if ev.explanation and ev.explanation|length > 160 %}…{% endif %}</td>
+                    <td><a href="/testing/events/{{ ev.id }}" class="btn btn-outline btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No analysed detections yet. Run a lab to generate one.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
