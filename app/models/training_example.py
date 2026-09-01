@@ -1,11 +1,12 @@
-"""Training example model — curated data for CyberLLM fine-tuning.
+"""Training example model — curated data for the internal Sentinel assistant.
 
 An example is a CANDIDATE until a human approves it. `approved` (the legacy
 boolean) is kept in sync with `status` so older queries keep working, but
 `status` is authoritative — see app/models/learning.py for the full lifecycle.
 
 Nothing here is ever auto-promoted: `safe_to_train` only becomes True through
-an explicit admin action recorded in `reviewed_by` / `reviewed_at`.
+an explicit admin action recorded in `reviewed_by` / `reviewed_at`. Examples
+originate from content-moderation review, never from arbitrary public content.
 """
 from datetime import datetime, timezone
 
@@ -27,13 +28,10 @@ class TrainingExample(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("security_events.id"), nullable=True)
     instruction = Column(Text, nullable=False)
     input_text = Column(Text, nullable=False)
     output_text = Column(Text, nullable=False)
-    attack_type = Column(String(50))
-    severity = Column(String(20))
-    source = Column(String(50), default="sentientai_lab")
+    source = Column(String(50), default="moderation")
     # Legacy boolean, kept in sync with `status`.
     approved = Column(Boolean, default=False)
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -58,14 +56,10 @@ class TrainingExample(Base):
 
     # ---- Promotion gate --------------------------------------------------
     safe_to_train = Column(Boolean, default=False, nullable=False, index=True)
-    dataset_version_id = Column(
-        Integer, ForeignKey("dataset_versions.id", ondelete="SET NULL"),
-        nullable=True, index=True,
-    )
     split = Column(String(10), default=SPLIT_TRAIN, nullable=False, index=True)
 
     # ---- Provenance + de-duplication -------------------------------------
-    provenance = Column(String(60), default="lab_submission", nullable=False)
+    provenance = Column(String(60), default="moderation_flag", nullable=False)
     dedup_hash = Column(String(64), nullable=True, index=True)
 
     # -- helpers -----------------------------------------------------------
@@ -109,7 +103,3 @@ class TrainingExample(Base):
             self.review_note = note
         if human_label is not None:
             self.human_label = human_label
-        if new_status == REJECTED:
-            # Rejected rows are retained for error analysis but must never be
-            # picked up by a dataset build.
-            self.dataset_version_id = None

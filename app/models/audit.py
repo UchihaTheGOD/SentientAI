@@ -19,13 +19,14 @@ from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Tex
 
 from app.database import Base
 
-# Audit event types (PHASE 31)
+# Audit event types — the internal operations/security trail.
 AUDIT_EVENT_TYPES = (
     "auth.login",
     "auth.login_failed",
     "auth.logout",
     "auth.register",
     "auth.password_changed",
+    "auth.password_reset",
     "post.created",
     "post.published",
     "post.updated",
@@ -35,19 +36,10 @@ AUDIT_EVENT_TYPES = (
     "comment.deleted",
     "report.created",
     "moderation.action",
-    "testing.session_started",
-    "testing.session_ended",
-    "testing.lab_completed",
-    "analysis.generated",
-    "analysis.feedback",
     "training.candidate_created",
     "training.candidate_approved",
     "training.candidate_rejected",
     "training.candidate_needs_edit",
-    "training.dataset_version_created",
-    "training.evaluation_run",
-    "checkpoint.registered",
-    "checkpoint.status_changed",
 )
 
 

@@ -1,6 +1,6 @@
 # PROJECT_CHECKPOINT.md — SentientAI
 
-*Last updated: 2026-08-31 — CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3), analysis-feedback loop (F4), Windows automation + maintenance CLI (F5).*
+*Last updated: 2026-08-31 — End-to-end audit: READY (23/23 pipeline tests pass, pytest 390/0/1). Previous: CyberLLM candidate scoring (F1), admin review-queue depth (F2), read-only testing analysis pages (F3), analysis-feedback loop (F4), Windows automation + maintenance CLI (F5).*
 *Branch: `redesign/public-site-and-security-foundation` (not merged, no PR).*
 
 ---
@@ -245,3 +245,73 @@ run backfill [--apply]    REM band scored-but-unbanded candidates (dry run w/o -
 Env vars: `SECRET_KEY` (required), `DATABASE_URL` (default
 `sqlite:///./data/sentientai.db`), `ENVIRONMENT`, `CYBERLLM_API_URL` /
 `CYBERLLM_API_KEY` (blank → mock), `SENTINEL_MODEL_NAME`.
+
+---
+
+## 9. AUDIT RESULTS (2026-08-31)
+
+**Verdict: READY** — the attack/audit pipeline is fully functional end-to-end.
+
+**Method:** live-server execution with unique canary strings
+(`AUDIT_TEST_001_SQLI` through `AUDIT_TEST_020_NEEDSEDIT`), each verified by
+querying the actual SQLite database for the exact canary in the resulting
+`SecurityEvent`, `TrainingExample`, `AuditEvent`, and `AnalysisFeedback` rows.
+
+**Pytest suite: 390 passed, 1 skipped, 0 failures, 476 warnings** (unchanged
+from previous checkpoint).
+
+### 9.1 Pipeline Tests (23/23 pass)
+
+| ID | Canary / Test | Result | What Was Proved |
+|----|---------------|--------|-----------------|
+| T001 | `AUDIT_TEST_001_SQLI` | ✅ | SQLi → detected, SQL Injection, high → SecurityEvent #23 → TrainingExample (candidate, score=61, band=review) → Audit session_started |
+| T002 | `AUDIT_TEST_002_XSS` | ✅ | XSS stored → detected, XSS, medium → Event #24 → TrainingExample (score=57, band=review) |
+| T003 | `AUDIT_TEST_003_CLEAN` | ✅ | Clean payload → not_detected, none → no false positive |
+| T004 | `AUDIT_TEST_004_CMDI` | ✅ | Command injection → critical, blocked → session terminated → audit session_ended → 303 redirect |
+| T005 | Unauthenticated | ✅ | `/testing` → 303 redirect (blocked) |
+| T006 | Non-admin | ✅ | `/admin` → 403 Forbidden |
+| T007 | `AUDIT_TEST_007_FEEDBACK` | ✅ | Analysis feedback → AnalysisFeedback row → audit `analysis.feedback` |
+| T008 | Approve (dedup) | ✅ | Correctly caught duplicate (twin #17 already approved, same dedup_hash) |
+| T009 | `AUDIT_TEST_009_REJECT` | ✅ | Reject → status=rejected, safe_to_train=0 → audit `candidate_rejected` |
+| T010 | CSRF absent | ✅ | POST without csrf_token → 403 |
+| T011 | `AUDIT_TEST_011_XSSREFL` | ✅ | XSS reflected → detected, XSS, medium |
+| T012 | Sentinel page | ✅ | `/testing/sentinel` → 200 |
+| T013 | Knowledge page | ✅ | `/testing/knowledge` → 200 |
+| T014 | Training page | ✅ | `/testing/training` → 200 |
+| T015 | `AUDIT_TEST_015_NOFP` | ✅ | Clean payload in XSS lab → not_detected, none |
+| T016 | `AUDIT_TEST_016_RETRIAGE` | ✅ | "Incorrect" feedback recorded; retriage correct (band=review, not useful) |
+| T017 | Admin queue | ✅ | `/admin/training` → 200 |
+| T018 | Admin rejected | ✅ | `/admin/training/rejected` → 200 |
+| T019 | Event detail | ✅ | `/testing/events/{id}` → 200 |
+| T020 | `AUDIT_TEST_020_NEEDSEDIT` | ✅ | Needs-edit → status=needs_edit → audit `candidate_needs_edit` |
+| T021 | IDOR check | ✅ | User2 cannot see admin's event → 404 |
+| T022 | Timestamp / user_id | ✅ | Event user_id=admin, timestamp present |
+| T023 | Export | ✅ | `/admin/export` → 200, content-type=application/jsonl |
+
+### 9.2 Security Model Verified
+
+- Server-side auth: unauth → 303, non-admin → 403 (**T005, T006**)
+- CSRF: no token → 403 (**T010**)
+- IDOR: user2 → 404 for admin's event (**T021**)
+- Detection: never-downgrade, critical=block (**T004**)
+- Model safety: candidates start `approved=False, safe_to_train=False`; only
+  admin `apply_review()` promotes (**T001, T008**)
+- Dedup guard: correctly prevents duplicate approvals (**T008**)
+- False positive: clean payloads → `not_detected, none` (**T003, T015**)
+
+### 9.3 What Was NOT Tested
+
+- Batch B (avatar management) — not implemented yet
+- Batch E (admin depth pages) — not implemented yet
+- `run.bat` / CLI commands — documented as working, not re-verified
+- Real Sentinel client — no `CYBERLLM_API_URL` configured; mock used
+- UI rendering / CSS — audit focused on data pipeline, not visual
+
+### 9.4 Next Work (unchanged from §6)
+
+- Batch B: avatar management
+- Batch E: admin depth pages (users/posts/comments/tags/activity/system-health)
+- Consistency: unify post_card rendering across explore/search/feed/profile
+- Housekeeping: remove dead `RESEARCH_CATEGORIES`, fix TemplateResponse deprecations
+- Legacy dead code: `app/api/attacks.py`, `app/api/labs.py`
+

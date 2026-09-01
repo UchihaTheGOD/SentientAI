@@ -11,7 +11,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), default="user", nullable=False, index=True)  # user | tester | admin
+    role = Column(String(20), default="user", nullable=False, index=True)  # user | admin
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -35,10 +35,6 @@ class User(Base):
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
-
-    @property
-    def is_tester(self) -> bool:
-        return self.role in ("tester", "admin")
 
     @property
     def can_sign_in(self) -> bool:

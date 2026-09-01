@@ -4,26 +4,34 @@ This module answers one question — *how much should a human trust this candida
 before reading it* — and nothing more. It is:
 
 * **Deterministic and rule-based.** No model is consulted, so the score of a
-  given observation never drifts between runs. The signals are the same
-  telemetry the detection engine already produced plus cheap text checks.
+  given candidate never drifts between runs. The signals are a coarse
+  moderation strength plus cheap, content-agnostic text checks.
 * **Advisory only.** Scoring decides what a reviewer sees first and how a
   candidate is *triaged*; it never sets ``approved`` or ``safe_to_train``. The
   only path to a trainable row is still ``TrainingExample.apply_review`` via a
   human (see ``app/services/training.py``). A score is a hint, never a gate.
 
-The three bands map onto the task's triage vocabulary:
+The three bands map onto the triage vocabulary:
 
-* ``useful``  — concrete detection evidence and a well-formed answer; most
-  likely worth keeping.
-* ``review``  — ambiguous: no attack detected, thin evidence, or a duplicate of
-  something already collected. A human should look before it counts.
+* ``useful``  — a clear moderation signal and a well-formed answer; most likely
+  worth keeping.
+* ``review``  — ambiguous: no signal, thin evidence, or a duplicate of something
+  already collected. A human should look before it counts.
 * ``noisy``   — junk: empty/too-short input, mostly non-printable, or padded.
   Kept (never auto-deleted) but sunk to the bottom of the queue.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Sequence
+from typing import List
+
+# Coarse strength of the upstream signal that produced this candidate. The
+# moderation review is the only producer today; the value is deliberately a
+# small vocabulary, not a probability, so scoring stays a stable hint.
+SIGNAL_STRONG = "strong"
+SIGNAL_WEAK = "weak"
+SIGNAL_NONE = "none"
+SIGNALS = (SIGNAL_STRONG, SIGNAL_WEAK, SIGNAL_NONE)
 
 # Triage bands (persisted on TrainingExample.quality_band).
 BAND_USEFUL = "useful"
@@ -49,10 +57,10 @@ _MIN_INPUT_CHARS = 4
 _LONG_INPUT_CHARS = 2000
 # Fraction of control/non-printable characters that marks input as junk.
 _NONPRINTABLE_RATIO = 0.15
-# A defensible answer usually names a mitigation; these are cheap markers.
+# A helpful answer usually names a concrete action; these are cheap markers.
 _DEFENSE_MARKERS = (
-    "defen", "parameteris", "parameteriz", "sanitis", "sanitiz", "escap",
-    "validat", "encode", "prepared statement", "recommend", "mitigat",
+    "recommend", "remove", "report", "block", "review", "warn", "escalat",
+    "moderat", "guideline", "policy", "context", "because",
 )
 
 
@@ -78,8 +86,8 @@ def _nonprintable_ratio(text: str) -> float:
 def _looks_padded(text: str) -> bool:
     """True when the input is dominated by one repeated token.
 
-    A long payload made of ``padding padding padding`` teaches the shape of the
-    padding, not the attack — the eval sets built later should not reward it.
+    A long body made of ``spam spam spam`` teaches the shape of the padding,
+    not anything useful — the eval sets built later should not reward it.
     """
     tokens = text.split()
     if len(tokens) < 8:
@@ -90,10 +98,7 @@ def _looks_padded(text: str) -> bool:
 
 def score_candidate(
     *,
-    detected: bool,
-    attack_category: str,
-    severity: str,
-    patterns_matched: Sequence[str],
+    signal: str = SIGNAL_NONE,
     instruction: str,
     input_text: str,
     output_text: str,
@@ -101,8 +106,10 @@ def score_candidate(
 ) -> ScoreResult:
     """Score a candidate 0–100 and assign a triage band.
 
-    All arguments are already-sanitised values taken from the detection result
-    and the generated example; nothing here reads raw request state.
+    ``signal`` is the coarse strength of the moderation decision that produced
+    this candidate (``"strong"`` / ``"weak"`` / ``"none"``). All arguments are
+    already-sanitised values taken from the flagged content and the generated
+    example; nothing here reads raw request state.
     """
     score = _BASE
     notes: List[str] = []
@@ -110,25 +117,17 @@ def score_candidate(
 
     stripped = (input_text or "").strip()
 
-    # --- Evidence: the strongest signal a candidate teaches something real ---
-    matched = [p for p in (patterns_matched or []) if p]
-    if detected and matched:
+    # --- Signal: the strongest cue that a candidate teaches something real ---
+    sig = (signal or SIGNAL_NONE).lower()
+    if sig == SIGNAL_STRONG:
         score += 25
-        preview = ", ".join(matched[:3])
-        notes.append(f"Detection matched {len(matched)} pattern(s): {preview}.")
-    elif detected:
+        notes.append("Strong moderation signal — likely a real example.")
+    elif sig == SIGNAL_WEAK:
         score += 5
-        notes.append("Detected, but no concrete pattern was recorded.")
+        notes.append("Weak moderation signal.")
     else:
         score -= 20
-        notes.append("No attack detected — weak as a positive example.")
-
-    # --- Severity: a critical technique is more instructive to keep ----------
-    sev = (severity or "").lower()
-    sev_bonus = {"critical": 10, "high": 6, "medium": 2}.get(sev, 0)
-    if sev_bonus:
-        score += sev_bonus
-        notes.append(f"Severity {sev}.")
+        notes.append("No moderation signal — weak as a positive example.")
 
     # --- Input sanity --------------------------------------------------------
     if len(stripped) < _MIN_INPUT_CHARS:
@@ -156,7 +155,7 @@ def score_candidate(
         notes.append("Answer is too short to be useful.")
     elif any(marker in lowered for marker in _DEFENSE_MARKERS):
         score += 10
-        notes.append("Answer names a concrete defense.")
+        notes.append("Answer gives a concrete recommendation.")
 
     # --- Duplication ---------------------------------------------------------
     if is_duplicate:

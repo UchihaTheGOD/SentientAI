@@ -57,9 +57,6 @@ class Settings:
         # deterministic local analyzer (no external calls).
         self.CYBERLLM_API_URL: str = os.getenv("CYBERLLM_API_URL", "")
         self.CYBERLLM_API_KEY: str = os.getenv("CYBERLLM_API_KEY", "")
-        self.SENTINEL_MODEL_NAME: str = os.getenv(
-            "SENTINEL_MODEL_NAME", "SentinelSmolLM2-360M-V9"
-        )
 
     @property
     def is_production(self) -> bool:

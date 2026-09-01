@@ -47,10 +47,8 @@ def _run_migrations():
     touch because the table already exists. Never drops data.
     """
     with engine.connect() as conn:
-        # Phase 1 migration: session_id on security_events
-        _safe_add_column(conn, "security_events", "session_id", "TEXT")
-
-        # Phase 2 migrations: User profile fields
+        # User profile fields
+        _safe_add_column(conn, "users", "display_name", "VARCHAR(100)")
         _safe_add_column(conn, "users", "display_name", "VARCHAR(100)")
         _safe_add_column(conn, "users", "bio", "TEXT")
         _safe_add_column(conn, "users", "website", "VARCHAR(255)")
@@ -91,8 +89,7 @@ def _run_migrations():
             ("safe_to_train", "BOOLEAN DEFAULT 0"),
             ("dedup_hash", "VARCHAR(64)"),
             ("split", "VARCHAR(10) DEFAULT 'train'"),
-            ("dataset_version_id", "INTEGER"),
-            ("provenance", "VARCHAR(60) DEFAULT 'lab_submission'"),
+            ("provenance", "VARCHAR(60) DEFAULT 'moderation_flag'"),
             ("review_note", "TEXT"),
             ("reviewed_at", "DATETIME"),
             ("updated_at", "DATETIME"),
@@ -118,23 +115,20 @@ def _run_migrations():
         _safe_exec(conn, "UPDATE training_examples SET status='candidate', safe_to_train=0 "
                          "WHERE (status IS NULL OR status='') AND (approved=0 OR approved IS NULL)")
         _safe_exec(conn, "UPDATE training_examples SET split='train' WHERE split IS NULL OR split=''")
-        _safe_exec(conn, "UPDATE training_examples SET provenance='lab_submission' "
+        _safe_exec(conn, "UPDATE training_examples SET provenance='moderation_flag' "
                          "WHERE provenance IS NULL OR provenance=''")
 
 
 def init_db():
     """Create all tables. Import models before calling this."""
     import app.models.user  # noqa: F401
-    import app.models.security_event  # noqa: F401
     import app.models.training_example  # noqa: F401
     import app.models.blog_post  # noqa: F401
-    import app.models.lab_session  # noqa: F401
     import app.models.activity  # noqa: F401
     import app.models.tag  # noqa: F401
     import app.models.social  # noqa: F401
     import app.models.moderation  # noqa: F401
     import app.models.audit  # noqa: F401
-    import app.models.learning  # noqa: F401
     Base.metadata.create_all(bind=engine)
     _run_migrations()
 

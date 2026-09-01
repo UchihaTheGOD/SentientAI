@@ -8,8 +8,6 @@ from app.database import get_db
 from app.models.user import User
 from app.models.blog_post import POST_PUBLISHED, BlogPost
 from app.models.activity import ACTIVITY_TYPES, Activity
-from app.models.lab_session import LabSession
-from app.models.security_event import SecurityEvent
 from app.models.social import Follow, Bookmark
 from app.services.auth_service import get_current_user, get_current_user_optional
 from app.services.activity_service import (
@@ -116,20 +114,12 @@ def public_profile(
             Follow.follower_id == user.id, Follow.followed_id == profile_user.id
         ).first() is not None
 
-    # Lab stats (public summary — no private details)
-    lab_sessions_count = (
-        db.query(func.count(LabSession.id))
-        .filter(LabSession.user_id == profile_user.id)
-        .scalar() or 0
-    )
-
     return templates.TemplateResponse("profile_public.html", {
         "request": request,
         "current_user": user,
         "profile_user": profile_user,
         "user_posts": user_posts,
         "public_activity": public_activity,
-        "lab_sessions_count": lab_sessions_count,
         "followers_count": followers_count,
         "following_count": following_count,
         "is_following": is_following,
@@ -144,7 +134,7 @@ def dashboard(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Authenticated user dashboard — activity, posts, lab progress."""
+    """Authenticated user dashboard — recent activity and the user's posts."""
     # User's recent activity (all, not just public)
     recent_activity = get_user_activities(db, user.id, public_only=False, limit=20)
 
@@ -157,29 +147,15 @@ def dashboard(
         .all()
     )
 
-    # Lab progress
-    lab_sessions = (
-        db.query(LabSession)
-        .filter(LabSession.user_id == user.id)
-        .order_by(LabSession.started_at.desc())
-        .limit(10)
-        .all()
-    )
-
     # Stats
     total_posts = db.query(func.count(BlogPost.id)).filter(BlogPost.user_id == user.id).scalar() or 0
-    total_sessions = db.query(func.count(LabSession.id)).filter(LabSession.user_id == user.id).scalar() or 0
-    total_events = db.query(func.count(SecurityEvent.id)).filter(SecurityEvent.user_id == user.id).scalar() or 0
 
     return templates.TemplateResponse("dashboard_user.html", {
         "request": request,
         "current_user": user,
         "recent_activity": recent_activity,
         "my_posts": my_posts,
-        "lab_sessions": lab_sessions,
         "total_posts": total_posts,
-        "total_sessions": total_sessions,
-        "total_events": total_events,
     })
 
 

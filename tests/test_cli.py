@@ -14,21 +14,19 @@ from app.models.learning import APPROVED, CANDIDATE, SPLIT_EVAL, SPLIT_TRAIN
 from app.models.training_example import TrainingExample
 from app.services import training as training_service
 
-INSTRUCTION = "Explain the attack in this observation and how to defend against it."
+INSTRUCTION = "Decide whether this reported comment should be removed and explain why."
 
 
 def _candidate(db, **overrides) -> TrainingExample:
     fields = {
         "instruction": INSTRUCTION,
-        "input_text": "A request parameter contained ' OR 1=1 -- against a login form.",
-        "output_text": "Boolean-based SQL injection. Use parameterised queries.",
-        "attack_type": "sql_injection",
-        "severity": "high",
-        "source": "sentientai_lab",
+        "input_text": "Reported comment: 'Nobody here wants you around, just leave.'",
+        "output_text": "Remove it: a personal attack that violates the harassment policy.",
+        "source": "moderation",
         "approved": False,
         "status": CANDIDATE,
         "safe_to_train": False,
-        "provenance": "lab_submission",
+        "provenance": "moderation_flag",
     }
     fields.update(overrides)
     fields.setdefault(

@@ -1,11 +1,8 @@
 """SentientAI — Main FastAPI application.
 
-Two experiences share one process:
-
-  *  the PUBLIC site (`/`, `/explore`, `/blog`, `/community`, `/u/...`) — a
-     normal reading and writing community, browsable anonymously;
-  *  the private TESTING area (`/testing`) — requires an authenticated,
-     non-suspended account and is never advertised on the public pages.
+A community publishing platform: a public reading and writing site (`/`,
+`/explore`, `/blog`, `/community`, `/u/...`) that is browsable anonymously,
+plus a private `/admin` panel reachable only by administrators.
 
 Middleware order matters. `add_middleware` puts the newest layer outermost, so
 the registration order below produces:
@@ -22,7 +19,6 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.database import init_db
-from app.labs import init_labs
 from app.services import errors
 from app.services.csrf import CSRFMiddleware
 
@@ -67,7 +63,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
-    init_labs()
     yield
 
 
@@ -78,7 +73,7 @@ async def lifespan(application: FastAPI):
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Sentient",
-        description="Community publishing platform with a private security testing area.",
+        description="Community publishing platform with a private administration panel.",
         version="0.3.0",
         docs_url="/api/docs",
         redoc_url=None,
@@ -93,7 +88,7 @@ def create_app() -> FastAPI:
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     from app.api import (
-        admin, auth, blog, community, feed, health, moderation, social, testing, users,
+        admin, auth, blog, community, feed, health, moderation, social, users,
     )
     application.include_router(health.router)
     application.include_router(auth.router)
@@ -103,7 +98,6 @@ def create_app() -> FastAPI:
     application.include_router(social.router)
     application.include_router(feed.router)
     application.include_router(moderation.router)
-    application.include_router(testing.router)
     application.include_router(admin.router)
 
     _register_error_handlers(application)

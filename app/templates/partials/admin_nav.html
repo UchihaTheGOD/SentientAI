@@ -1,0 +1,13 @@
+{# Lightweight admin subnav. Included at the top of each admin page's content.
+   Active state is derived from the request path so the current section is
+   highlighted. Phase 4 extends this toward the full admin nav. #}
+<nav class="filter-row admin-nav" aria-label="Admin sections">
+  <a class="filter-chip {% if request.url.path == '/admin' %}filter-chip--active{% endif %}"
+     href="/admin">Dashboard</a>
+  <a class="filter-chip {% if request.url.path == '/admin/training' %}filter-chip--active{% endif %}"
+     href="/admin/training">Review queue</a>
+  <a class="filter-chip {% if request.url.path == '/admin/training/rejected' %}filter-chip--active{% endif %}"
+     href="/admin/training/rejected">Rejected</a>
+  <a class="filter-chip {% if '/admin/moderation' in request.url.path %}filter-chip--active{% endif %}"
+     href="/admin/moderation">Moderation</a>
+</nav>

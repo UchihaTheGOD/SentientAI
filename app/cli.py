@@ -1,4 +1,4 @@
-"""Command-line maintenance tasks for the CyberLLM training pipeline.
+"""Command-line maintenance tasks for the training-example dataset.
 
 Thin wrappers over `app/services/training.py` and `app/services/scoring.py` so
 common dataset chores can run from a terminal (and from `run.bat`) without a
@@ -29,7 +29,7 @@ from app.services import scoring, training
 # ---------------------------------------------------------------------------
 
 def training_status(db) -> dict:
-    """Everything the /testing/training page shows, as plain numbers."""
+    """The dataset review counts, as plain numbers."""
     return {
         "status_counts": training.status_counts(db),
         "band_counts": training.band_counts(db),

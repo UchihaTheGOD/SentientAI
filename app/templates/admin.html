@@ -1,168 +1,73 @@
-{% extends "base_testing.html" %}
-{% block title %}Admin — SentientAI{% endblock %}
-
-{% block breadcrumb %}
-<span>Administration</span>
-{% endblock %}
+{% extends "base_public.html" %}
+{% block title %}Admin — Sentient{% endblock %}
 
 {% block content %}
-<div class="section-header">
-    <h1 class="section-title">Admin Dashboard</h1>
-    <a href="/admin/export" class="btn btn-outline btn-sm">Export Training Data (JSONL)</a>
-</div>
+<div class="page-wrap page-wrap--wide">
 
-<!-- Stats -->
-<div class="stats-grid">
-    <div class="stat-card cyan">
-        <span class="stat-value">{{ total_users }}</span>
-        <span class="stat-label">Total Users</span>
-    </div>
-    <div class="stat-card blue">
-        <span class="stat-value">{{ total_attacks }}</span>
-        <span class="stat-label">Total Events</span>
-    </div>
-    <div class="stat-card green">
-        <span class="stat-value">{{ successful }}</span>
-        <span class="stat-label">Successful</span>
-    </div>
-    <div class="stat-card red">
-        <span class="stat-value">{{ blocked }}</span>
-        <span class="stat-label">Blocked</span>
-    </div>
-</div>
+  {% include "partials/admin_nav.html" %}
 
-<div class="grid-2">
-    <!-- Attacks by Category -->
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">Events by Category</span>
-        </div>
-        {% if categories %}
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Count</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for cat, count in categories.items() %}
-                    <tr>
-                        <td>{{ cat }}</td>
-                        <td class="mono">{{ count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <p>No event data yet.</p>
-        </div>
-        {% endif %}
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Admin dashboard</h1>
+      <p class="page-lead">Platform overview and the assistant's review queue.</p>
     </div>
+    <a href="/admin/export" class="btn btn-outline btn-sm">Export dataset (JSONL)</a>
+  </header>
 
-    <!-- Recent Events -->
-    <div class="card">
-        <div class="card-header">
-            <span class="card-title">Recent Security Events</span>
-        </div>
-        {% if recent_events %}
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>User</th>
-                        <th>Lab</th>
-                        <th>Status</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for event in recent_events[:10] %}
-                    <tr>
-                        <td class="mono" style="font-size:0.85rem;">#{{ event.id }}</td>
-                        <td>{{ event.user_id }}</td>
-                        <td>{{ event.lab_id }}</td>
-                        <td>
-                            {% if event.blocked %}
-                            <span class="badge badge-red">Blocked</span>
-                            {% elif event.success %}
-                            <span class="badge badge-green">Success</span>
-                            {% elif event.detection_result == 'detected' %}
-                            <span class="badge badge-orange">Detected</span>
-                            {% else %}
-                            <span class="badge badge-blue">Clean</span>
-                            {% endif %}
-                        </td>
-                        <td><a href="/admin/events/{{ event.id }}" class="btn btn-outline btn-sm">View</a></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <p>No events yet.</p>
-        </div>
-        {% endif %}
+  <div class="dashboard-stats">
+    <div class="stat-card">
+      <div class="stat-card-num">{{ total_users }}</div>
+      <div class="stat-card-label">Registered users</div>
     </div>
-</div>
+    <div class="stat-card">
+      <div class="stat-card-num">{{ pending_count }}</div>
+      <div class="stat-card-label">Awaiting review</div>
+    </div>
+  </div>
 
-<!-- Pending Training Examples -->
-<div class="card" style="margin-top:24px;">
-    <div class="card-header">
-        <span class="card-title">Training Examples Awaiting Review</span>
-        <div style="display:flex;gap:8px;align-items:center;">
-            <span class="badge badge-orange">{{ pending_count }} Pending</span>
-            <a href="/admin/training" class="btn btn-outline btn-sm">Full queue</a>
-        </div>
-    </div>
+  <section class="card">
+    <header class="page-head" style="margin-bottom: var(--space-md);">
+      <h2 class="section-title">Examples awaiting review</h2>
+      <a href="/admin/training" class="btn btn-ghost btn-sm">Full queue ›</a>
+    </header>
 
     {% if pending_examples %}
     {% for ex in pending_examples[:10] %}
-    <div class="pending-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <span class="badge badge-purple">{{ ex.attack_type }}</span>
-                <span class="badge badge-blue">{{ ex.severity }}</span>
-                {% if ex.quality_band == 'useful' %}
-                <span class="badge badge-green">useful</span>
-                {% elif ex.quality_band == 'noisy' %}
-                <span class="badge badge-red">noisy</span>
-                {% elif ex.quality_band %}
-                <span class="badge badge-orange">review</span>
-                {% endif %}
-                <span class="mono" style="font-size:0.8rem;">score {{ ex.quality_score }}</span>
-                <span style="color:var(--text-muted);font-size:0.82rem;margin-left:8px;">
-                    Event #{{ ex.event_id }}
-                </span>
-            </div>
-            <div class="admin-actions">
-                <form method="post" action="/admin/training/{{ ex.id }}/approve" style="display:inline;">
-                  {{ csrf_input() }}
-                    <button type="submit" class="btn btn-success btn-sm">Approve</button>
-                </form>
-                <form method="post" action="/admin/training/{{ ex.id }}/reject" style="display:inline;">
-                  {{ csrf_input() }}
-                    <button type="submit" class="btn btn-danger btn-sm">Reject</button>
-                </form>
-            </div>
+    <div class="candidate-card">
+      <div class="candidate-head">
+        <div class="candidate-meta">
+          {% if ex.quality_band == 'useful' %}
+          <span class="badge badge-green">useful</span>
+          {% elif ex.quality_band == 'noisy' %}
+          <span class="badge badge-red">noisy</span>
+          {% elif ex.quality_band %}
+          <span class="badge badge-yellow">review</span>
+          {% endif %}
+          <span class="mono text-sm">score {{ ex.quality_score }}</span>
         </div>
-        <pre>{{ ex.instruction }}
+        <div class="candidate-actions">
+          <form method="post" action="/admin/training/{{ ex.id }}/approve" class="inline-form">
+            {{ csrf_input() }}
+            <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+          </form>
+          <form method="post" action="/admin/training/{{ ex.id }}/reject" class="inline-form">
+            {{ csrf_input() }}
+            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+          </form>
+        </div>
+      </div>
+      <div class="candidate-body">{{ ex.instruction }}
 
 Input: {{ ex.input_text[:200] }}
 
-Output: {{ ex.output_text[:200] }}</pre>
+Output: {{ ex.output_text[:200] }}</div>
     </div>
     {% endfor %}
     {% else %}
     <div class="empty-state">
-        <div class="icon">✓</div>
-        <p>No training examples pending review.</p>
+      <p>No examples are waiting for review.</p>
     </div>
     {% endif %}
+  </section>
 </div>
 {% endblock %}

@@ -64,11 +64,8 @@
                         <a href="/activity">Your activity</a>
                         <a href="/profile/edit">Settings</a>
                         <a href="/account/password">Password</a>
-                        {% if current_user.is_tester %}
-                        <hr>
-                        <a href="/testing" class="testing-link">Testing Lab ›</a>
-                        {% endif %}
                         {% if current_user.is_admin %}
+                        <hr>
                         <a href="/admin" class="admin-link">Admin ›</a>
                         <a href="/admin/moderation" class="admin-link">Moderation ›</a>
                         {% endif %}

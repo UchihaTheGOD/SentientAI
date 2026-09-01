@@ -13,14 +13,6 @@
         <div class="stat-card-num">{{ total_posts }}</div>
         <div class="stat-card-label">Total posts</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-card-num">{{ total_sessions }}</div>
-        <div class="stat-card-label">Lab sessions</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-num">{{ total_events }}</div>
-        <div class="stat-card-label">Security events</div>
-      </div>
     </div>
 
     {# My posts #}
@@ -59,25 +51,6 @@
       {% endif %}
     </div>
 
-    {# Lab sessions (if tester) #}
-    {% if current_user.is_tester and lab_sessions %}
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
-        <div class="section-title" style="margin:0;">Recent lab sessions</div>
-        <a href="/testing/sessions" class="btn btn-ghost btn-sm">View all</a>
-      </div>
-      {% for session in lab_sessions[:5] %}
-      <div class="post-row">
-        <div class="post-row-title">
-          <a href="/testing/sessions/{{ session.session_id }}">{{ session.lab_id }} — {{ session.session_id[:8] }}…</a>
-        </div>
-        <span class="badge {% if session.status == 'terminated' %}badge-red{% elif session.status == 'completed' %}badge-green{% else %}badge-yellow{% endif %}">{{ session.status }}</span>
-        <span class="text-xs text-muted">{{ session.started_at.strftime('%b %d') if session.started_at else '' }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
   </main>
 
   {# Sidebar #}
@@ -98,9 +71,6 @@
       <div style="display:flex;flex-direction:column;gap:var(--space-xs);">
         <a href="/u/{{ current_user.username }}" class="btn btn-ghost btn-sm" style="justify-content:center;">View public profile</a>
         <a href="/profile/edit" class="btn btn-ghost btn-sm" style="justify-content:center;">Edit profile</a>
-        {% if current_user.is_tester %}
-        <a href="/testing" class="btn btn-ghost btn-sm" style="justify-content:center;color:var(--accent);">Testing Lab →</a>
-        {% endif %}
       </div>
     </div>
 
