@@ -116,7 +116,7 @@ def register(
     user = User(
         username=username,
         email=email,
-        hashed_password=hash_password(password),
+        password_hash=hash_password(password),
         role="user",
     )
     db.add(user)
@@ -166,7 +166,7 @@ def login(
         }, status_code=400)
 
     user = db.query(User).filter(User.username == username).first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(password, user.password_hash):
         # Deliberately identical message for "no such user" and "wrong password"
         # so the form cannot be used to enumerate accounts.
         audit.record(db, "auth.login_failed", detail=f"username={username[:50]}", request=request)
@@ -178,7 +178,7 @@ def login(
         reason = f" Reason: {user.suspension_reason}" if user.suspension_reason else ""
         return fail(f"This account has been suspended.{reason}")
 
-    token = create_access_token(data={"sub": str(user.id)})
+    token = create_access_token(data={"sub": str(user.id), "tv": user.token_version})
     # Everyone lands on the public site. The testing area is reached
     # deliberately, never as a side effect of signing in.
     response = RedirectResponse(url=target, status_code=303)
@@ -200,6 +200,10 @@ def login(
 def logout(request: Request, db: Session = Depends(get_db),
            user=Depends(get_current_user_optional)):
     if user:
+        # Invalidate the session server-side, not just by dropping the cookie:
+        # bumping the version retires the token everywhere it may have been copied.
+        user.token_version = (user.token_version or 0) + 1
+        db.commit()
         audit.record(db, "auth.logout", user=user, request=request)
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("access_token")
@@ -228,7 +232,7 @@ def password_change(
     db: Session = Depends(get_db),
 ):
     errors = []
-    if not verify_password(current_password, user.hashed_password):
+    if not verify_password(current_password, user.password_hash):
         errors.append("Your current password is incorrect.")
     else:
         problem = _validate_password(new_password)
@@ -236,7 +240,7 @@ def password_change(
             errors.append(problem)
         elif new_password != confirm_password:
             errors.append("The new passwords do not match.")
-        elif verify_password(new_password, user.hashed_password):
+        elif verify_password(new_password, user.password_hash):
             errors.append("The new password must be different from the current one.")
 
     if errors:
@@ -244,10 +248,25 @@ def password_change(
             "request": request, "current_user": user, "errors": errors, "success": False,
         }, status_code=400)
 
-    user.hashed_password = hash_password(new_password)
+    # Store only the new Argon2id hash, then invalidate every other session by
+    # bumping the token version. The current session stays alive because we
+    # re-issue its cookie with the new version — the user is not logged out of
+    # the tab they just used, but any other device is.
+    user.password_hash = hash_password(new_password)
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
     audit.record(db, "auth.password_changed", user=user, request=request)
 
-    return templates.TemplateResponse("account_password.html", {
+    token = create_access_token(data={"sub": str(user.id), "tv": user.token_version})
+    response = templates.TemplateResponse("account_password.html", {
         "request": request, "current_user": user, "errors": [], "success": True,
     })
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.ENVIRONMENT == "production",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return response

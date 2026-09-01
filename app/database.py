@@ -73,6 +73,9 @@ def _run_migrations():
         _safe_add_column(conn, "users", "suspension_reason", "VARCHAR(255)")
         _safe_add_column(conn, "users", "suspended_at", "DATETIME")
 
+        # Session invalidation counter (User.token_version / auth_service).
+        _safe_add_column(conn, "users", "token_version", "INTEGER DEFAULT 0")
+
         # Comment moderation hide, distinct from the author's own delete.
         _safe_add_column(conn, "comments", "is_hidden", "BOOLEAN DEFAULT 0")
         _safe_add_column(conn, "comments", "hidden_reason", "VARCHAR(255)")
@@ -107,6 +110,7 @@ def _run_migrations():
                          "WHERE published_at IS NULL AND status='published'")
         _safe_exec(conn, "UPDATE blog_posts SET is_hidden=0 WHERE is_hidden IS NULL")
         _safe_exec(conn, "UPDATE users SET is_suspended=0 WHERE is_suspended IS NULL")
+        _safe_exec(conn, "UPDATE users SET token_version=0 WHERE token_version IS NULL")
         _safe_exec(conn, "UPDATE comments SET is_hidden=0 WHERE is_hidden IS NULL")
         # Existing approved/pending examples map onto the new review lifecycle.
         _safe_exec(conn, "UPDATE training_examples SET status='approved', safe_to_train=1 "

@@ -95,7 +95,7 @@ def test_registration_creates_a_plain_user_not_an_admin(client, db):
     assert created is not None
     # A request must never be able to grant itself a role.
     assert created.role == "user"
-    assert created.hashed_password != PASSWORD
+    assert created.password_hash != PASSWORD
 
 
 def test_registration_cannot_choose_its_own_role(client, db):

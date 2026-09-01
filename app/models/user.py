@@ -10,10 +10,15 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=False)
     role = Column(String(20), default="user", nullable=False, index=True)  # user | tester | admin
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Bumped to invalidate every existing session at once — on logout, password
+    # change/reset, suspension, deletion, and admin reset. Tokens carry the value
+    # they were minted with; a mismatch in get_current_user means it is stale.
+    token_version = Column(Integer, default=0, nullable=False)
 
     # Profile fields (nullable — existing rows get NULL, filled via /profile edit)
     display_name = Column(String(100), nullable=True)
