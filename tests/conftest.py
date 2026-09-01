@@ -26,15 +26,10 @@ _DB_PATH = _TMP_DIR / "test.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{_DB_PATH.as_posix()}"
 os.environ["SECRET_KEY"] = "test-secret-key-not-used-anywhere-else"
 os.environ["ENVIRONMENT"] = "test"
-# Keep the CyberLLM client on its local/mock path: a test must never depend on
-# an outbound network call.
-os.environ["CYBERLLM_API_URL"] = ""
-os.environ["CYBERLLM_API_KEY"] = ""
 
 from starlette.testclient import TestClient  # noqa: E402
 
 from app.database import Base, SessionLocal, engine, init_db  # noqa: E402
-from app.labs import init_labs  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.services import ratelimit  # noqa: E402
@@ -46,9 +41,6 @@ PASSWORD = "TestPassword123"
 @pytest.fixture(scope="session", autouse=True)
 def _schema():
     init_db()
-    # Labs are registered in memory by importing their modules, so this does not
-    # write rows and does not need repeating between tests.
-    init_labs()
     yield
 
 

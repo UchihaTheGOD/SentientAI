@@ -27,7 +27,6 @@ from app.models.learning import (
     APPROVED, CANDIDATE, DUPLICATE, EXAMPLE_STATUSES, NEEDS_EDIT, REJECTED,
     REJECTION_REASONS, SPLIT_EVAL, SPLIT_TRAIN,
 )
-from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 
 PENDING_STATUSES = (CANDIDATE, NEEDS_EDIT)
@@ -134,22 +133,6 @@ def band_counts(db: Session) -> dict[str, int]:
     return counts
 
 
-def examples_for_user(db: Session, user_id: int, limit: int = 50) -> List[TrainingExample]:
-    """Candidates derived from one account's own lab submissions.
-
-    Joined through `SecurityEvent` so a user only ever sees knowledge collected
-    from their own activity — never another account's observations.
-    """
-    return (
-        db.query(TrainingExample)
-        .join(SecurityEvent, TrainingExample.event_id == SecurityEvent.id)
-        .filter(SecurityEvent.user_id == user_id)
-        .order_by(TrainingExample.created_at.desc())
-        .limit(limit)
-        .all()
-    )
-
-
 # ---------------------------------------------------------------------------
 # Human review — the only path to `safe_to_train`
 # ---------------------------------------------------------------------------
@@ -237,8 +220,6 @@ def export_approved_jsonl(db: Session, split: str = SPLIT_TRAIN) -> str:
             "instruction": example.instruction,
             "input": example.input_text,
             "output": example.output_text,
-            "attack_type": example.attack_type,
-            "severity": example.severity,
             "source": example.source,
             "split": example.split or SPLIT_TRAIN,
             "provenance": example.provenance,

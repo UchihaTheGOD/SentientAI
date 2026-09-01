@@ -25,25 +25,23 @@ from app.models.learning import (
 from app.models.training_example import TrainingExample
 from app.services import training as training_service
 
-INSTRUCTION = "Explain the attack in this observation and how to defend against it."
-INPUT_TEXT = "A request parameter contained ' OR 1=1 -- against a lab login form."
-OUTPUT_TEXT = "This is a boolean-based SQL injection attempt. Use parameterised queries."
+INSTRUCTION = "Decide whether this reported comment should be removed and explain why."
+INPUT_TEXT = "Reported comment: 'Nobody here wants you around, just leave.'"
+OUTPUT_TEXT = "Remove it: the comment targets a person with a personal attack, which the harassment policy forbids."
 
 
 def _candidate(db, **overrides) -> TrainingExample:
-    """A candidate exactly as `analysis.analyze_lab_submission` writes one."""
+    """A candidate exactly as the moderation producer writes one."""
     fields = {
         "instruction": INSTRUCTION,
         "input_text": INPUT_TEXT,
         "output_text": OUTPUT_TEXT,
-        "attack_type": "sql_injection",
-        "severity": "high",
-        "source": "sentientai_lab",
+        "source": "moderation",
         "approved": False,
         "status": CANDIDATE,
         "safe_to_train": False,
-        "model_prediction": "sql_injection",
-        "provenance": "lab_submission",
+        "model_prediction": "spam",
+        "provenance": "moderation_flag",
     }
     fields.update(overrides)
     fields.setdefault(
@@ -67,7 +65,6 @@ def test_a_fresh_candidate_is_not_trainable(db):
     assert example.safe_to_train is False
     assert example.is_trainable is False
     assert example.reviewed_by is None
-    assert example.dataset_version_id is None
 
 
 def test_a_candidate_is_excluded_from_every_export(db):
@@ -132,7 +129,7 @@ def test_an_admin_approval_records_who_decided(admin_client, db, admin):
     example = _candidate(db)
     response = admin_client.post(
         f"/admin/training/{example.id}/approve",
-        {"note": "Correct label, useful explanation.", "label": "sql_injection"},
+        {"note": "Correct label, useful explanation.", "label": "harassment"},
     )
     assert response.status_code == 303
 
@@ -145,8 +142,8 @@ def test_an_admin_approval_records_who_decided(admin_client, db, admin):
     assert row.review_note == "Correct label, useful explanation."
     # The human label is stored separately from what the pipeline guessed, so
     # the two can be compared instead of one overwriting the other.
-    assert row.human_label == "sql_injection"
-    assert row.model_prediction == "sql_injection"
+    assert row.human_label == "harassment"
+    assert row.model_prediction == "spam"
 
 
 def test_reviewing_an_unknown_example_is_a_404(admin_client):
@@ -176,7 +173,7 @@ def test_rejection_retains_the_row_with_its_reason(admin_client, db):
     example = _candidate(db)
     assert admin_client.post(
         f"/admin/training/{example.id}/reject",
-        {"reason": "wrong_label", "note": "The detection called this XSS."},
+        {"reason": "wrong_label", "note": "The model called this harassment, but it is spam."},
     ).status_code == 303
 
     db.expire_all()
@@ -186,7 +183,7 @@ def test_rejection_retains_the_row_with_its_reason(admin_client, db):
     assert row.state == REJECTED
     assert row.safe_to_train is False
     assert "reason=wrong_label" in row.review_note
-    assert "The detection called this XSS." in row.review_note
+    assert "The model called this harassment, but it is spam." in row.review_note
 
 
 def test_a_rejection_reason_outside_the_vocabulary_becomes_other(db, admin):
@@ -215,26 +212,13 @@ def test_a_rejected_row_never_reaches_an_export(db, admin):
     assert db.query(TrainingExample).filter(TrainingExample.id == example.id).count() == 1
 
 
-def test_rejecting_clears_any_dataset_membership(db, admin):
-    example = _candidate(db, dataset_version_id=None)
-    training_service.approve_example(db, example.id, admin.id)
-    example.dataset_version_id = 1
-    db.commit()
-
-    training_service.reject_example(db, example.id, admin.id, reason="unsafe")
-    db.expire_all()
-    assert db.query(TrainingExample).filter(
-        TrainingExample.id == example.id,
-    ).first().dataset_version_id is None
-
-
 # ---------------------------------------------------------------------------
 # De-duplication
 # ---------------------------------------------------------------------------
 
 def test_the_dedup_hash_ignores_formatting_and_case(db):
-    a = training_service.dedup_hash("Explain  THIS", "a  payload\n")
-    b = training_service.dedup_hash("explain this", "a payload")
+    a = training_service.dedup_hash("Explain  THIS", "a  comment\n")
+    b = training_service.dedup_hash("explain this", "a comment")
     assert a == b
 
 
@@ -262,7 +246,7 @@ def test_approving_a_second_identical_example_marks_it_duplicate(db, admin):
 
 def test_two_genuinely_different_examples_both_approve(db, admin):
     first = _candidate(db)
-    second = _candidate(db, input_text="A parameter contained <script>alert(1)</script>.")
+    second = _candidate(db, input_text="A second reported comment with different wording.")
 
     training_service.approve_example(db, first.id, admin.id)
     training_service.approve_example(db, second.id, admin.id)
@@ -304,12 +288,12 @@ def test_the_train_export_excludes_the_eval_split(db, admin):
 
 def test_the_export_carries_provenance_and_the_reviewer(db, admin):
     example = _candidate(db)
-    training_service.approve_example(db, example.id, admin.id, human_label="sql_injection")
+    training_service.approve_example(db, example.id, admin.id, human_label="harassment")
     row = json.loads(training_service.export_approved_jsonl(db).splitlines()[0])
-    assert row["provenance"] == "lab_submission"
+    assert row["provenance"] == "moderation_flag"
     assert row["reviewed_by"] == admin.id
-    assert row["human_label"] == "sql_injection"
-    assert row["source"] == "sentientai_lab"
+    assert row["human_label"] == "harassment"
+    assert row["source"] == "moderation"
 
 
 def test_the_export_drops_a_row_that_disagrees_with_itself(db, admin):

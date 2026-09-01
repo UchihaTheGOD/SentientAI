@@ -20,7 +20,7 @@ def log_activity(
         user_id: The acting user.
         activity_type: One of ACTIVITY_TYPES (extensible).
         description: Human-readable description of what happened.
-        target_type: Optional entity type (e.g. "blog_post", "lab_session").
+        target_type: Optional entity type (e.g. "blog_post", "comment").
         target_id: Optional entity ID (string for uuid compat).
         is_public: Whether this shows on the user's public profile.
 

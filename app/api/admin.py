@@ -1,5 +1,4 @@
-"""Admin panel routes — stats, event review, training example management."""
-import json
+"""Admin panel routes — overview stats and training-example review."""
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from sqlalchemy.orm import Session
@@ -8,7 +7,6 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.user import User
 from app.models.learning import NEEDS_EDIT, REJECTION_REASONS
-from app.models.security_event import SecurityEvent
 from app.models.training_example import TrainingExample
 from app.services import audit
 from app.services.auth_service import require_admin
@@ -36,74 +34,18 @@ def admin_dashboard(
     db: Session = Depends(get_db),
 ):
     total_users = db.query(func.count(User.id)).scalar() or 0
-    total_attacks = db.query(func.count(SecurityEvent.id)).scalar() or 0
 
-    successful = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.success == True
-    ).scalar() or 0
-
-    blocked = db.query(func.count(SecurityEvent.id)).filter(
-        SecurityEvent.blocked == True
-    ).scalar() or 0
-
-    # Attacks by category
-    category_counts = (
-        db.query(SecurityEvent.attack_category, func.count(SecurityEvent.id))
-        .filter(SecurityEvent.detection_result == "detected")
-        .group_by(SecurityEvent.attack_category)
-        .all()
-    )
-    categories = {cat: count for cat, count in category_counts}
-
-    # Recent events
-    recent_events = (
-        db.query(SecurityEvent)
-        .order_by(SecurityEvent.timestamp.desc())
-        .limit(20)
-        .all()
-    )
-
-    # Pending training examples
+    # Pending training examples awaiting review.
     pending = training_service.get_pending_examples(db)
     pending_count = len(pending)
 
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "user": user,
+        "current_user": user,
         "total_users": total_users,
-        "total_attacks": total_attacks,
-        "successful": successful,
-        "blocked": blocked,
-        "categories": categories,
-        "recent_events": recent_events,
         "pending_examples": pending,
         "pending_count": pending_count,
-    })
-
-
-@router.get("/events/{event_id}", response_class=HTMLResponse)
-def admin_event_detail(
-    event_id: int,
-    request: Request,
-    user: User = Depends(require_admin),
-    db: Session = Depends(get_db),
-):
-    event = db.query(SecurityEvent).filter(SecurityEvent.id == event_id).first()
-    if not event:
-        return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
-
-    raw_json = None
-    if event.raw_analysis_json:
-        try:
-            raw_json = json.loads(event.raw_analysis_json)
-        except json.JSONDecodeError:
-            pass
-
-    return templates.TemplateResponse("admin_event.html", {
-        "request": request,
-        "user": user,
-        "event": event,
-        "raw_json": raw_json,
     })
 
 
@@ -165,6 +107,7 @@ def admin_training_queue(
     return templates.TemplateResponse("admin_training.html", {
         "request": request,
         "user": user,
+        "current_user": user,
         "pending_examples": pending,
         "pending_count": len(pending),
         "band_labels": BAND_LABELS,
@@ -184,6 +127,7 @@ def admin_training_rejected(
     return templates.TemplateResponse("admin_rejected.html", {
         "request": request,
         "user": user,
+        "current_user": user,
         "rejected_examples": rejected,
     })
 

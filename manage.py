@@ -2,7 +2,7 @@
 
 Usage:
     python manage.py create-admin --username X --email Y --password Z
-    python manage.py set-role --username X --role tester
+    python manage.py set-role --username X --role admin
     python manage.py list-users
 """
 import argparse
@@ -12,7 +12,7 @@ from app.models.user import User
 from app.services.auth_service import hash_password
 
 
-VALID_ROLES = ("user", "tester", "admin")
+VALID_ROLES = ("user", "admin")
 
 
 def create_admin(args):

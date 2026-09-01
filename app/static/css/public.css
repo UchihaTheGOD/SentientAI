@@ -222,7 +222,6 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   transition: background 0.1s;
 }
 .user-dropdown a:hover { background: var(--bg-subtle); color: var(--text-primary); }
-.user-dropdown .testing-link { color: var(--accent); }
 .user-dropdown .admin-link { color: var(--danger); }
 
 /* Mobile nav toggle */
@@ -1293,3 +1292,20 @@ a:hover .post-card-title { color: var(--accent); }
 .mod-details { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.55; margin-bottom: var(--space-md); }
 .mod-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 .mod-log { margin-top: var(--space-md); font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--border-light); padding-top: var(--space-sm); }
+
+/* ============================================================
+   Admin — training-example review
+   ============================================================ */
+.admin-nav { margin-bottom: var(--space-lg); }
+.mono { font-family: var(--font-mono, ui-monospace, monospace); }
+.candidate-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-lg); margin-bottom: var(--space-md); }
+.candidate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-md); flex-wrap: wrap; }
+.candidate-meta { display: flex; gap: var(--space-xs); align-items: center; flex-wrap: wrap; }
+.candidate-notes { margin: var(--space-sm) 0; padding-left: 18px; color: var(--text-muted); font-size: 0.82rem; }
+.candidate-body {
+  background: var(--bg-subtle); border: 1px solid var(--border-light);
+  border-radius: var(--radius); padding: var(--space-md); margin: var(--space-sm) 0;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.82rem;
+  white-space: pre-wrap; word-break: break-word; overflow-x: auto;
+}
+.candidate-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: flex-end; margin-top: var(--space-sm); }
