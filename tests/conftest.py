@@ -167,10 +167,11 @@ def _make_user(role: str = "user", **overrides) -> User:
     n = _counter["n"]
     session = SessionLocal()
     try:
+        hashed = hash_password(PASSWORD)
         user = User(
             username=overrides.pop("username", f"{role}{n}"),
             email=overrides.pop("email", f"{role}{n}@example.test"),
-            hashed_password=hash_password(PASSWORD),
+            password_hash=hashed,
             role=role,
             **overrides,
         )

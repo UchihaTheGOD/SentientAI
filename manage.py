@@ -30,7 +30,7 @@ def create_admin(args):
         user = User(
             username=args.username,
             email=args.email,
-            hashed_password=hash_password(args.password),
+            password_hash=hash_password(args.password),
             role="admin",
         )
         db.add(user)
