@@ -27,11 +27,11 @@ code; do not layer on top. Do not fabricate features or test results.
 
 ## Phases (each green + committed)
 - [x] **P1 — Security/secrets foundation.** argon2-cffi req; Argon2id; `password_hash` rename; `token_version` + `tv` claim + fail-closed check; logout/password-change invalidation; SECRET_KEY prod guard; SMTP + reset settings in config; `.env.example`/`.gitignore` rewrite; DATABASE_URL→`app.db`; drop dead TEACHER_*/ADMIN_SECRET. (SENTINEL_MODEL_NAME kept until P2b.)
-- [ ] **P2a — Delete unregistered dead code** (attacks.py/labs.py + orphan templates + base.html).
-- [ ] **P2b — Remove /testing area + lab backend + their tests**; decouple TrainingExample/scoring/training; drop SecurityEvent/LabSession (+ simplify learning stack); fix leaks; reparent admin templates; delete base_testing/style.css/main.js; drop init_labs from conftest+main; extend test_public_routes to /dashboard,/activity; delete verify_security.py.
-- [ ] **P3 — Password reset via SMTP** (PasswordResetToken model, email service, forgot/reset routes+templates, no enumeration, single-use/expiry, session invalidation, no auto-login).
-- [ ] **P4 — Admin panel** (base_admin + nav Dashboard/Users/Posts/Comments/Requests/Logs/AI-Dataset/Settings; user mgmt incl Remove-All-Users w/ confirm+transaction; posts/comments mgmt; logs viewer w/ filters; settings read-only; every route require_admin).
-- [ ] **P5 — Internal Sentinel re-sourcing** (moderation→candidate producer; admin review→approve→export JSONL; honest, no training).
+- [x] **P2a — Delete unregistered dead code** (attacks.py/labs.py + orphan templates + base.html).
+- [x] **P2b — Remove /testing area + lab backend + their tests**; decouple TrainingExample/scoring/training; drop SecurityEvent/LabSession (+ simplify learning stack); fix leaks; reparent admin templates; delete base_testing/style.css/main.js; drop init_labs from conftest+main; extend test_public_routes to /dashboard,/activity; delete verify_security.py.
+- [x] **P3 — Password reset via SMTP** (PasswordResetToken model, email service, forgot/reset routes+templates, no enumeration, single-use/expiry, session invalidation, no auto-login).
+- [x] **P4 — Admin panel** (base_admin + nav Dashboard/Users/Posts/Comments/Requests/Logs/AI-Dataset/Settings; user mgmt incl Remove-All-Users w/ confirm+transaction; posts/comments mgmt; logs viewer w/ filters; settings read-only; every route require_admin).
+- [x] **P5 — Internal Sentinel re-sourcing** (moderation→candidate producer in app/services/collection.py, wired into the admin-only moderation flow; admin review→approve→export JSONL; advisory scoring only, never auto-trains; integration tests re-added).
 - [ ] **P6 — Messaging/chat** (Message model+service+routes+templates+notifications+tests).
 - [ ] **P7 — Seed/reset → single admin** admin/admin@12345/admin@12345 (Argon2id, hash-only); dev reset+seed; re-home posts to real users.
 - [ ] **P8 — Public UI cleanup** + post_card unification + about/contact polish.
