@@ -27,7 +27,7 @@ from app.models.moderation import (
 )
 from app.models.social import Comment
 from app.models.user import User
-from app.services import audit
+from app.services import audit, collection
 from app.services.auth_service import get_current_user, require_admin
 from app.services.pagination import clamp_page, paginate
 from app.services.ratelimit import limit_report
@@ -110,6 +110,14 @@ def log_action(
         target_type=target_type, target_id=target_id,
         detail=f"{action}: {reason or 'no reason given'}",
         request=request,
+    )
+    # Internal Sentinel pipeline (producer). A moderator's decision on reported
+    # content becomes an unreviewed training candidate — never auto-trained, and
+    # a no-op for actions that aren't a clean keep/remove judgement. It swallows
+    # its own errors so it can never break a moderation action.
+    collection.collect_from_moderation(
+        db, action=action, target_type=target_type, target_id=target_id,
+        moderator=moderator, reason=reason, report_id=report_id, request=request,
     )
 
 
