@@ -53,11 +53,6 @@ class Settings:
         self.SMTP_FROM: str = os.getenv("SMTP_FROM", "")
         self.SMTP_USE_TLS: bool = _as_bool(os.getenv("SMTP_USE_TLS", "true"))
 
-        # Internal content-analysis / dataset endpoint. Blank → built-in
-        # deterministic local analyzer (no external calls).
-        self.CYBERLLM_API_URL: str = os.getenv("CYBERLLM_API_URL", "")
-        self.CYBERLLM_API_KEY: str = os.getenv("CYBERLLM_API_KEY", "")
-
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"

@@ -1,6 +1,6 @@
 """Authentication routes — register, login, logout, password change."""
 import re
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -15,6 +15,7 @@ from app.services.auth_service import (
     create_access_token, get_current_user, get_current_user_optional,
     hash_password, verify_password,
 )
+from app.services import password_reset as reset_service
 from app.services.ratelimit import limit_login, limit_password, limit_register
 from app.template_env import templates
 
@@ -136,12 +137,17 @@ def register(
 def login_page(
     request: Request,
     registered: str = Query(""),
+    reset: str = Query(""),
     next: str = Query(""),
     user=Depends(get_current_user_optional),
 ):
     if user:
         return RedirectResponse(url=safe_next(next), status_code=303)
-    msg = "Account created — sign in to get started." if registered else None
+    msg = None
+    if registered:
+        msg = "Account created — sign in to get started."
+    elif reset:
+        msg = "Your password has been reset — sign in with your new password."
     return templates.TemplateResponse("login.html", {
         "request": request, "error": None, "message": msg, "next": safe_next(next),
     })
@@ -179,8 +185,6 @@ def login(
         return fail(f"This account has been suspended.{reason}")
 
     token = create_access_token(data={"sub": str(user.id), "tv": user.token_version})
-    # Everyone lands on the public site. The testing area is reached
-    # deliberately, never as a side effect of signing in.
     response = RedirectResponse(url=target, status_code=303)
     response.set_cookie(
         key="access_token",
@@ -269,4 +273,103 @@ def password_change(
         secure=settings.ENVIRONMENT == "production",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Password reset (forgot → emailed single-use link → set a new password)
+# ---------------------------------------------------------------------------
+
+def _external_base(request: Request) -> str:
+    """Scheme+host for building an absolute reset link, proxy-aware.
+
+    Behind a TLS-terminating proxy the request reaches us as http; the forwarded
+    headers carry what the browser actually used, so the emailed link keeps the
+    right scheme and host.
+    """
+    proto = (request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+             or request.url.scheme)
+    host = (request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+            or request.url.netloc)
+    return f"{proto}://{host}"
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request, user=Depends(get_current_user_optional)):
+    # A signed-in user already has the in-account change form.
+    if user:
+        return RedirectResponse(url="/account/password", status_code=303)
+    return templates.TemplateResponse("forgot_password.html", {
+        "request": request, "sent": False,
+    })
+
+
+@router.post("/forgot-password", response_class=HTMLResponse,
+             dependencies=[Depends(limit_password)])
+def forgot_password(
+    request: Request,
+    email: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    base = _external_base(request)
+
+    def build_url(raw: str) -> str:
+        return f"{base}/reset-password?token={quote(raw, safe='')}"
+
+    # Enumeration-safe: does nothing observable when the address is unknown.
+    reset_service.initiate_reset(db, email=email, build_url=build_url)
+
+    # The same confirmation regardless of whether an account matched.
+    return templates.TemplateResponse("forgot_password.html", {
+        "request": request, "sent": True,
+    })
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(
+    request: Request,
+    token: str = Query(""),
+    db: Session = Depends(get_db),
+):
+    row = reset_service.verify_token(db, token)
+    return templates.TemplateResponse("reset_password.html", {
+        "request": request, "valid": row is not None, "token": token, "errors": [],
+    })
+
+
+@router.post("/reset-password", response_class=HTMLResponse,
+             dependencies=[Depends(limit_password)])
+def reset_password(
+    request: Request,
+    token: str = Form(""),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    row = reset_service.verify_token(db, token)
+    if row is None:
+        # Expired, already used, or forged — there is no form to re-show.
+        return templates.TemplateResponse("reset_password.html", {
+            "request": request, "valid": False, "token": "", "errors": [],
+        }, status_code=400)
+
+    errors = []
+    problem = _validate_password(new_password)
+    if problem:
+        errors.append(problem)
+    elif new_password != confirm_password:
+        errors.append("The new passwords do not match.")
+
+    if errors:
+        return templates.TemplateResponse("reset_password.html", {
+            "request": request, "valid": True, "token": token, "errors": errors,
+        }, status_code=400)
+
+    user = reset_service.consume_reset(db, row, new_password)
+    audit.record(db, "auth.password_reset", user=user, request=request)
+
+    # Deliberately NOT signed in: a reset ends at the login page. Every prior
+    # session is already invalid because consume_reset bumped token_version.
+    response = RedirectResponse(url="/login?reset=1", status_code=303)
+    response.delete_cookie("access_token")
     return response

@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.password_reset import PasswordResetToken
 from app.models.training_example import TrainingExample
 from app.models.blog_post import BlogPost
 from app.models.activity import Activity
@@ -8,7 +9,7 @@ from app.models.moderation import Report, ModerationAction
 from app.models.audit import AuditEvent, DailyMetric, SearchQueryStat
 
 __all__ = [
-    "User", "TrainingExample", "BlogPost",
+    "User", "PasswordResetToken", "TrainingExample", "BlogPost",
     "Activity", "Tag", "post_tags",
     "PostLike", "Comment", "CommentLike", "Bookmark", "Follow", "Notification",
     "Report", "ModerationAction",

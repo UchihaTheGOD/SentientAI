@@ -122,6 +122,7 @@ def _run_migrations():
 def init_db():
     """Create all tables. Import models before calling this."""
     import app.models.user  # noqa: F401
+    import app.models.password_reset  # noqa: F401
     import app.models.training_example  # noqa: F401
     import app.models.blog_post  # noqa: F401
     import app.models.activity  # noqa: F401
