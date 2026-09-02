@@ -106,28 +106,6 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
         return None
 
 
-def require_lab_access(user: User = Depends(get_current_user)) -> User:
-    """Gate for the private /testing area.
-
-    Any authenticated, active, non-suspended account may use the labs — the
-    suspension and activity checks live in `get_current_user`, so reaching this
-    dependency already means the account is in good standing. Kept as a named
-    dependency (rather than using `get_current_user` directly) so the policy for
-    the whole testing area can be tightened in exactly one place.
-    """
-    return user
-
-
-def require_tester(user: User = Depends(get_current_user)) -> User:
-    """Elevated role gate — for surfaces beyond the ordinary lab experience."""
-    if user.role not in ("tester", "admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This area requires a tester or admin account.",
-        )
-    return user
-
-
 def require_admin(user: User = Depends(get_current_user)) -> User:
     """Dependency that ensures current user is admin."""
     if user.role != "admin":
