@@ -73,4 +73,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // ---- Confirm destructive submits ----
+  // A progressive-enhancement guard for forms that delete things: if JS is on,
+  // ask before the POST goes out. The server still enforces its own checks
+  // (CSRF, admin auth, typed-in confirmation), so this is convenience, not
+  // security — with JS off the form still submits and the server decides.
+  document.querySelectorAll('form[data-confirm]').forEach(form => {
+    form.addEventListener('submit', (event) => {
+      if (!window.confirm(form.dataset.confirm || 'Are you sure?')) {
+        event.preventDefault();
+      }
+    });
+  });
+
 });

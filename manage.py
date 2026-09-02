@@ -1,9 +1,12 @@
-"""SentientAI management CLI — user role management.
+"""SentientAI management CLI — user and database administration.
 
 Usage:
     python manage.py create-admin --username X --email Y --password Z
     python manage.py set-role --username X --role admin
     python manage.py list-users
+    python manage.py seed-admin              # create the initial admin (idempotent)
+    python manage.py remove-all-users        # delete every non-admin account
+    python manage.py reset-db --yes          # DESTRUCTIVE: drop, recreate, seed one admin
 """
 import argparse
 import sys
@@ -13,6 +16,12 @@ from app.services.auth_service import hash_password
 
 
 VALID_ROLES = ("user", "admin")
+
+# The initial administrator. These are the project's fixed bootstrap credentials;
+# change the password after first sign-in in any real deployment.
+INITIAL_ADMIN_USERNAME = "admin"
+INITIAL_ADMIN_EMAIL = "admin@12345"
+INITIAL_ADMIN_PASSWORD = "admin@12345"
 
 
 def create_admin(args):
@@ -249,6 +258,87 @@ The pipeline combines these approaches, using each stage's strengths to compensa
         db.close()
 
 
+def seed_admin(args):
+    """Create the initial administrator if it does not already exist.
+
+    Idempotent: if an account with the admin username already exists it is left
+    untouched (its password is not reset), so running this on an existing
+    database is safe.
+    """
+    init_db()
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(
+            User.username == INITIAL_ADMIN_USERNAME
+        ).first()
+        if existing:
+            print(f"[SKIP] Admin '{INITIAL_ADMIN_USERNAME}' already exists (id={existing.id}).")
+            return
+        admin = User(
+            username=INITIAL_ADMIN_USERNAME,
+            email=INITIAL_ADMIN_EMAIL,
+            password_hash=hash_password(INITIAL_ADMIN_PASSWORD),
+            role="admin",
+            is_active=True,
+        )
+        db.add(admin)
+        db.commit()
+        print(f"[OK] Initial admin created: {INITIAL_ADMIN_USERNAME} ({INITIAL_ADMIN_EMAIL})")
+    finally:
+        db.close()
+
+
+def remove_all_users(args):
+    """Delete every non-admin account and its data. Admins are preserved."""
+    from app.services import admin_service
+
+    init_db()
+    db = SessionLocal()
+    try:
+        removed = admin_service.remove_all_normal_users(db)
+        print(f"[OK] Removed {removed} non-admin account(s). Administrators preserved.")
+    finally:
+        db.close()
+
+
+def reset_db(args):
+    """DESTRUCTIVE: drop every table, recreate the schema, seed exactly one admin.
+
+    This is the development "start over" button. It refuses to run without an
+    explicit --yes so it can't wipe a database by reflex.
+    """
+    if not args.yes:
+        print("[ABORT] reset-db is destructive. Re-run with --yes to confirm.")
+        sys.exit(1)
+
+    from app.database import Base, engine
+
+    # init_db() imports every model module, and that import is what registers
+    # each table on Base.metadata. Running it first guarantees drop_all() sees
+    # the whole schema — otherwise it would only drop the handful of tables
+    # already imported and silently leave the rest behind.
+    init_db()
+    print("[..] Dropping all tables…")
+    Base.metadata.drop_all(bind=engine)
+    print("[..] Recreating schema…")
+    init_db()
+
+    db = SessionLocal()
+    try:
+        admin = User(
+            username=INITIAL_ADMIN_USERNAME,
+            email=INITIAL_ADMIN_EMAIL,
+            password_hash=hash_password(INITIAL_ADMIN_PASSWORD),
+            role="admin",
+            is_active=True,
+        )
+        db.add(admin)
+        db.commit()
+        print(f"[OK] Database reset. Single admin: {INITIAL_ADMIN_USERNAME} ({INITIAL_ADMIN_EMAIL})")
+    finally:
+        db.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description="SentientAI Management CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -273,6 +363,22 @@ def main():
     # seed-blog
     p_seed = subparsers.add_parser("seed-blog", help="Create placeholder blog posts")
     p_seed.set_defaults(func=seed_blog)
+
+    # seed-admin
+    p_seed_admin = subparsers.add_parser(
+        "seed-admin", help="Create the initial admin account (idempotent)")
+    p_seed_admin.set_defaults(func=seed_admin)
+
+    # remove-all-users
+    p_remove = subparsers.add_parser(
+        "remove-all-users", help="Delete every non-admin account and its data")
+    p_remove.set_defaults(func=remove_all_users)
+
+    # reset-db
+    p_reset = subparsers.add_parser(
+        "reset-db", help="DESTRUCTIVE: drop, recreate, and seed one admin")
+    p_reset.add_argument("--yes", action="store_true", help="Confirm the destructive reset")
+    p_reset.set_defaults(func=reset_db)
 
     args = parser.parse_args()
     if not args.command:

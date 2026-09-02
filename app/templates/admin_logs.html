@@ -1,0 +1,57 @@
+{% extends "base_public.html" %}
+{% block title %}Logs — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Activity log</h1>
+      <p class="page-lead">
+        The internal audit trail — the most recent {{ events|length }} event(s).
+        Passwords, tokens and secrets are never recorded here.
+      </p>
+    </div>
+  </header>
+
+  <form method="get" action="/admin/logs" class="filter-row" style="margin-bottom: var(--space-md);">
+    <select name="event_type" class="form-input" style="max-width: 18rem;">
+      <option value="">All event types</option>
+      {% for t in event_types %}
+      <option value="{{ t }}" {% if selected == t %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+    {% if selected %}<a href="/admin/logs" class="btn btn-ghost btn-sm">Clear</a>{% endif %}
+  </form>
+
+  {% if events %}
+  <table class="data-table">
+    <thead>
+      <tr><th>When</th><th>Event</th><th>Actor</th><th>Target</th><th>Detail</th></tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td class="text-sm text-muted">{{ e.created_at.strftime('%Y-%m-%d %H:%M:%S') if e.created_at else '—' }}</td>
+        <td><span class="mono text-sm">{{ e.event_type }}</span></td>
+        <td class="text-sm">
+          {% set actor = actors.get(e.user_id) %}
+          {% if actor %}<a href="/admin/users/{{ actor.id }}">@{{ actor.username }}</a>
+          {% elif e.actor_label %}{{ e.actor_label }}{% else %}—{% endif %}
+        </td>
+        <td class="text-sm text-muted">
+          {% if e.target_type %}{{ e.target_type }}{% if e.target_id %} #{{ e.target_id }}{% endif %}{% else %}—{% endif %}
+        </td>
+        <td class="text-sm text-muted">{{ e.detail or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state"><p>No events recorded{% if selected %} for that type{% endif %}.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

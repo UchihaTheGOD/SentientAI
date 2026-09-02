@@ -1,0 +1,44 @@
+{% extends "base_public.html" %}
+{% block title %}Settings — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  {% include "partials/admin_nav.html" %}
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Settings</h1>
+      <p class="page-lead">Runtime configuration, read-only.</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <p class="text-sm text-muted" style="margin-bottom: var(--space-md);">
+      These values come from the environment (.env), not the database. Secrets are
+      shown only as “configured” or “not set” — never their actual value. To change
+      any of them, edit the environment and restart the app.
+    </p>
+    <table class="data-table">
+      <tbody>
+        {% for label, value in config_rows %}
+        <tr>
+          <td class="text-sm"><strong>{{ label }}</strong></td>
+          <td class="text-sm mono">{{ value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-top: var(--space-lg);">
+    <h2 class="section-title">Assistant data</h2>
+    <p class="text-sm text-muted">
+      The internal assistant's review queue and dataset export live under
+      <a href="/admin/training">AI review</a>. Nothing is ever added to the
+      training set automatically — every example is approved by a human first.
+    </p>
+    <a href="/admin/export" class="btn btn-outline btn-sm">Export approved dataset (JSONL)</a>
+  </section>
+</div>
+{% endblock %}

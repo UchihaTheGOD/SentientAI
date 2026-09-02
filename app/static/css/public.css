@@ -1309,3 +1309,21 @@ a:hover .post-card-title { color: var(--accent); }
   white-space: pre-wrap; word-break: break-word; overflow-x: auto;
 }
 .candidate-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: flex-end; margin-top: var(--space-sm); }
+
+/* Admin — account detail meta line + destructive-action zone */
+.admin-meta-row {
+  display: flex; gap: var(--space-lg); flex-wrap: wrap;
+  font-size: 0.85rem; color: var(--text-secondary);
+  padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--space-sm);
+}
+.danger-zone {
+  margin-top: var(--space-sm); padding: var(--space-md);
+  border: 1px solid var(--danger, #c0392b); border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+.danger-zone > summary {
+  cursor: pointer; font-weight: 600; list-style: none;
+}
+.danger-zone > summary::-webkit-details-marker { display: none; }
+.danger-zone[open] > summary { margin-bottom: var(--space-sm); }
