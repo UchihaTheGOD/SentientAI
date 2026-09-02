@@ -1,0 +1,69 @@
+{% extends "base_public.html" %}
+{% block title %}Posts — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <header class="page-head">
+    <h1 class="page-title">Posts</h1>
+    <p class="page-lead">{{ posts.total }} post{{ '' if posts.total == 1 else 's' }}.</p>
+  </header>
+
+  {% if done %}
+  <div class="alert alert-success" data-autodismiss>
+    {% if done == 'post-deleted' %}Post deleted.{% else %}Done.{% endif %}
+  </div>
+  {% endif %}
+
+  <form method="get" action="/admin/posts" class="filter-row" style="margin-bottom: var(--space-md);">
+    <input type="search" name="q" value="{{ q }}" class="form-input" placeholder="Search titles"
+           style="max-width: 20rem;">
+    <select name="state" class="form-input" style="max-width: 12rem;">
+      <option value="">Any state</option>
+      <option value="published" {% if state == 'published' %}selected{% endif %}>Published</option>
+      <option value="draft" {% if state == 'draft' %}selected{% endif %}>Draft</option>
+      <option value="archived" {% if state == 'archived' %}selected{% endif %}>Archived</option>
+      <option value="hidden" {% if state == 'hidden' %}selected{% endif %}>Hidden by moderator</option>
+    </select>
+    <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+  </form>
+
+  {% if posts.items %}
+  <table class="data-table">
+    <thead>
+      <tr><th>Title</th><th>Author</th><th>State</th><th>Views</th><th>Created</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for p in posts.items %}
+      <tr>
+        <td><a href="/blog/{{ p.slug }}">{{ p.title }}</a>
+            {% if p.is_hidden %}<span class="badge badge-red">hidden</span>{% endif %}</td>
+        <td class="text-sm">
+          {% set author = authors.get(p.user_id) %}
+          {% if author %}<a href="/admin/users/{{ author.id }}">@{{ author.username }}</a>
+          {% else %}{{ p.author }}{% endif %}
+        </td>
+        <td class="text-sm text-muted">{{ p.state_label }}</td>
+        <td class="text-sm text-muted">{{ p.views }}</td>
+        <td class="text-sm text-muted">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/posts/{{ p.id }}/delete" class="inline-form"
+                data-confirm="Delete this post permanently?">
+            {{ csrf_input() }}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% set page = posts %}
+  {% include "partials/pagination.html" with context %}
+  {% else %}
+  <div class="empty-state"><p>No posts match those filters.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

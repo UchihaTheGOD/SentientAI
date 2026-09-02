@@ -11,62 +11,59 @@
       <h1 class="page-title">Admin dashboard</h1>
       <p class="page-lead">Platform overview and the assistant's review queue.</p>
     </div>
-    <a href="/admin/export" class="btn btn-outline btn-sm">Export dataset (JSONL)</a>
   </header>
 
   <div class="dashboard-stats">
-    <div class="stat-card">
-      <div class="stat-card-num">{{ total_users }}</div>
-      <div class="stat-card-label">Registered users</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-card-num">{{ pending_count }}</div>
-      <div class="stat-card-label">Awaiting review</div>
-    </div>
+    <a class="stat-card" href="/admin/users">
+      <div class="stat-card-num">{{ stats.total_users }}</div>
+      <div class="stat-card-label">Users</div>
+    </a>
+    <a class="stat-card" href="/admin/users?status=suspended">
+      <div class="stat-card-num">{{ stats.suspended_users }}</div>
+      <div class="stat-card-label">Suspended</div>
+    </a>
+    <a class="stat-card" href="/admin/posts">
+      <div class="stat-card-num">{{ stats.total_posts }}</div>
+      <div class="stat-card-label">Posts ({{ stats.published_posts }} published)</div>
+    </a>
+    <a class="stat-card" href="/admin/comments">
+      <div class="stat-card-num">{{ stats.total_comments }}</div>
+      <div class="stat-card-label">Comments</div>
+    </a>
+    <a class="stat-card" href="/admin/moderation">
+      <div class="stat-card-num">{{ stats.open_reports }}</div>
+      <div class="stat-card-label">Open reports</div>
+    </a>
+    <a class="stat-card" href="/admin/training">
+      <div class="stat-card-num">{{ stats.pending_review }}</div>
+      <div class="stat-card-label">Awaiting AI review</div>
+    </a>
   </div>
 
   <section class="card">
     <header class="page-head" style="margin-bottom: var(--space-md);">
-      <h2 class="section-title">Examples awaiting review</h2>
-      <a href="/admin/training" class="btn btn-ghost btn-sm">Full queue ›</a>
+      <h2 class="section-title">Recent activity</h2>
+      <a href="/admin/logs" class="btn btn-ghost btn-sm">All logs ›</a>
     </header>
 
-    {% if pending_examples %}
-    {% for ex in pending_examples[:10] %}
-    <div class="candidate-card">
-      <div class="candidate-head">
-        <div class="candidate-meta">
-          {% if ex.quality_band == 'useful' %}
-          <span class="badge badge-green">useful</span>
-          {% elif ex.quality_band == 'noisy' %}
-          <span class="badge badge-red">noisy</span>
-          {% elif ex.quality_band %}
-          <span class="badge badge-yellow">review</span>
-          {% endif %}
-          <span class="mono text-sm">score {{ ex.quality_score }}</span>
-        </div>
-        <div class="candidate-actions">
-          <form method="post" action="/admin/training/{{ ex.id }}/approve" class="inline-form">
-            {{ csrf_input() }}
-            <button type="submit" class="btn btn-primary btn-sm">Approve</button>
-          </form>
-          <form method="post" action="/admin/training/{{ ex.id }}/reject" class="inline-form">
-            {{ csrf_input() }}
-            <button type="submit" class="btn btn-danger btn-sm">Reject</button>
-          </form>
-        </div>
-      </div>
-      <div class="candidate-body">{{ ex.instruction }}
-
-Input: {{ ex.input_text[:200] }}
-
-Output: {{ ex.output_text[:200] }}</div>
-    </div>
-    {% endfor %}
+    {% if recent_events %}
+    <table class="data-table">
+      <thead>
+        <tr><th>When</th><th>Event</th><th>Actor</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        {% for e in recent_events %}
+        <tr>
+          <td class="text-sm text-muted">{{ e.created_at.strftime('%Y-%m-%d %H:%M') if e.created_at else '—' }}</td>
+          <td><span class="mono text-sm">{{ e.event_type }}</span></td>
+          <td class="text-sm">{{ e.actor_label or '—' }}</td>
+          <td class="text-sm text-muted">{{ (e.detail or '')[:80] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     {% else %}
-    <div class="empty-state">
-      <p>No examples are waiting for review.</p>
-    </div>
+    <div class="empty-state"><p>No activity recorded yet.</p></div>
     {% endif %}
   </section>
 </div>

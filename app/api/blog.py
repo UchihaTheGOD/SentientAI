@@ -31,6 +31,7 @@ from app.models.social import Bookmark, Comment, CommentLike, PostLike
 from app.models.tag import Tag
 from app.models.user import User
 from app.services import audit, tags as tag_service
+from app.services import admin_service
 from app.services.activity_service import log_activity
 from app.services.auth_service import get_current_user, get_current_user_optional
 from app.services.content import (
@@ -497,21 +498,14 @@ def delete_post(
     db: Session = Depends(get_db),
 ):
     """Permanently remove a post the caller owns, along with the rows that only
-    exist because of it. Dependent rows are deleted explicitly rather than
-    trusting `ON DELETE CASCADE`, which SQLite ignores unless foreign keys are
-    switched on for the connection."""
+    exist because of it. The cascade lives in one place
+    (`admin_service.delete_post_cascade`) because SQLite ignores
+    `ON DELETE CASCADE` unless foreign keys are switched on for the connection,
+    so it has to be done by hand — and identically wherever a post is deleted."""
     post = _owned_post(db, slug, user)
     post_id, title, owner_id = post.id, post.title, post.user_id
 
-    comment_ids = [c.id for c in db.query(Comment.id).filter(Comment.post_id == post_id).all()]
-    if comment_ids:
-        db.query(CommentLike).filter(CommentLike.comment_id.in_(comment_ids)).delete(
-            synchronize_session=False)
-    db.query(Comment).filter(Comment.post_id == post_id).delete(synchronize_session=False)
-    db.query(PostLike).filter(PostLike.post_id == post_id).delete(synchronize_session=False)
-    db.query(Bookmark).filter(Bookmark.post_id == post_id).delete(synchronize_session=False)
-    post.tags = []
-    db.delete(post)
+    admin_service.delete_post_cascade(db, post)
     db.commit()
 
     audit.record(db, "post.deleted", user=user, target_type="blog_post",
