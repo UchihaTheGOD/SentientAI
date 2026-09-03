@@ -126,9 +126,9 @@ def main(argv: Optional[list] = None) -> int:
     args = parser.parse_args(argv)
 
     # Sync the schema first, like every other standalone entrypoint
-    # (manage.py, seed_community.py, app startup). Idempotent and never drops
-    # data — this is what lets `run status` work against a DB the app hasn't
-    # opened since the training-pipeline columns were added.
+    # (manage.py, app startup). Idempotent and never drops data — this is what
+    # lets `run status` work against a DB the app hasn't opened since the
+    # training-pipeline columns were added.
     init_db()
 
     db = SessionLocal()
