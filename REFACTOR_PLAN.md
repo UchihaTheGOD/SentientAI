@@ -33,7 +33,7 @@ code; do not layer on top. Do not fabricate features or test results.
 - [x] **P4 — Admin panel** (base_admin + nav Dashboard/Users/Posts/Comments/Requests/Logs/AI-Dataset/Settings; user mgmt incl Remove-All-Users w/ confirm+transaction; posts/comments mgmt; logs viewer w/ filters; settings read-only; every route require_admin).
 - [x] **P5 — Internal Sentinel re-sourcing** (moderation→candidate producer in app/services/collection.py, wired into the admin-only moderation flow; admin review→approve→export JSONL; advisory scoring only, never auto-trains; integration tests re-added).
 - [x] **P6 — Messaging/chat** (Message model + `app/services/messaging.py` + `app/api/messages.py` inbox/thread/send; header envelope badge via `unread_messages`; profile "Message" button; message→Notification; server-rendered, no websockets; tests).
-- [ ] **P7 — Seed/reset → single admin** admin/admin@12345/admin@12345 (Argon2id, hash-only); dev reset+seed; re-home posts to real users.
-- [ ] **P8 — Public UI cleanup** + post_card unification + about/contact polish.
+- [x] **P7 — Seed/reset → single admin** (`seed_blog` rewritten to legitimate posts — Python type hints / web typography / writing tests — authored by real seed users `maya` & `devon` with `apply_state(POST_PUBLISHED)`; the old stored-XSS / SQL-injection / detection-pipeline posts removed). Reset-db already seeds exactly one admin (admin/admin@12345).
+- [~] **P8 — Public UI cleanup.** Done: purged dead `RESEARCH_CATEGORIES`/`ALL_CATEGORIES` from `blog_post.py` and the two leak comments (`blog.py` whitelist note, `users.py` `/profile` redirect); verified **zero** security-testing vocabulary in any template. Remaining: post_card partial unification + about/contact copy polish.
 - [ ] **P9 — DOCUMENTATION.md + README rewrite**; consolidate PROJECT_STATE/PROJECT_CHECKPOINT.
 - [ ] **P10 — Final verification** (full suite, security checklist, smoke) + implementation report (§23).
