@@ -5,6 +5,8 @@
     comment_counts — {post_id: int}  (optional)
     like_counts    — {post_id: int}  (optional)
     show_state     — True to show Draft/Archived badges (author's own lists)
+    show_bookmark  — True to render a bookmark toggle in the footer; requires
+                     `current_user` and a `bookmarks` set of post ids in context
 
   The whole card is not wrapped in an <a>: the title is the link, so buttons and
   tag links inside the card stay clickable and the markup stays valid.
@@ -63,6 +65,15 @@
         {{ (comment_counts or {}).get(post.id, 0) }}
       </span>
       <span class="post-card-stat" style="margin-left:auto;">{{ post.reading_time }} min read</span>
+      {% if show_bookmark and current_user %}
+      {% set is_bookmarked = post.id in (bookmarks or []) %}
+      <form method="POST" action="/blog/{{ post.slug }}/bookmark" style="display:inline;">
+        {{ csrf_input() }}
+        <button type="submit" class="comment-action-btn {% if is_bookmarked %}text-accent{% endif %}" title="{% if is_bookmarked %}Remove bookmark{% else %}Bookmark{% endif %}" aria-label="Toggle bookmark">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="{% if is_bookmarked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </form>
+      {% endif %}
     </div>
 
   </div>
