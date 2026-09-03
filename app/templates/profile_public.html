@@ -79,25 +79,7 @@
 
     {% if user_posts %}
     {% for post in user_posts %}
-    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-      <div class="post-card">
-        <div class="post-card-body">
-          <div class="post-card-meta">
-            <span class="tag">{{ post.category }}</span>
-            <span class="post-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
-          </div>
-          <h2 class="post-card-title">{{ post.title }}</h2>
-          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-          <div class="post-card-footer">
-            <span class="post-card-stat">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {{ post.views or 0 }}
-            </span>
-            <span class="post-card-stat">{{ post.reading_time }} min read</span>
-          </div>
-        </div>
-      </div>
-    </a>
+    {% include "partials/post_card.html" with context %}
     {% endfor %}
     {% else %}
     <div class="empty-state">
