@@ -102,12 +102,11 @@ def contact_submit(
 
 @router.get("/profile", response_class=HTMLResponse)
 def profile(user: User = Depends(get_current_user)):
-    """Kept as a redirect because the testing-area sidebar still links here.
+    """Legacy redirect to the public profile.
 
-    The page this used to render predated the public/private split: it showed the
-    account's e-mail in a bare grid and advertised the testing environment, both
-    on a public route and in the testing area's visual language. Everything it
-    offered now lives on the public profile, `/profile/edit` and
-    `/account/password`.
+    An older account page lived here before the public profile existed; it has
+    been retired. Everything it offered now lives on the public profile,
+    `/profile/edit` and `/account/password`, so keep the path working and send
+    people to their profile.
     """
     return RedirectResponse(f"/u/{user.username}", status_code=303)

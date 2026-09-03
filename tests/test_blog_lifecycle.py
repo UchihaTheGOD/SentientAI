@@ -13,13 +13,16 @@ from app.models.blog_post import (
     POST_ARCHIVED,
     POST_DRAFT,
     POST_PUBLISHED,
-    RESEARCH_CATEGORIES,
     BlogPost,
 )
 from app.models.social import Bookmark, Comment, CommentLike, PostLike
 from tests.conftest import Client
 
 BODY = "A body with plenty of words in it, comfortably past the minimum length."
+
+# A category that is deliberately not on the community list, used to prove the
+# write flow refuses anything outside BLOG_CATEGORIES.
+UNLISTED_CATEGORY = "Not A Real Category"
 
 
 @pytest.fixture
@@ -140,14 +143,12 @@ def test_the_public_write_form_offers_community_categories_only(auth_client):
     assert page.status_code == 200
     for category in BLOG_CATEGORIES:
         assert category in page.text
-    # The research categories belong to the testing area. Offering them here
-    # would let someone file a public post under lab terminology.
-    for category in RESEARCH_CATEGORIES:
-        assert category not in page.text
+    # Nothing outside the community list is offered.
+    assert UNLISTED_CATEGORY not in page.text
 
 
-def test_a_research_category_is_refused_by_the_public_write_route(auth_client, db):
-    response = _write(auth_client, category="Vulnerability Research")
+def test_an_unlisted_category_is_refused_by_the_public_write_route(auth_client, db):
+    response = _write(auth_client, category=UNLISTED_CATEGORY)
     assert response.status_code == 400
     assert db.query(BlogPost).count() == 0
 

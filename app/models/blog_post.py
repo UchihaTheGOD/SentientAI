@@ -102,16 +102,3 @@ BLOG_CATEGORIES = [
     "Community",
 ]
 
-# Keep a secondary set for tester/research content — used in /testing write flow
-RESEARCH_CATEGORIES = [
-    "Vulnerability Research",
-    "Detection Engineering",
-    "SOC",
-    "Web Security",
-    "Incident Response",
-    "Security Engineering",
-    "Lab Notes",
-]
-
-ALL_CATEGORIES = BLOG_CATEGORIES + RESEARCH_CATEGORIES
-

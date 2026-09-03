@@ -98,9 +98,7 @@ def _validate(title: str, category: str, content: str) -> list[str]:
     if len(title.strip()) > MAX_TITLE:
         errors.append(f"Title must be under {MAX_TITLE} characters.")
     # Whitelist check — the category is echoed back into pages, so it may only
-    # ever be one of ours. The public site offers the community categories only;
-    # RESEARCH_CATEGORIES belongs to the testing area, and letting it through
-    # here would put lab vocabulary on public pages.
+    # ever be one of ours. Anything not on the community list is refused.
     if category not in BLOG_CATEGORIES:
         errors.append("Choose one of the listed categories.")
     if len(content.strip()) < MIN_CONTENT:
