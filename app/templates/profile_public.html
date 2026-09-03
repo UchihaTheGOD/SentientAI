@@ -51,6 +51,7 @@
               {% if is_following %}Unfollow{% else %}Follow{% endif %}
             </button>
           </form>
+          <a href="/messages/{{ profile_user.username }}" class="btn btn-ghost btn-sm">Message</a>
         {% else %}
           <a href="/login" class="btn btn-primary btn-sm">Follow</a>
         {% endif %}

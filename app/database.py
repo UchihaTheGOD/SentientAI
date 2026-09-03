@@ -128,6 +128,7 @@ def init_db():
     import app.models.activity  # noqa: F401
     import app.models.tag  # noqa: F401
     import app.models.social  # noqa: F401
+    import app.models.message  # noqa: F401
     import app.models.moderation  # noqa: F401
     import app.models.audit  # noqa: F401
     Base.metadata.create_all(bind=engine)
