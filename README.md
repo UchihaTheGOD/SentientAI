@@ -1,168 +1,168 @@
-# SentientAI — Cybersecurity Training Platform
+# Sentient — Community Publishing Platform
 
-Interactive cybersecurity training platform with sandboxed labs, real-time attack detection, and AI-powered analysis architecture.
+Sentient is a server-rendered blogging and social platform: a public site anyone
+can read, and members can write on, plus a private administration panel for the
+people who run it. It is a normal content site — posts, tags, comments, likes,
+bookmarks, follows, direct messages, notifications, search — with security built
+into the application itself (authentication, CSRF, sanitisation, rate limiting).
 
-## Features
+There is also a small **internal** content-moderation assistant ("Sentinel").
+It is not a public feature: it turns a moderator's own review decisions into a
+human-curated dataset and lives entirely behind the admin panel.
 
-- **Sandboxed Labs** — SQL Injection, Stored/Reflected XSS (more coming)
-- **Attack Detection** — Rule-based pattern matching engine
-- **Educational Analysis** — Explains attacks, techniques, and defenses
-- **Security Event Logging** — Every lab interaction is recorded
-- **Training Data Pipeline** — Curate examples for CyberLLM fine-tuning
-- **Admin Panel** — Review events, approve/reject training data, export JSONL
-- **CyberLLM Integration** — Mock client ready for real model connection
+## What it does
 
-## Quick Start
+### Public site (browsable anonymously, actions require an account)
+- Homepage with featured / latest / trending posts and popular authors
+- Explore, category (`/category/{name}`) and tag (`/tag/{slug}`) listings
+- Full-text-ish search over posts and people (`/search`)
+- Read posts (`/blog/{slug}`); view counts for non-authors
+- Public profiles (`/u/{username}`) with follow / unfollow
+- Write, edit, publish, archive and delete **your own** posts (draft by default)
+- Likes, bookmarks, threaded-ish comments and comment likes
+- A personalised feed of people you follow + recommendations (`/feed`)
+- Direct messages between members (`/messages`)
+- Notifications and an activity log
+- Account settings, change password, and a self-service password reset by email
+- Register, log in, log out; about and contact pages
 
-### 1. Clone & Navigate
+### Private admin panel (`/admin`, administrators only)
+- Overview, user management (including a guarded "remove all normal users")
+- Content moderation: posts and comments, reports queue, hide/unhide
+- Audit log viewer with filters
+- The Sentinel review queue: approve / reject / needs-edit candidates and
+  export the approved dataset as JSONL
+- Read-only settings summary
 
-```powershell
-cd C:\Users\DARK\Desktop\SentientAI
-```
+Every `/admin` route is authorised on the server with `require_admin`; hiding a
+link is never the only thing standing between a normal user and admin data.
 
-### 2. Create Virtual Environment
+## Tech stack
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
+- **Python** + **FastAPI** / Starlette, served by **Uvicorn**
+- **Jinja2** server-side templates (no SPA; `script-src 'self'`, no inline JS)
+- **SQLAlchemy 2.0** over **SQLite** (single-file `app.db`; portable to Postgres)
+- **passlib[argon2]** — Argon2id password hashing
+- **python-jose** — HS256 JWT session cookie
+- **pytest** — full in-process test suite
 
-Linux/macOS:
+## Quick start
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python -m venv venv
 ```
 
-### 3. Install Dependencies
+Activate it — `source venv/bin/activate` (Linux/macOS) or
+`.\venv\Scripts\Activate.ps1` (Windows PowerShell) — then:
 
-```powershell
+```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment
+Create your environment file from the template and set a strong secret:
 
-```powershell
-Copy-Item .env.example .env
+```bash
+cp .env.example .env
 ```
 
-Edit `.env` and set a strong `SECRET_KEY`:
-```
-SECRET_KEY=your-random-secret-key-here
-ADMIN_SECRET=your-admin-registration-secret
+At minimum set `SECRET_KEY` (any long random string in development; **required**
+in production — the app refuses to start without it when `ENVIRONMENT=production`).
+
+Create the initial administrator and start the server:
+
+```bash
+python manage.py seed-admin
 ```
 
-### 5. Start the Server
-
-```powershell
+```bash
 python run.py
 ```
 
-The server starts at **http://127.0.0.1:8000**
+The site runs at **http://127.0.0.1:8000**. Interactive API docs (route list)
+are at `/api/docs`.
 
-### 6. Create an Account
+### Initial administrator
 
-1. Go to http://127.0.0.1:8000/register
-2. Fill in username, email, password
-3. To create an admin account, enter the `ADMIN_SECRET` value in the admin secret field
-4. Log in at http://127.0.0.1:8000/login
+`seed-admin` (and `reset-db`) create exactly one administrator:
 
-### 7. Run Labs
+| Field | Value |
+| --- | --- |
+| username | `admin` |
+| email | `admin@12345` |
+| password | `admin@12345` |
+| role | `admin` |
 
-1. Navigate to **Labs** from the dashboard
-2. Select a lab (SQL Injection, Stored XSS, Reflected XSS)
-3. Enter a payload and submit
-4. View the detection result and educational analysis
+These are fixed bootstrap credentials — **change the password after first
+sign-in** in any real deployment. (`admin@12345` is not a routable email
+address, so the password-reset email cannot actually be delivered to the seed
+admin; reset works normally for real user email addresses.)
 
-### 8. Admin Panel
+### Optional: example content
 
-Access `/admin` (requires admin account) to:
-- View all security events
-- Review training examples
-- Approve/reject for CyberLLM training
-- Export approved data as JSONL
-
-## Project Structure
-
-```
-sentientai/
-├── app/
-│   ├── main.py              # FastAPI app, middleware, router registration
-│   ├── config.py             # Settings from environment variables
-│   ├── database.py           # SQLAlchemy engine, session, Base
-│   ├── api/                  # Route handlers
-│   │   ├── auth.py           # Register, login, logout
-│   │   ├── users.py          # Dashboard, profile
-│   │   ├── labs.py           # Lab listing, detail, submission
-│   │   ├── attacks.py        # Attack history, blocked page
-│   │   ├── admin.py          # Admin dashboard, training management
-│   │   └── health.py         # Health check
-│   ├── models/               # SQLAlchemy models
-│   │   ├── user.py
-│   │   ├── security_event.py
-│   │   └── training_example.py
-│   ├── services/             # Business logic
-│   │   ├── auth_service.py   # Password hashing, JWT, dependencies
-│   │   ├── detection.py      # Rule-based attack detection engine
-│   │   ├── analysis.py       # Analysis orchestrator
-│   │   ├── cyberllm_client.py # CyberLLM interface + mock
-│   │   └── training.py       # Training example CRUD + export
-│   ├── labs/                 # Sandboxed lab implementations
-│   │   ├── __init__.py       # Lab registry
-│   │   ├── sql_injection.py  # SQL injection simulation
-│   │   └── xss.py            # Stored + Reflected XSS simulation
-│   ├── templates/            # Jinja2 HTML templates
-│   └── static/               # CSS + JS
-├── data/                     # SQLite database (created at runtime)
-├── requirements.txt
-├── .env.example
-├── run.py
-└── README.md
+```bash
+python manage.py seed-blog
 ```
 
-## CyberLLM Integration
+creates three published example posts authored by two example users (`maya`,
+`devon`).
 
-The platform is designed for future CyberLLM/Sentinel integration.
+## Management CLI
 
-**Current state:** `MockCyberLLMClient` provides structured analysis using detection engine output.
-
-**To connect the real model:**
-
-1. Set `CYBERLLM_API_URL` and `CYBERLLM_API_KEY` in `.env`
-2. Implement `RealCyberLLMClient` in `app/services/cyberllm_client.py`
-3. Update the factory function `get_cyberllm_client()` to return the real client
-
-The interface:
-```python
-class CyberLLMClientInterface:
-    def analyze_attack(self, event: dict) -> AttackAnalysis
-    def classify_attack(self, event: dict) -> str
-    def explain_attack(self, event: dict) -> str
-    def generate_training_example(self, event: dict) -> dict
+```bash
+python manage.py <command>
 ```
 
-## Database
+| Command | What it does |
+| --- | --- |
+| `seed-admin` | Create the initial admin (idempotent) |
+| `seed-blog` | Create a few example published posts |
+| `create-admin --username U --email E --password P` | Create another admin |
+| `set-role --username U --role admin\|user` | Change a user's role |
+| `list-users` | List accounts |
+| `remove-all-users` | Delete every non-admin account and its data |
+| `reset-db --yes` | **Destructive**: drop, recreate, seed one admin |
 
-SQLite by default. To switch to PostgreSQL:
+Internal dataset chores (admin/operator use) live in `python -m app.cli`
+(`training-status`, `export-training`, `export-eval`, `score-backfill`).
 
-1. Install `psycopg2-binary`: `pip install psycopg2-binary`
-2. Update `DATABASE_URL` in `.env`:
-   ```
-   DATABASE_URL=postgresql://user:password@localhost:5432/sentientai
-   ```
-3. Restart the server — tables are auto-created on startup.
+## Testing
 
-## Security Notes
-
-- Passwords are hashed with bcrypt
-- Authentication uses JWT in httpOnly cookies
-- All lab inputs are sandboxed — no real OS commands, filesystem access, or database queries
-- Parameterized queries via SQLAlchemy
-- Security headers applied via middleware
-- Secrets stored in `.env` (never committed)
-
-## API Health Check
-
+```bash
+./venv/Scripts/python.exe -m pytest        # Windows
 ```
-GET /api/health
-→ {"status": "ok", "service": "sentientai"}
+```bash
+./venv/bin/python -m pytest                 # Linux/macOS
 ```
+
+The suite runs in-process against a throwaway SQLite database with a fresh state
+per test. See [DOCUMENTATION.md](DOCUMENTATION.md) for the full architecture,
+data model, security model and known limitations.
+
+## Configuration
+
+All configuration is read from environment variables (loaded from `.env`); see
+[`.env.example`](.env.example). Nothing sensitive is hardcoded or stored in the
+database. Key variables:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SECRET_KEY` | *(dev-only fallback)* | JWT signing key; **required in production** |
+| `ENVIRONMENT` | `development` | `production` enables the SECRET_KEY guard |
+| `DATABASE_URL` | `sqlite:///./app.db` | Any SQLAlchemy URL |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Session cookie lifetime |
+| `PASSWORD_RESET_TOKEN_EXPIRE_MINUTES` | `30` | Reset link lifetime |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_USE_TLS` | *(blank)* | Outbound email for password reset; blank host = log the link in dev, error in production |
+
+## Security at a glance
+
+- Passwords hashed with **Argon2id** (OWASP parameters); only the hash is stored
+- Sessions are HS256 JWTs in an httpOnly cookie, carrying a `token_version` that
+  is bumped to invalidate every existing session on logout-all, password change,
+  reset, suspend or delete
+- **CSRF** protection (signed double-submit token) on every state-changing route
+- Output is **sanitised** server-side; a strict Content-Security-Policy is a
+  second line of defence (no inline scripts execute)
+- Per-action **rate limiting** on sensitive endpoints (login, register, reset,
+  messages, comments, …)
+- Security headers on every response (`X-Frame-Options: DENY`, `nosniff`, …)
+- No passwords, hashes, tokens, secrets or API keys are ever written to logs
