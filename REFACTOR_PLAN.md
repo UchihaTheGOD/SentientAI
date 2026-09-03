@@ -32,7 +32,7 @@ code; do not layer on top. Do not fabricate features or test results.
 - [x] **P3 — Password reset via SMTP** (PasswordResetToken model, email service, forgot/reset routes+templates, no enumeration, single-use/expiry, session invalidation, no auto-login).
 - [x] **P4 — Admin panel** (base_admin + nav Dashboard/Users/Posts/Comments/Requests/Logs/AI-Dataset/Settings; user mgmt incl Remove-All-Users w/ confirm+transaction; posts/comments mgmt; logs viewer w/ filters; settings read-only; every route require_admin).
 - [x] **P5 — Internal Sentinel re-sourcing** (moderation→candidate producer in app/services/collection.py, wired into the admin-only moderation flow; admin review→approve→export JSONL; advisory scoring only, never auto-trains; integration tests re-added).
-- [ ] **P6 — Messaging/chat** (Message model+service+routes+templates+notifications+tests).
+- [x] **P6 — Messaging/chat** (Message model + `app/services/messaging.py` + `app/api/messages.py` inbox/thread/send; header envelope badge via `unread_messages`; profile "Message" button; message→Notification; server-rendered, no websockets; tests).
 - [ ] **P7 — Seed/reset → single admin** admin/admin@12345/admin@12345 (Argon2id, hash-only); dev reset+seed; re-home posts to real users.
 - [ ] **P8 — Public UI cleanup** + post_card unification + about/contact polish.
 - [ ] **P9 — DOCUMENTATION.md + README rewrite**; consolidate PROJECT_STATE/PROJECT_CHECKPOINT.

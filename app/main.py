@@ -88,7 +88,8 @@ def create_app() -> FastAPI:
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
     from app.api import (
-        admin, auth, blog, community, feed, health, moderation, social, users,
+        admin, auth, blog, community, feed, health, messages, moderation,
+        social, users,
     )
     application.include_router(health.router)
     application.include_router(auth.router)
@@ -97,6 +98,7 @@ def create_app() -> FastAPI:
     application.include_router(community.router)
     application.include_router(social.router)
     application.include_router(feed.router)
+    application.include_router(messages.router)
     application.include_router(moderation.router)
     application.include_router(admin.router)
 

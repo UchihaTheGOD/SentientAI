@@ -23,7 +23,7 @@
   {% for notif in notifications %}
   <div class="notif-item {% if not notif.is_read %}unread{% endif %}">
     <div class="author-avatar notif-icon notif-icon--{{ notif.notif_type }}">
-      {% if notif.notif_type == 'like' %}♥{% elif notif.notif_type == 'follow' %}+{% elif notif.notif_type == 'comment' %}💬{% elif notif.notif_type == 'reply' %}↩{% else %}•{% endif %}
+      {% if notif.notif_type == 'like' %}♥{% elif notif.notif_type == 'follow' %}+{% elif notif.notif_type == 'comment' %}💬{% elif notif.notif_type == 'reply' %}↩{% elif notif.notif_type == 'message' %}✉{% else %}•{% endif %}
     </div>
     <div class="notif-body">
       {# Unread items go through the POST route so opening one marks just that

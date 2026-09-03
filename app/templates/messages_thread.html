@@ -1,0 +1,50 @@
+{% extends "base_public.html" %}
+{% block title %}{{ other.display }} — Messages — Sentient{% endblock %}
+
+{% block content %}
+<div class="notifs-page">
+
+  <div class="page-head flex-between">
+    <div style="display:flex;align-items:center;gap:var(--space-sm);">
+      <a href="/messages" class="btn btn-ghost btn-sm">‹ Inbox</a>
+      <a href="/u/{{ other.username }}" style="display:flex;align-items:center;gap:var(--space-sm);text-decoration:none;color:inherit;">
+        <span class="author-avatar">
+          {% if other.avatar_url | safe_url %}
+          <img src="{{ other.avatar_url | safe_url }}" alt="{{ other.display }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+          {% else %}{{ other.display[0]|upper }}{% endif %}
+        </span>
+        <span><strong>{{ other.display }}</strong><br><span class="text-muted text-sm">@{{ other.username }}</span></span>
+      </a>
+    </div>
+  </div>
+
+  <div class="message-thread" style="display:flex;flex-direction:column;gap:var(--space-sm);margin:var(--space-lg) 0;">
+    {% if messages %}
+    {% for m in messages %}
+    {% set mine = m.sender_id == current_user.id %}
+    <div style="display:flex;justify-content:{% if mine %}flex-end{% else %}flex-start{% endif %};">
+      <div class="card" style="max-width:70%;padding:var(--space-sm) var(--space-md);background:{% if mine %}var(--accent);color:#fff{% else %}var(--surface-2, #f4f4f5){% endif %};">
+        <div style="white-space:pre-wrap;word-break:break-word;">{{ m.body }}</div>
+        <div class="text-sm" style="opacity:0.7;margin-top:4px;">{{ m.created_at.strftime('%b %d, %H:%M') if m.created_at else '' }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+      <p>No messages yet. Say hello to {{ other.display }}.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+  <form method="POST" action="/messages/{{ other.username }}" class="card" style="padding:var(--space-md);">
+    {{ csrf_input() }}
+    <textarea name="body" rows="3" maxlength="2000" placeholder="Write a message…" class="form-input" style="width:100%;resize:vertical;" required>{{ draft or '' }}</textarea>
+    <div class="flex-between" style="margin-top:var(--space-sm);">
+      <span class="text-muted text-sm">Messages are private between you and {{ other.display }}.</span>
+      <button type="submit" class="btn btn-primary btn-sm">Send</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
