@@ -3,24 +3,48 @@
 
 {% block content %}
 <div class="notifs-page">
-  <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:var(--space-xl);">Notifications</h1>
+
+  <div class="page-head flex-between">
+    <div>
+      <h1 class="page-title">Notifications</h1>
+      <p class="page-lead">
+        {% if unread %}{{ unread }} unread{% else %}You're all caught up.{% endif %}
+      </p>
+    </div>
+    {% if unread %}
+    <form method="POST" action="/notifications/read-all">
+      {{ csrf_input() }}
+      <button type="submit" class="btn btn-ghost btn-sm">Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
 
   {% if notifications %}
   {% for notif in notifications %}
   <div class="notif-item {% if not notif.is_read %}unread{% endif %}">
-    <div class="author-avatar" style="background:{% if notif.notif_type == 'like' %}#d1fae5;color:#059669{% elif notif.notif_type == 'follow' %}#ede9fe;color:var(--accent){% elif notif.notif_type == 'comment' or notif.notif_type == 'reply' %}#dbeafe;color:#2563eb{% else %}var(--bg-subtle);color:var(--text-muted){% endif %};">
-      {% if notif.notif_type == 'like' %}♥{% elif notif.notif_type == 'follow' %}+{% elif notif.notif_type == 'comment' %}💬{% elif notif.notif_type == 'reply' %}↩{% else %}•{% endif %}
+    <div class="author-avatar notif-icon notif-icon--{{ notif.notif_type }}">
+      {% if notif.notif_type == 'like' %}♥{% elif notif.notif_type == 'follow' %}+{% elif notif.notif_type == 'comment' %}💬{% elif notif.notif_type == 'reply' %}↩{% elif notif.notif_type == 'message' %}✉{% else %}•{% endif %}
     </div>
     <div class="notif-body">
-      {% if notif.target_url %}
-      <a href="{{ notif.target_url }}" style="color:inherit;">{{ notif.message }}</a>
+      {# Unread items go through the POST route so opening one marks just that
+         one read; read items are a plain link. Nothing is marked read merely by
+         loading this page. #}
+      {% if not notif.is_read %}
+      <form method="POST" action="/notifications/{{ notif.id }}/read" class="notif-open">
+        {{ csrf_input() }}
+        <button type="submit" class="notif-link">{{ notif.message }}</button>
+      </form>
+      {% elif notif.target_url %}
+      <a href="{{ notif.target_url | safe_url }}" class="notif-link">{{ notif.message }}</a>
       {% else %}
-      {{ notif.message }}
+      <span class="notif-link">{{ notif.message }}</span>
       {% endif %}
       <div class="notif-time">{{ notif.created_at.strftime('%b %d, %Y at %H:%M') if notif.created_at else '' }}</div>
     </div>
   </div>
   {% endfor %}
+
+  {% include "partials/pagination.html" with context %}
   {% else %}
   <div class="empty-state">
     <div class="empty-state-icon">🔔</div>

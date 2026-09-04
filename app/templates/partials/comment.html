@@ -1,0 +1,102 @@
+{#
+  One comment (or reply). Callers pass:
+    comment       — a Comment
+    post          — the BlogPost it belongs to
+    comment_users — {user_id: User}
+    is_reply      — True to hide the Reply control (threading is one level deep)
+
+  Bodies go through the `content` filter, never `| safe`. Author-deleted and
+  moderator-hidden rows render as placeholders so a thread keeps its shape
+  without republishing removed text.
+#}
+{% set author = (comment_users or {}).get(comment.user_id) %}
+{% set is_mine = current_user and current_user.id == comment.user_id %}
+<div class="comment-item {% if is_reply %}comment-item--reply{% endif %}" id="comment-{{ comment.id }}">
+
+  <div class="comment-header">
+    <div class="author-avatar">
+      {% if author and author.avatar_url %}
+      <img src="{{ author.avatar_url | safe_url }}" alt="">
+      {% else %}
+      {{ (author.display if author else '?')[0]|upper }}
+      {% endif %}
+    </div>
+    {% if author %}
+    <a href="/u/{{ author.username }}" class="comment-author">{{ author.display }}</a>
+    {% else %}
+    <span class="comment-author">[deleted account]</span>
+    {% endif %}
+    <span class="comment-time">
+      {{ comment.created_at.strftime('%b %d, %Y') if comment.created_at else '' }}
+      {% if comment.updated_at and comment.created_at and (comment.updated_at - comment.created_at).total_seconds() > 60 %}
+      · edited
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="comment-body {% if comment.is_deleted or comment.is_hidden %}deleted{% endif %}">
+    {%- if comment.is_deleted %}[deleted by the author]
+    {%- elif comment.is_hidden %}[removed by a moderator]
+    {%- else %}{{ comment.body | content }}{% endif -%}
+  </div>
+
+  {% if current_user and not comment.is_deleted and not comment.is_hidden %}
+  <div class="comment-actions">
+    {% if not is_reply %}
+    <button type="button" class="comment-action-btn" data-reply-toggle="reply-form-{{ comment.id }}">Reply</button>
+    {% endif %}
+
+    {% if is_mine %}
+    <button type="button" class="comment-action-btn" data-reply-toggle="edit-form-{{ comment.id }}">Edit</button>
+    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete">
+      {{ csrf_input() }}
+      <button type="submit" class="comment-action-btn"
+              onclick="return confirm('Delete this comment?')">Delete</button>
+    </form>
+    {% else %}
+    <a class="comment-action-btn" href="/report?type=comment&amp;id={{ comment.id }}">Report</a>
+    {% if current_user.is_admin %}
+    {# Admins remove rather than edit — moderation never rewrites what
+       someone said. The route checks the role again server-side. #}
+    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete">
+      {{ csrf_input() }}
+      <button type="submit" class="comment-action-btn text-danger">Remove</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  {% if is_mine %}
+  <div class="reply-form" id="edit-form-{{ comment.id }}">
+    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/edit" data-once>
+      {{ csrf_input() }}
+      <label class="sr-only" for="edit-body-{{ comment.id }}">Edit your comment</label>
+      <textarea id="edit-body-{{ comment.id }}" name="body" class="form-textarea" rows="3"
+                required minlength="2" maxlength="2000">{{ comment.body }}</textarea>
+      <div class="form-row-actions">
+        <button type="submit" class="btn btn-primary btn-sm" data-loading="Saving…">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-reply-toggle="edit-form-{{ comment.id }}">Cancel</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if not is_reply %}
+  <div class="reply-form" id="reply-form-{{ comment.id }}">
+    <form method="POST" action="/blog/{{ post.slug }}/comment" data-once>
+      {{ csrf_input() }}
+      <input type="hidden" name="parent_id" value="{{ comment.id }}">
+      <label class="sr-only" for="reply-body-{{ comment.id }}">Your reply</label>
+      <textarea id="reply-body-{{ comment.id }}" name="body" class="form-textarea" rows="2"
+                placeholder="Reply to {{ author.display if author else 'this comment' }}…"
+                required minlength="2" maxlength="2000"></textarea>
+      <div class="form-row-actions">
+        <button type="submit" class="btn btn-primary btn-sm" data-loading="Posting…">Reply</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-reply-toggle="reply-form-{{ comment.id }}">Cancel</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  {% endif %}
+
+</div>

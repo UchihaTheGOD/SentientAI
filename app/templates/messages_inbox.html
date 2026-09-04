@@ -1,0 +1,41 @@
+{% extends "base_public.html" %}
+{% block title %}Messages — Sentient{% endblock %}
+
+{% block content %}
+<div class="notifs-page">
+
+  <div class="page-head">
+    <h1 class="page-title">Messages</h1>
+    <p class="page-lead">Your conversations.</p>
+  </div>
+
+  {% if conversations %}
+  <div class="conversation-list">
+    {% for c in conversations %}
+    <a href="/messages/{{ c.user.username }}" class="notif-item {% if c.unread %}unread{% endif %}" style="text-decoration:none;color:inherit;">
+      <div class="author-avatar">
+        {% if c.user.avatar_url | safe_url %}
+        <img src="{{ c.user.avatar_url | safe_url }}" alt="{{ c.user.display }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        {% else %}{{ c.user.display[0]|upper }}{% endif %}
+      </div>
+      <div class="notif-body">
+        <div class="flex-between">
+          <strong>{{ c.user.display }}</strong>
+          {% if c.unread %}<span class="notif-badge">{{ c.unread if c.unread < 10 else '9+' }}</span>{% endif %}
+        </div>
+        <div class="notif-link" style="cursor:pointer;">{% if c.outgoing %}<span class="text-muted">You:</span> {% endif %}{{ c.preview }}</div>
+        <div class="notif-time">{{ c.last_at.strftime('%b %d, %Y at %H:%M') if c.last_at else '' }}</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">✉</div>
+    <h3>No messages yet</h3>
+    <p>Start a conversation from someone's profile to see it here.</p>
+    <a href="/community" class="btn btn-ghost">Find people</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

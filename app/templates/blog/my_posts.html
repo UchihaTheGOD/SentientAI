@@ -1,0 +1,81 @@
+{% extends "base_public.html" %}
+{% block title %}Your posts — Sentient{% endblock %}
+
+{% block content %}
+{% set show_state = True %}
+<div class="page-wrap">
+
+  <div class="page-head flex-between">
+    <div>
+      <h1 class="page-title">Your posts</h1>
+      <p class="page-lead">Drafts are only visible to you until you publish them.</p>
+    </div>
+    <a href="/write" class="btn btn-primary btn-sm">+ New post</a>
+  </div>
+
+  <div class="filter-row">
+    <a href="/my/posts" class="filter-chip {% if not active_state %}filter-chip--active{% endif %}">
+      All <span class="filter-chip-count">{{ total }}</span>
+    </a>
+    {% for key, label in [('draft', 'Drafts'), ('published', 'Published'), ('archived', 'Archived')] %}
+    <a href="/my/posts?state={{ key }}" class="filter-chip {% if active_state == key %}filter-chip--active{% endif %}">
+      {{ label }} <span class="filter-chip-count">{{ counts.get(key, 0) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if posts %}
+  {% for post in posts %}
+  <div class="own-post">
+    {% include "partials/post_card.html" with context %}
+    <div class="own-post-actions">
+      <a href="/blog/{{ post.slug }}" class="btn btn-ghost btn-sm">View</a>
+      <a href="/blog/{{ post.slug }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+
+      {% if post.state != 'published' %}
+      <form method="POST" action="/blog/{{ post.slug }}/state">
+        {{ csrf_input() }}
+        <input type="hidden" name="action" value="publish">
+        <button type="submit" class="btn btn-primary btn-sm">Publish</button>
+      </form>
+      {% else %}
+      <form method="POST" action="/blog/{{ post.slug }}/state">
+        {{ csrf_input() }}
+        <input type="hidden" name="action" value="draft">
+        <button type="submit" class="btn btn-ghost btn-sm">Unpublish</button>
+      </form>
+      {% endif %}
+
+      {% if post.state != 'archived' %}
+      <form method="POST" action="/blog/{{ post.slug }}/state">
+        {{ csrf_input() }}
+        <input type="hidden" name="action" value="archive">
+        <button type="submit" class="btn btn-ghost btn-sm">Archive</button>
+      </form>
+      {% endif %}
+
+      <form method="POST" action="/blog/{{ post.slug }}/delete" style="margin-left:auto;">
+        {{ csrf_input() }}
+        {# Generic confirm text on purpose: interpolating the title into a JS
+           string literal inside an attribute would let a crafted title escape
+           the quoting, even on the author's own page. #}
+        <button type="submit" class="btn btn-danger btn-sm"
+                onclick="return confirm('Delete this post for good? Comments and likes on it go too.')">
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% include "partials/pagination.html" with context %}
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">✍️</div>
+    <h3>{% if active_state %}Nothing {{ active_state }}{% else %}You haven't written anything yet{% endif %}</h3>
+    <p>Start a draft whenever you like — nobody sees it until you publish.</p>
+    <a href="/write" class="btn btn-primary">Write your first post</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

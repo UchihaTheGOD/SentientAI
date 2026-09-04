@@ -1,0 +1,17 @@
+{% extends "base_public.html" %}
+{% block title %}Something went wrong — Sentient{% endblock %}
+
+{% block content %}
+<div class="container container--narrow error-page">
+    <p class="error-code">500</p>
+    <h1 class="error-title">Something went wrong on our end</h1>
+    <p class="error-text">
+        This one's on us. The error has been recorded. Try again in a moment —
+        and if it keeps happening, let us know.
+    </p>
+    <div class="error-actions">
+        <a href="/" class="btn btn-primary">Back home</a>
+        <a href="/contact" class="btn btn-outline">Report a problem</a>
+    </div>
+</div>
+{% endblock %}
