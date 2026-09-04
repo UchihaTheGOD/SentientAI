@@ -81,6 +81,18 @@ python run.py
 The site runs at **http://127.0.0.1:8000**. Interactive API docs (route list)
 are at `/api/docs`.
 
+### Windows launch shortcuts
+
+On Windows you can use the batch helpers instead of typing the commands:
+
+- `run.bat start` — task-runner shortcut (also `run.bat test`, `run.bat status`,
+  `run.bat export`, …); calls the venv's Python directly.
+- Double-click **`it old didn't work.bat`** — a fallback launcher to use *if
+  `run.bat` didn't work*: it activates the virtualenv and runs `python run.py`
+  (after a tongue-in-cheek banner).
+
+Both expect the `venv` to already exist with dependencies installed (see above).
+
 ### Initial administrator
 
 `seed-admin` (and `reset-db`) create exactly one administrator:
