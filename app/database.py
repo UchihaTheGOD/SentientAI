@@ -1,5 +1,23 @@
-"""SQLAlchemy database setup. SQLite now, Postgres-ready."""
-from sqlalchemy import create_engine, text
+"""SQLAlchemy database setup. SQLite now, Postgres-ready.
+
+Schema management has two layers, both **non-destructive**:
+
+* ``Base.metadata.create_all`` creates any *table* that does not yet exist,
+  with its full, current set of columns.
+* ``_run_migrations`` upgrades tables that already existed from an older
+  release. SQLite's ``create_all`` never alters an existing table, so a column
+  added to a model *after* the table was first created — for example
+  ``users.password_hash`` on a database created before that column existed —
+  would otherwise stay missing and every query touching it would fail with
+  ``sqlite3.OperationalError: no such column``. The migration is *model-driven*:
+  for each mapped table already in the database it adds every column the model
+  declares but the table lacks. The source of truth is the models, so the
+  upgrade can never "forget" a column.
+
+``init_db`` never drops or deletes anything; the only destructive path is
+``manage.py reset-db --yes``.
+"""
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 
@@ -22,17 +40,9 @@ def get_db():
         db.close()
 
 
-def _safe_add_column(conn, table: str, column: str, col_type: str):
-    """Idempotent ALTER TABLE ADD COLUMN — ignores if column already exists."""
-    try:
-        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
-        conn.commit()
-    except Exception:
-        conn.rollback()
-
-
 def _safe_exec(conn, sql: str):
-    """Run a statement, swallowing failures (used for idempotent backfills)."""
+    """Run a statement, swallowing failures (used for idempotent ALTERs and
+    value backfills so a re-run, or a column that already exists, is a no-op)."""
     try:
         conn.execute(text(sql))
         conn.commit()
@@ -40,64 +50,80 @@ def _safe_exec(conn, sql: str):
         conn.rollback()
 
 
-def _run_migrations():
-    """Safe, idempotent schema migrations for existing databases.
+def _sqlite_type(column, dialect) -> str:
+    """The column's SQL type as this dialect emits it (VARCHAR(255), INTEGER,
+    BOOLEAN, DATETIME, TEXT, ...). Falls back to TEXT — SQLite is dynamically
+    typed, so an imperfect affinity is still safe."""
+    try:
+        return column.type.compile(dialect=dialect)
+    except Exception:
+        return "TEXT"
 
-    Only used to add columns to tables that SQLAlchemy create_all won't
-    touch because the table already exists. Never drops data.
+
+def _default_clause(column):
+    """A SQL literal for a safe column DEFAULT, or ``None`` to add it without one.
+
+    Only *scalar* model defaults are translated (booleans, numbers, plain
+    strings), so an existing row gets a sensible value for columns like
+    ``token_version`` (0) or ``status`` ('candidate'). Callable defaults
+    (timestamps) and columns with no default are added without a DEFAULT.
+
+    Every added column is nullable at the DDL level regardless of the model's
+    ``nullable=False``: SQLite forbids adding a NOT NULL column without a
+    default, and we cannot invent a value for a pre-existing row (there is no
+    real password hash to backfill, for instance). New inserts still flow
+    through the ORM, which enforces the model's NOT NULL constraint.
     """
-    with engine.connect() as conn:
-        # User profile fields
-        _safe_add_column(conn, "users", "display_name", "VARCHAR(100)")
-        _safe_add_column(conn, "users", "display_name", "VARCHAR(100)")
-        _safe_add_column(conn, "users", "bio", "TEXT")
-        _safe_add_column(conn, "users", "website", "VARCHAR(255)")
-        _safe_add_column(conn, "users", "avatar_url", "VARCHAR(500)")
+    default = column.default
+    if default is not None and getattr(default, "is_scalar", False):
+        value = default.arg
+        if isinstance(value, bool):            # bool before int: bool *is* an int
+            return "1" if value else "0"
+        if isinstance(value, (int, float)):
+            return repr(value)
+        if isinstance(value, str):
+            return "'" + value.replace("'", "''") + "'"
+    return None
 
-        # Phase 2 migrations: BlogPost enhancements
-        _safe_add_column(conn, "blog_posts", "user_id", "INTEGER")
-        _safe_add_column(conn, "blog_posts", "views", "INTEGER DEFAULT 0")
-        _safe_add_column(conn, "blog_posts", "excerpt", "TEXT")
 
-        # ---- Redesign migrations ----------------------------------------
-        # Post lifecycle (draft / published / archived) + moderation hide.
-        _safe_add_column(conn, "blog_posts", "status", "VARCHAR(20) DEFAULT 'draft'")
-        _safe_add_column(conn, "blog_posts", "published_at", "DATETIME")
-        _safe_add_column(conn, "blog_posts", "is_hidden", "BOOLEAN DEFAULT 0")
-        _safe_add_column(conn, "blog_posts", "hidden_reason", "VARCHAR(255)")
+def _add_missing_columns(conn, dialect, insp) -> None:
+    """For every mapped table that already exists, add each column the model
+    declares but the table is missing. This upgrades an old database to the
+    current schema (this is what restores ``users.password_hash``). Tables that
+    ``create_all`` just built already have every column, so they are skipped;
+    tables in the database but not mapped by a model (legacy leftovers) are left
+    untouched — nothing is dropped."""
+    existing_tables = set(insp.get_table_names())
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue  # create_all already built it with every current column
+        present = {col["name"] for col in insp.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present:
+                continue
+            ddl = (
+                f'ALTER TABLE "{table.name}" '
+                f'ADD COLUMN "{column.name}" {_sqlite_type(column, dialect)}'
+            )
+            default = _default_clause(column)
+            if default is not None:
+                ddl += f" DEFAULT {default}"
+            _safe_exec(conn, ddl)
 
-        # Account suspension, kept separate from is_active.
-        _safe_add_column(conn, "users", "is_suspended", "BOOLEAN DEFAULT 0")
-        _safe_add_column(conn, "users", "suspension_reason", "VARCHAR(255)")
-        _safe_add_column(conn, "users", "suspended_at", "DATETIME")
 
-        # Session invalidation counter (User.token_version / auth_service).
-        _safe_add_column(conn, "users", "token_version", "INTEGER DEFAULT 0")
+def _run_migrations(bind=None) -> None:
+    """Safe, idempotent schema upgrade for existing databases. Never drops data.
 
-        # Comment moderation hide, distinct from the author's own delete.
-        _safe_add_column(conn, "comments", "is_hidden", "BOOLEAN DEFAULT 0")
-        _safe_add_column(conn, "comments", "hidden_reason", "VARCHAR(255)")
+    First add any column a model gained after its table was created, then run a
+    few value backfills so legacy rows agree with the new columns.
+    """
+    target = bind or engine
+    insp = inspect(target)
+    with target.connect() as conn:
+        _add_missing_columns(conn, target.dialect, insp)
 
-        # Training pipeline: review lifecycle, provenance, dedup, split.
-        for column, coltype in (
-            ("status", "VARCHAR(20) DEFAULT 'candidate'"),
-            ("quality_score", "INTEGER DEFAULT 0"),
-            ("quality_notes", "TEXT"),
-            ("quality_band", "VARCHAR(10)"),
-            ("model_prediction", "VARCHAR(80)"),
-            ("human_label", "VARCHAR(80)"),
-            ("safe_to_train", "BOOLEAN DEFAULT 0"),
-            ("dedup_hash", "VARCHAR(64)"),
-            ("split", "VARCHAR(10) DEFAULT 'train'"),
-            ("provenance", "VARCHAR(60) DEFAULT 'moderation_flag'"),
-            ("review_note", "TEXT"),
-            ("reviewed_at", "DATETIME"),
-            ("updated_at", "DATETIME"),
-        ):
-            _safe_add_column(conn, "training_examples", column, coltype)
-
-        # ---- Backfills ---------------------------------------------------
-        # Legacy rows predate `status`; derive it from the `published` bool so
+        # ---- Backfills: give legacy rows values consistent with new columns ---
+        # Legacy posts predate `status`; derive it from the `published` bool so
         # `BlogPost.state` and the new queries agree with what users already see.
         _safe_exec(conn, "UPDATE blog_posts SET status='published' "
                          "WHERE (status IS NULL OR status='') AND published=1")
@@ -119,8 +145,13 @@ def _run_migrations():
                          "WHERE provenance IS NULL OR provenance=''")
 
 
-def init_db():
-    """Create all tables. Import models before calling this."""
+def init_db(bind=None) -> None:
+    """Create every table, then upgrade any pre-existing table to the current
+    schema. Import the models first so all tables are registered on ``Base``.
+
+    Non-destructive: it never drops or deletes. Pass ``bind`` to target a
+    specific engine (used by tests); production callers use the default engine.
+    """
     import app.models.user  # noqa: F401
     import app.models.password_reset  # noqa: F401
     import app.models.training_example  # noqa: F401
@@ -131,7 +162,6 @@ def init_db():
     import app.models.message  # noqa: F401
     import app.models.moderation  # noqa: F401
     import app.models.audit  # noqa: F401
-    Base.metadata.create_all(bind=engine)
-    _run_migrations()
-
-
+    target = bind or engine
+    Base.metadata.create_all(bind=target)
+    _run_migrations(target)

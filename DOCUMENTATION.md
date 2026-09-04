@@ -134,8 +134,9 @@ production).
 ## 6. Data model
 
 All models share the declarative `Base`. `init_db()` imports every model module
-(so all tables are registered), runs `create_all`, then applies additive
-migrations. The SQLite engine does **not** enable `PRAGMA foreign_keys`, so
+(so all tables are registered), runs `create_all`, then applies additive,
+model-driven migrations that add any column a model gained after its table was
+first created (see §19). The SQLite engine does **not** enable `PRAGMA foreign_keys`, so
 cascading deletes are handled explicitly in service code (see `admin_service`,
 blog delete).
 
@@ -389,14 +390,34 @@ it never touches approval state.
 
 ## 19. Database initialisation, migrations, seeding
 
-- `init_db()` (`app/database.py`) imports all models, `create_all`, then runs
-  small additive migrations (`_run_migrations`). It is idempotent and never drops
-  data, so it is safe to call on every startup and from each standalone
-  entrypoint.
-- Seeding is explicit and lives in `manage.py` (§20). The initial admin is
-  `admin` / `admin@12345` / `admin@12345` (role admin, active).
-- `reset-db --yes` is the only destructive operation and refuses to run without
-  the flag.
+- **`init_db()`** (`app/database.py`) runs on every startup and from each
+  standalone entrypoint. It imports all models, calls `create_all`, then runs an
+  additive, **model-driven** migration. It is idempotent and **never drops or
+  deletes** data, so it is always safe to call.
+- **Why the migration exists.** `create_all` only creates tables that do not yet
+  exist — it never alters an existing one. A column added to a model *after* its
+  table was first created (for example `users.password_hash` on a database from
+  an earlier release) would otherwise stay missing, and every query touching it
+  would fail with `sqlite3.OperationalError: no such column`. The migration
+  closes that gap: for each mapped table already present it adds every column the
+  model declares but the table lacks. The source of truth is the models, so it
+  cannot "forget" a column.
+- **How existing rows are treated.** New columns are added nullable (SQLite
+  cannot add a `NOT NULL` column without a default); scalar model defaults
+  (e.g. `token_version` → 0) are backfilled. A pre-existing row for which no real
+  value can be invented — a legacy account has no password hash — gets `NULL` and
+  simply cannot sign in until its password is reset; that is the safe outcome.
+  New inserts still flow through the ORM, which enforces the model's `NOT NULL`.
+  Tables present in the database that no model maps (leftovers from an older
+  schema) are left untouched — nothing is dropped.
+- **Upgrading an old database:** just start the app (or run any `manage.py`
+  command); the schema is upgraded in place and existing data preserved.
+- **Seeding** is explicit and lives in `manage.py` (§20). The initial admin is
+  `admin` / `admin@12345` / `admin@12345` (role admin, active); `seed-admin` is
+  idempotent.
+- **`reset-db --yes`** is the only destructive operation and refuses to run
+  without the flag. It drops every table, recreates the **complete current
+  schema**, then seeds exactly one admin — the clean "start over" path.
 
 ---
 
