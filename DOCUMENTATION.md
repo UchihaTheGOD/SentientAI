@@ -433,7 +433,8 @@ Run:
 ./venv/bin/python -m pytest                 # Linux/macOS
 ```
 
-Current result: **413 passed, 1 skipped** (see the implementation report).
+Current result: **413 passed, 1 skipped** (see the implementation report and
+the [verification report](VERIFICATION_REPORT.md) for an independent run).
 
 ---
 
@@ -487,4 +488,5 @@ These are real, deliberate constraints — not TODOs hidden as features.
 | No public security-testing / attack functionality | ✅ |
 
 See [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md) for the full report with
-test evidence.
+test evidence, and [VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) for an
+independent verification pass (fresh test run + live-app checks).
