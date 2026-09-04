@@ -136,7 +136,9 @@ Internal dataset chores (admin/operator use) live in `python -m app.cli`
 
 The suite runs in-process against a throwaway SQLite database with a fresh state
 per test. See [DOCUMENTATION.md](DOCUMENTATION.md) for the full architecture,
-data model, security model and known limitations.
+data model, security model and known limitations, and
+[VERIFICATION_REPORT.md](VERIFICATION_REPORT.md) for an independent verification
+pass (fresh test run + live-app checks of the important flows).
 
 ## Configuration
 
