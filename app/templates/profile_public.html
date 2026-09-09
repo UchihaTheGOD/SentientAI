@@ -7,8 +7,8 @@
   {# Header #}
   <div class="profile-header">
     <div class="author-avatar author-avatar--hero">
-      {% if profile_user.avatar_url %}
-      <img src="{{ profile_user.avatar_url }}" alt="{{ profile_user.display }}">
+      {% if profile_user.avatar_url | safe_url %}
+      <img src="{{ profile_user.avatar_url | safe_url }}" alt="{{ profile_user.display }}">
       {% else %}
       {{ profile_user.display[0]|upper }}
       {% endif %}
@@ -46,16 +46,21 @@
           <a href="/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
         {% elif current_user %}
           <form method="POST" action="/users/{{ profile_user.username }}/follow">
+            {{ csrf_input() }}
             <button type="submit" class="btn {% if is_following %}btn-ghost{% else %}btn-primary{% endif %} btn-sm">
               {% if is_following %}Unfollow{% else %}Follow{% endif %}
             </button>
           </form>
+          <a href="/messages/{{ profile_user.username }}" class="btn btn-ghost btn-sm">Message</a>
         {% else %}
           <a href="/login" class="btn btn-primary btn-sm">Follow</a>
         {% endif %}
 
-        {% if profile_user.website %}
-        <a href="{{ profile_user.website }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+        {# Validated on save, re-checked here: a row written before the
+           validation was fixed must still not produce a javascript: href. #}
+        {% set profile_site = profile_user.website | safe_url %}
+        {% if profile_site %}
+        <a href="{{ profile_site }}" target="_blank" rel="nofollow ugc noopener" class="btn btn-ghost btn-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Website
         </a>
@@ -74,25 +79,7 @@
 
     {% if user_posts %}
     {% for post in user_posts %}
-    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-      <div class="post-card">
-        <div class="post-card-body">
-          <div class="post-card-meta">
-            <span class="tag">{{ post.category }}</span>
-            <span class="post-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
-          </div>
-          <h2 class="post-card-title">{{ post.title }}</h2>
-          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-          <div class="post-card-footer">
-            <span class="post-card-stat">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {{ post.views or 0 }}
-            </span>
-            <span class="post-card-stat">{{ post.reading_time }} min read</span>
-          </div>
-        </div>
-      </div>
-    </a>
+    {% include "partials/post_card.html" with context %}
     {% endfor %}
     {% else %}
     <div class="empty-state">

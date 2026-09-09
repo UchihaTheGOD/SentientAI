@@ -97,33 +97,7 @@
     <div>
       <div class="section-title">Latest</div>
       {% for post in latest_posts %}
-      <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-        <div class="post-card">
-          <div class="post-card-body">
-            <div class="post-card-meta">
-              <div class="post-card-author">
-                <div class="author-avatar">{{ post.author[0]|upper }}</div>
-                <span>{{ post.author }}</span>
-              </div>
-              <span class="post-card-date">{{ post.created_at.strftime('%b %d') if post.created_at else '' }}</span>
-              <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
-            </div>
-            <h3 class="post-card-title">{{ post.title }}</h3>
-            <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-            <div class="post-card-footer">
-              <span class="post-card-stat">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                {{ post.views or 0 }}
-              </span>
-              <span class="post-card-stat">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                0
-              </span>
-              <span class="post-card-stat">{{ post.reading_time }} min read</span>
-            </div>
-          </div>
-        </div>
-      </a>
+      {% include "partials/post_card.html" with context %}
       {% endfor %}
       <div style="text-align:center;margin-top:var(--space-xl);">
         <a href="/explore" class="btn btn-ghost">Explore all posts →</a>
@@ -155,8 +129,8 @@
         {% for author, count in popular_authors %}
         <a href="/u/{{ author.username }}" class="author-item">
           <div class="author-avatar author-avatar--lg">
-            {% if author.avatar_url %}
-            <img src="{{ author.avatar_url }}" alt="{{ author.display }}">
+            {% if author.avatar_url | safe_url %}
+            <img src="{{ author.avatar_url | safe_url }}" alt="{{ author.display }}">
             {% else %}
             {{ author.display[0]|upper }}
             {% endif %}

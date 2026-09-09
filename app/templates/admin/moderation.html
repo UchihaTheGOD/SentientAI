@@ -1,0 +1,164 @@
+{% extends "base_public.html" %}
+{% block title %}Moderation queue — Sentient{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Moderation queue</h1>
+      <p class="page-lead">
+        Reports from the community. Hiding is reversible — nothing here deletes content.
+      </p>
+    </div>
+    <a href="/admin" class="btn btn-ghost btn-sm">Admin home</a>
+  </header>
+
+  {% if done %}
+  <div class="alert alert-success" data-autodismiss>Done — {{ done|replace('-', ' ') }}.</div>
+  {% endif %}
+
+  <nav class="filter-row" aria-label="Filter by status">
+    <a class="filter-chip {% if not status_filter %}filter-chip--active{% endif %}"
+       href="/admin/moderation">Needs review ({{ counts.open + counts.reviewing }})</a>
+    {% for state in statuses %}
+    <a class="filter-chip {% if status_filter == state %}filter-chip--active{% endif %}"
+       href="/admin/moderation?status={{ state }}">{{ state|capitalize }} ({{ counts[state] }})</a>
+    {% endfor %}
+  </nav>
+
+  {% if reports.is_empty %}
+  <div class="empty-state">
+    <h2>Nothing waiting</h2>
+    <p class="text-muted">
+      {% if status_filter %}No {{ status_filter }} reports.{% else %}The queue is clear.{% endif %}
+    </p>
+  </div>
+  {% else %}
+
+  <ul class="mod-list">
+    {% for report in reports.items %}
+    <li class="mod-item">
+      <div class="mod-item-head">
+        <div>
+          <span class="badge badge--reason">{{ report.reason_label }}</span>
+          <span class="text-muted text-sm">
+            {{ report.target_type }} #{{ report.target_id }}
+            · {{ report.created_at.strftime('%d %b %Y, %H:%M') if report.created_at else '—' }}
+            · reported by
+            {%- if reporters.get(report.reporter_id) %}
+            <a href="/u/{{ reporters[report.reporter_id].username }}">@{{ reporters[report.reporter_id].username }}</a>
+            {%- else %} a deleted account{% endif %}
+          </span>
+        </div>
+        <span class="badge {% if report.is_open %}badge--warning{% else %}badge--muted{% endif %}">{{ report.status }}</span>
+      </div>
+
+      {% if report.target_label %}
+      <div class="mod-target">{{ report.target_label }}</div>
+      {% endif %}
+
+      {% if report.details %}
+      <div class="mod-details">{{ report.details|clean }}</div>
+      {% endif %}
+
+      <div class="mod-actions">
+        <a href="{{ target_urls[report.id] }}" class="btn btn-ghost btn-sm">View content</a>
+
+        {% if report.is_open %}
+        {% if report.target_type == 'post' %}
+        <form method="POST" action="/admin/moderation/post/{{ report.target_id }}/hide" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="report_id" value="{{ report.id }}">
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <input type="text" name="reason" class="form-input form-input--inline"
+                 placeholder="Reason (shown to the author)" maxlength="255">
+          <button type="submit" class="btn btn-danger btn-sm">Hide post</button>
+        </form>
+        <form method="POST" action="/admin/moderation/post/{{ report.target_id }}/restore" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <button type="submit" class="link-btn">Restore</button>
+        </form>
+        {% elif report.target_type == 'comment' %}
+        <form method="POST" action="/admin/moderation/comment/{{ report.target_id }}/hide" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="report_id" value="{{ report.id }}">
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <input type="text" name="reason" class="form-input form-input--inline"
+                 placeholder="Reason" maxlength="255">
+          <button type="submit" class="btn btn-danger btn-sm">Hide comment</button>
+        </form>
+        <form method="POST" action="/admin/moderation/comment/{{ report.target_id }}/restore" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <button type="submit" class="link-btn">Restore</button>
+        </form>
+        {% elif report.target_type == 'profile' %}
+        <form method="POST" action="/admin/moderation/user/{{ report.target_id }}/suspend" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="report_id" value="{{ report.id }}">
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <input type="text" name="reason" class="form-input form-input--inline"
+                 placeholder="Reason (shown at sign-in)" maxlength="255">
+          <button type="submit" class="btn btn-danger btn-sm">Suspend account</button>
+        </form>
+        <form method="POST" action="/admin/moderation/user/{{ report.target_id }}/reinstate" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <button type="submit" class="link-btn">Reinstate</button>
+        </form>
+        {% endif %}
+
+        <form method="POST" action="/admin/moderation/{{ report.id }}/resolve" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <input type="text" name="note" class="form-input form-input--inline"
+                 placeholder="Resolution note" maxlength="500">
+          <button type="submit" class="btn btn-primary btn-sm">Resolve</button>
+        </form>
+        <form method="POST" action="/admin/moderation/{{ report.id }}/dismiss" class="inline-form">
+          {{ csrf_input() }}
+          <input type="hidden" name="status_filter" value="{{ status_filter }}">
+          <button type="submit" class="link-btn">Dismiss</button>
+        </form>
+        {% else %}
+        <span class="text-muted text-sm">
+          Closed{% if report.resolved_at %} on {{ report.resolved_at.strftime('%d %b %Y') }}{% endif %}
+          {%- if report.resolution_note %} — {{ report.resolution_note|clean }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+
+  {% set page = reports %}
+  {% include "partials/pagination.html" with context %}
+  {% endif %}
+
+  <section class="mod-log">
+    <h2 class="section-title">Recent moderation actions</h2>
+    {% if recent_actions %}
+    <table class="data-table">
+      <thead>
+        <tr><th>When</th><th>Moderator</th><th>Action</th><th>Target</th><th>Reason</th></tr>
+      </thead>
+      <tbody>
+        {% for action in recent_actions %}
+        <tr>
+          <td class="text-muted text-sm">{{ action.created_at.strftime('%d %b %H:%M') if action.created_at else '—' }}</td>
+          <td>{% if moderators.get(action.moderator_id) %}@{{ moderators[action.moderator_id].username }}{% else %}—{% endif %}</td>
+          <td>{{ action.action|replace('_', ' ') }}</td>
+          <td class="text-muted">{{ action.target_type }} #{{ action.target_id }}</td>
+          <td class="text-muted text-sm">{{ action.reason|clean if action.reason else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No moderation actions recorded yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

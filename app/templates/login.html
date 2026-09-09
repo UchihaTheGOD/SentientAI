@@ -21,15 +21,20 @@
     {% endif %}
 
     <form method="post" action="/login" data-once>
+      {{ csrf_input() }}
+      <input type="hidden" name="next" value="{{ next or '/' }}">
       <div class="form-group">
         <label class="form-label" for="username">Username</label>
         <input type="text" id="username" name="username" class="form-input"
-               required autocomplete="username" autofocus>
+               value="{{ username or '' }}" required autocomplete="username" autofocus>
       </div>
       <div class="form-group">
         <label class="form-label" for="password">Password</label>
         <input type="password" id="password" name="password" class="form-input"
                required autocomplete="current-password">
+        <div class="form-hint" style="text-align:right;">
+          <a href="/forgot-password">Forgot your password?</a>
+        </div>
       </div>
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:var(--space-sm);" data-loading="Signing in…">
         Sign in
@@ -37,7 +42,8 @@
     </form>
 
     <div class="auth-footer">
-      Don't have an account? <a href="/register">Create one — free</a>
+      Don't have an account?
+      <a href="/register{% if next and next != '/' %}?next={{ next|urlencode }}{% endif %}">Create one — free</a>
     </div>
   </div>
 </div>

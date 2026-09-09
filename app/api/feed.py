@@ -1,19 +1,30 @@
 """Feed and search routes for the public community platform."""
 from fastapi import APIRouter, Request, Depends, Query
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, desc
 
 from app.database import get_db
 from app.models.user import User
-from app.models.blog_post import BlogPost, BLOG_CATEGORIES
+from app.models.blog_post import POST_PUBLISHED, BlogPost, BLOG_CATEGORIES
 from app.models.social import PostLike, Follow, Bookmark
 from app.models.tag import Tag
 from app.services.auth_service import get_current_user, get_current_user_optional
+from app.services.content import public_posts_query
+from app.services.ratelimit import limit_search
+from app.template_env import templates
 
 router = APIRouter(tags=["feed"])
-templates = Jinja2Templates(directory="app/templates")
+
+# Listings must agree with `content.public_posts_query`: published *and* not
+# moderator-hidden. Filtering on `published` alone left hidden posts on
+# /explore, /feed and /search after a moderator had removed them from
+# /blog — the same reason expressed as a filter for the aggregate queries
+# below, which start from `Tag` rather than from `BlogPost`.
+_PUBLIC_POST_FILTER = (
+    BlogPost.status == POST_PUBLISHED,
+    BlogPost.is_hidden == False,  # noqa: E712
+)
 
 
 def _post_like_counts(db: Session, post_ids: list) -> dict:
@@ -60,7 +71,7 @@ def explore(
     user=Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    query = db.query(BlogPost).filter(BlogPost.published == True)
+    query = public_posts_query(db)
 
     if category and category in BLOG_CATEGORIES:
         query = query.filter(BlogPost.category == category)
@@ -91,7 +102,7 @@ def explore(
     popular_tags = (
         db.query(Tag, func.count(Tag.id).label("cnt"))
         .join(Tag.posts)
-        .filter(BlogPost.published == True)
+        .filter(*_PUBLIC_POST_FILTER)
         .group_by(Tag.id)
         .order_by(desc("cnt"))
         .limit(20)
@@ -133,8 +144,8 @@ def feed(
     # Posts from followed users
     if followed_ids:
         followed_query = (
-            db.query(BlogPost)
-            .filter(BlogPost.published == True, BlogPost.user_id.in_(followed_ids))
+            public_posts_query(db)
+            .filter(BlogPost.user_id.in_(followed_ids))
         )
         if sort == "popular":
             followed_query = followed_query.outerjoin(
@@ -149,8 +160,8 @@ def feed(
     # Recommended — recent popular posts not from followed users (or own)
     exclude_ids = followed_ids + [user.id]
     recommended = (
-        db.query(BlogPost)
-        .filter(BlogPost.published == True, ~BlogPost.user_id.in_(exclude_ids))
+        public_posts_query(db)
+        .filter(~BlogPost.user_id.in_(exclude_ids))
         .order_by(desc(BlogPost.views))
         .limit(10)
         .all()
@@ -182,11 +193,15 @@ def feed(
 @router.get("/search", response_class=HTMLResponse)
 def search(
     request: Request,
-    q: str = Query(""),
+    q: str = Query("", max_length=120),
     kind: str = Query("posts", enum=["posts", "users", "tags"]),
     user=Depends(get_current_user_optional),
     db: Session = Depends(get_db),
+    _rate=Depends(limit_search),
 ):
+    # `q` is bound as a parameter by SQLAlchemy and escaped on output by the
+    # template; the length cap is here so a huge term cannot be used to make
+    # the database do unbounded work.
     q = q.strip()
     results_posts = []
     results_users = []
@@ -195,9 +210,8 @@ def search(
     if q:
         if kind == "posts" or not kind:
             results_posts = (
-                db.query(BlogPost)
+                public_posts_query(db)
                 .filter(
-                    BlogPost.published == True,
                     or_(
                         BlogPost.title.ilike(f"%{q}%"),
                         BlogPost.summary.ilike(f"%{q}%"),
@@ -213,7 +227,11 @@ def search(
             results_users = (
                 db.query(User)
                 .filter(
-                    User.is_active == True,
+                    User.is_active == True,  # noqa: E712
+                    # A suspended account stays out of discovery: the profile
+                    # is still reachable by direct URL for moderation, but it
+                    # is not surfaced to searchers.
+                    User.is_suspended == False,  # noqa: E712
                     or_(
                         User.username.ilike(f"%{q}%"),
                         User.display_name.ilike(f"%{q}%"),
@@ -236,7 +254,7 @@ def search(
     trending_tags = (
         db.query(Tag, func.count(Tag.id).label("cnt"))
         .join(Tag.posts)
-        .filter(BlogPost.published == True)
+        .filter(*_PUBLIC_POST_FILTER)
         .group_by(Tag.id)
         .order_by(desc("cnt"))
         .limit(15)

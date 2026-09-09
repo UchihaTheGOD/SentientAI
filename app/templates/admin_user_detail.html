@@ -1,0 +1,121 @@
+{% extends "base_public.html" %}
+{% block title %}{{ account.username }} — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  {% include "partials/admin_nav.html" %}
+
+  <p><a href="/admin/users" class="text-sm">‹ Back to users</a></p>
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ account.display }}</h1>
+      <p class="page-lead">@{{ account.username }} · {{ account.email }}</p>
+    </div>
+    <a href="/u/{{ account.username }}" class="btn btn-outline btn-sm">View public profile</a>
+  </header>
+
+  <div class="admin-meta-row">
+    <span>Role: {% if account.role == 'admin' %}<span class="badge badge-yellow">admin</span>{% else %}user{% endif %}</span>
+    <span>Status:
+      {% if account.is_suspended %}<span class="badge badge-red">suspended</span>
+      {% elif not account.is_active %}<span class="badge">inactive</span>
+      {% else %}<span class="badge badge-green">active</span>{% endif %}
+    </span>
+    <span>Joined: {{ account.created_at.strftime('%Y-%m-%d') if account.created_at else '—' }}</span>
+  </div>
+  {% if account.is_suspended and account.suspension_reason %}
+  <p class="text-sm text-muted">Suspension reason: {{ account.suspension_reason }}</p>
+  {% endif %}
+
+  <div class="dashboard-stats" style="margin-top: var(--space-md);">
+    <div class="stat-card"><div class="stat-card-num">{{ post_count }}</div><div class="stat-card-label">Posts</div></div>
+    <div class="stat-card"><div class="stat-card-num">{{ comment_count }}</div><div class="stat-card-label">Comments</div></div>
+    <div class="stat-card"><div class="stat-card-num">{{ report_count }}</div><div class="stat-card-label">Reports filed</div></div>
+  </div>
+
+  {% if account.role != 'admin' %}
+  <section class="card" style="margin-top: var(--space-lg);">
+    <h2 class="section-title">Account actions</h2>
+
+    {% if account.is_suspended %}
+    <form method="post" action="/admin/moderation/user/{{ account.id }}/reinstate" class="inline-form">
+      {{ csrf_input() }}
+      <button type="submit" class="btn btn-primary btn-sm">Reinstate account</button>
+    </form>
+    {% else %}
+    <form method="post" action="/admin/moderation/user/{{ account.id }}/suspend" style="margin-bottom: var(--space-md);">
+      {{ csrf_input() }}
+      <div class="form-group">
+        <label class="form-label" for="reason">Suspend — reason (optional)</label>
+        <input type="text" id="reason" name="reason" class="form-input" maxlength="255"
+               placeholder="Shown to the user when they try to sign in">
+      </div>
+      <button type="submit" class="btn btn-danger btn-sm">Suspend account</button>
+    </form>
+    {% endif %}
+
+    <hr style="margin: var(--space-md) 0;">
+
+    <details class="danger-zone">
+      <summary class="text-danger">Delete this account permanently</summary>
+      <p class="text-sm text-muted">
+        This removes the account and everything it owns — posts, comments, likes,
+        bookmarks, follows and notifications. This cannot be undone.
+      </p>
+      <form method="post" action="/admin/users/{{ account.id }}/delete">
+        {{ csrf_input() }}
+        <div class="form-group">
+          <label class="form-label" for="confirm">Type <strong>{{ account.username }}</strong> to confirm</label>
+          <input type="text" id="confirm" name="confirm" class="form-input" autocomplete="off"
+                 placeholder="{{ account.username }}">
+        </div>
+        <button type="submit" class="btn btn-danger btn-sm">Delete account</button>
+      </form>
+    </details>
+  </section>
+  {% else %}
+  <section class="card" style="margin-top: var(--space-lg);">
+    <p class="text-sm text-muted">
+      Administrator accounts are managed from the command line (manage.py), not
+      from this panel — they cannot be suspended or deleted here.
+    </p>
+  </section>
+  {% endif %}
+
+  {% if recent_posts %}
+  <section class="card" style="margin-top: var(--space-lg);">
+    <h2 class="section-title">Recent posts</h2>
+    <table class="data-table">
+      <tbody>
+        {% for p in recent_posts %}
+        <tr>
+          <td><a href="/blog/{{ p.slug }}">{{ p.title }}</a></td>
+          <td class="text-sm text-muted">{{ p.state_label }}</td>
+          <td class="text-sm text-muted">{{ p.created_at.strftime('%Y-%m-%d') if p.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if events %}
+  <section class="card" style="margin-top: var(--space-lg);">
+    <h2 class="section-title">Recent account events</h2>
+    <table class="data-table">
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td class="text-sm text-muted">{{ e.created_at.strftime('%Y-%m-%d %H:%M') if e.created_at else '—' }}</td>
+          <td><span class="mono text-sm">{{ e.event_type }}</span></td>
+          <td class="text-sm text-muted">{{ (e.detail or '')[:80] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

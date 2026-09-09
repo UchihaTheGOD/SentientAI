@@ -1,18 +1,18 @@
 """Public-facing routes — homepage, about, contact, profile."""
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
 from app.database import get_db
 from app.models.user import User
-from app.models.blog_post import BlogPost, BLOG_CATEGORIES
+from app.models.blog_post import POST_PUBLISHED, BlogPost, BLOG_CATEGORIES
 from app.models.social import PostLike, Follow
 from app.services.auth_service import get_current_user, get_current_user_optional
+from app.services.content import public_posts_query
+from app.template_env import templates
 
 router = APIRouter(tags=["public"])
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -21,7 +21,9 @@ def index(
     user=Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    base_q = db.query(BlogPost).filter(BlogPost.published == True)
+    # `public_posts_query` is the single definition of "a visitor may see
+    # this": published and not moderator-hidden.
+    base_q = public_posts_query(db)
 
     # Featured: most-viewed
     featured_posts = base_q.order_by(desc(BlogPost.views)).limit(3).all()
@@ -36,7 +38,11 @@ def index(
     popular_authors = (
         db.query(User, func.count(BlogPost.id).label("post_count"))
         .join(BlogPost, BlogPost.user_id == User.id)
-        .filter(BlogPost.published == True)
+        .filter(
+            BlogPost.status == POST_PUBLISHED,
+            BlogPost.is_hidden == False,  # noqa: E712
+            User.is_suspended == False,  # noqa: E712
+        )
         .group_by(User.id)
         .order_by(func.count(BlogPost.id).desc())
         .limit(5)
@@ -95,12 +101,12 @@ def contact_submit(
 
 
 @router.get("/profile", response_class=HTMLResponse)
-def profile(
-    request: Request,
-    user: User = Depends(get_current_user),
-):
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
-        "current_user": user,
-        "user": user,
-    })
+def profile(user: User = Depends(get_current_user)):
+    """Legacy redirect to the public profile.
+
+    An older account page lived here before the public profile existed; it has
+    been retired. Everything it offered now lives on the public profile,
+    `/profile/edit` and `/account/password`, so keep the path working and send
+    people to their profile.
+    """
+    return RedirectResponse(f"/u/{user.username}", status_code=303)

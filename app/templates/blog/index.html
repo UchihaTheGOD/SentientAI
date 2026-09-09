@@ -1,52 +1,43 @@
 {% extends "base_public.html" %}
-{% block title %}Blog — Sentient{% endblock %}
+{% block title %}{{ heading or 'Blog' }} — Sentient{% endblock %}
+{% block meta_description %}{{ lead or 'Articles, essays and ideas from the community.' }}{% endblock %}
 
 {% block content %}
 <div class="explore-layout">
   <main>
-    <div class="explore-header">
-      <h1 class="explore-title">Blog</h1>
-      <p class="text-muted" style="margin-bottom:var(--space-lg);">Articles, essays, and ideas from our community.</p>
 
-      {# Category filters #}
+    <div class="explore-header">
+      <h1 class="explore-title">{{ heading or 'Blog' }}</h1>
+      <p class="page-lead">{{ lead }}</p>
+
       <div class="filter-tabs">
-        <a href="/blog" class="filter-tab {% if not active_category %}active{% endif %}">All</a>
+        <a href="/blog" class="filter-tab {% if not active_category and not active_tag %}active{% endif %}">All</a>
         {% for cat in categories %}
-        <a href="/blog?category={{ cat|urlencode }}" class="filter-tab {% if active_category == cat %}active{% endif %}">{{ cat }}</a>
+        <a href="/category/{{ cat|urlencode }}" class="filter-tab {% if active_category == cat %}active{% endif %}">{{ cat }}</a>
         {% endfor %}
+      </div>
+
+      <div class="sort-row">
+        <a href="{{ query_string(params, sort='') or '?' }}" class="sort-link {% if sort != 'popular' %}active{% endif %}">Latest</a>
+        <a href="{{ query_string(params, sort='popular') }}" class="sort-link {% if sort == 'popular' %}active{% endif %}">Most read</a>
+        {% if page.total %}
+        <span class="text-sm text-muted" style="margin-left:auto;">{{ page.total }} post{{ 's' if page.total != 1 }}</span>
+        {% endif %}
       </div>
     </div>
 
     {% if posts %}
     {% for post in posts %}
-    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-      <div class="post-card">
-        <div class="post-card-body">
-          <div class="post-card-meta">
-            <div class="post-card-author">
-              <div class="author-avatar">{{ post.author[0]|upper }}</div>
-              <span>{{ post.author }}</span>
-            </div>
-            <span class="post-card-date">{{ post.created_at.strftime('%b %d, %Y') if post.created_at else '' }}</span>
-            <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
-          </div>
-          <h2 class="post-card-title">{{ post.title }}</h2>
-          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-          <div class="post-card-footer">
-            <span class="post-card-stat">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {{ post.views or 0 }}
-            </span>
-            <span class="post-card-stat">{{ post.reading_time }} min read</span>
-          </div>
-        </div>
-      </div>
-    </a>
+    {% include "partials/post_card.html" with context %}
     {% endfor %}
+
+    {% include "partials/pagination.html" with context %}
     {% else %}
     <div class="empty-state">
       <div class="empty-state-icon">📝</div>
-      <h3>No posts yet{% if active_category %} in {{ active_category }}{% endif %}</h3>
+      <h3>
+        Nothing here yet{% if active_category %} in {{ active_category }}{% elif active_tag %} tagged {{ active_tag.name }}{% endif %}
+      </h3>
       <p>{% if current_user %}Be the first to write something.{% else %}Sign up and be the first to write.{% endif %}</p>
       {% if current_user %}
       <a href="/write" class="btn btn-primary">Write a post</a>
@@ -61,13 +52,14 @@
     {% if current_user %}
     <div class="sidebar-widget">
       <a href="/write" class="btn btn-primary" style="width:100%;justify-content:center;">+ Write a post</a>
+      <a href="/my/posts" class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:var(--space-sm);">Your posts</a>
     </div>
     {% endif %}
     <div class="sidebar-widget">
       <div class="sidebar-widget-title">Browse topics</div>
       <div class="category-chips">
         {% for cat in categories %}
-        <a href="/blog?category={{ cat|urlencode }}" class="tag {% if active_category == cat %}tag--active{% endif %}">{{ cat }}</a>
+        <a href="/category/{{ cat|urlencode }}" class="tag {% if active_category == cat %}tag--active{% endif %}">{{ cat }}</a>
         {% endfor %}
       </div>
     </div>

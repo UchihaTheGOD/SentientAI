@@ -55,6 +55,24 @@ def unread_notifications(context) -> int:
 
 
 @jinja2.pass_context
+def unread_messages(context) -> int:
+    """Unread direct-message count for the header badge (0 when anonymous)."""
+    user = context.get("current_user") or context.get("user")
+    if not user or not getattr(user, "id", None):
+        return 0
+    from app.database import SessionLocal
+    from app.services import messaging
+
+    db = SessionLocal()
+    try:
+        return messaging.unread_count(db, user.id)
+    except Exception:
+        return 0
+    finally:
+        db.close()
+
+
+@jinja2.pass_context
 def canonical_url(context, path: str | None = None) -> str:
     request = context.get("request")
     if not request:
@@ -79,6 +97,7 @@ def query_string(params: dict, **overrides) -> str:
 templates.env.globals["csrf_input"] = csrf_input
 templates.env.globals["csrf_token"] = csrf_token
 templates.env.globals["unread_notifications"] = unread_notifications
+templates.env.globals["unread_messages"] = unread_messages
 templates.env.globals["canonical_url"] = canonical_url
 templates.env.globals["query_string"] = query_string
 

@@ -1,0 +1,93 @@
+{% extends "base_public.html" %}
+{% block title %}Review queue — Sentient Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/admin">Admin</a> <span class="breadcrumb-sep">›</span>
+    <span>Review queue</span>
+  </nav>
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Review queue</h1>
+      <p class="page-lead">
+        Highest-scoring candidates first. The score and band are advisory hints —
+        your decision is the only thing that makes a row usable. Rejections are kept with a reason.
+      </p>
+    </div>
+    <div class="mod-actions">
+      <span class="badge badge-yellow">{{ pending_count }} pending</span>
+      <a href="/admin/training/rejected" class="btn btn-outline btn-sm">Rejected</a>
+      <a href="/admin/export" class="btn btn-outline btn-sm">Export train (JSONL)</a>
+    </div>
+  </header>
+
+  {% if pending_examples %}
+  {% for ex in pending_examples %}
+  <div class="candidate-card">
+    <div class="candidate-head">
+      <div class="candidate-meta">
+        {% if ex.quality_band == 'useful' %}
+        <span class="badge badge-green">{{ band_labels.get(ex.quality_band, ex.quality_band) }}</span>
+        {% elif ex.quality_band == 'noisy' %}
+        <span class="badge badge-red">{{ band_labels.get(ex.quality_band, ex.quality_band) }}</span>
+        {% elif ex.quality_band %}
+        <span class="badge badge-yellow">{{ band_labels.get(ex.quality_band, ex.quality_band) }}</span>
+        {% endif %}
+        <span class="mono text-sm">score {{ ex.quality_score }}</span>
+        {% if ex.state == 'needs_edit' %}<span class="badge badge-yellow">Needs editing</span>{% endif %}
+        <span class="text-muted text-sm">predicted “{{ ex.model_prediction or '—' }}”</span>
+      </div>
+    </div>
+
+    {% if ex.quality_notes %}
+    <ul class="candidate-notes">
+      {% for note in ex.quality_notes.split('\n') %}{% if note %}<li>{{ note }}</li>{% endif %}{% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="candidate-body">{{ ex.instruction }}
+
+Input: {{ ex.input_text[:300] }}
+
+Output: {{ ex.output_text[:300] }}</div>
+
+    <div class="candidate-actions">
+      <form method="post" action="/admin/training/{{ ex.id }}/approve" class="inline-form">
+        {{ csrf_input() }}
+        <input type="hidden" name="next" value="/admin/training">
+        <input type="text" name="label" placeholder="human label (optional)" maxlength="80"
+               class="form-input form-input--inline">
+        <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+      </form>
+
+      <form method="post" action="/admin/training/{{ ex.id }}/reject" class="inline-form">
+        {{ csrf_input() }}
+        <input type="hidden" name="next" value="/admin/training">
+        <select name="reason" class="form-input form-input--inline">
+          {% for reason in rejection_reasons %}
+          <option value="{{ reason }}">{{ reason }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+      </form>
+
+      <form method="post" action="/admin/training/{{ ex.id }}/needs-edit" class="inline-form">
+        {{ csrf_input() }}
+        <input type="hidden" name="next" value="/admin/training">
+        <button type="submit" class="btn btn-outline btn-sm">Needs edit</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <p>No candidates awaiting review.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
