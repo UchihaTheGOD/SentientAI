@@ -1,0 +1,60 @@
+{% extends "base_public.html" %}
+{% block title %}Comments — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <header class="page-head">
+    <h1 class="page-title">Comments</h1>
+    <p class="page-lead">{{ comments.total }} comment{{ '' if comments.total == 1 else 's' }}.</p>
+  </header>
+
+  {% if done %}
+  <div class="alert alert-success" data-autodismiss>
+    {% if done == 'comment-deleted' %}Comment deleted.{% else %}Done.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if comments.items %}
+  <table class="data-table">
+    <thead>
+      <tr><th>Comment</th><th>Author</th><th>On post</th><th>When</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in comments.items %}
+      <tr>
+        <td class="text-sm">
+          {{ c.body | plain | truncate(120) }}
+          {% if c.is_deleted %}<span class="badge">deleted by author</span>{% endif %}
+          {% if c.is_hidden %}<span class="badge badge-red">hidden</span>{% endif %}
+        </td>
+        <td class="text-sm">
+          {% set author = authors.get(c.user_id) %}
+          {% if author %}<a href="/admin/users/{{ author.id }}">@{{ author.username }}</a>{% else %}—{% endif %}
+        </td>
+        <td class="text-sm">
+          {% set post = posts.get(c.post_id) %}
+          {% if post %}<a href="/blog/{{ post.slug }}">{{ post.title | truncate(40) }}</a>{% else %}—{% endif %}
+        </td>
+        <td class="text-sm text-muted">{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/comments/{{ c.id }}/delete" class="inline-form"
+                data-confirm="Delete this comment permanently?">
+            {{ csrf_input() }}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% set page = comments %}
+  {% include "partials/pagination.html" with context %}
+  {% else %}
+  <div class="empty-state"><p>No comments yet.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

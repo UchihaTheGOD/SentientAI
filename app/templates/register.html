@@ -17,9 +17,12 @@
     {% endif %}
 
     <form method="post" action="/register" data-once>
+      {{ csrf_input() }}
+      <input type="hidden" name="next" value="{{ next or '/' }}">
       <div class="form-group">
         <label class="form-label" for="username">Username</label>
         <input type="text" id="username" name="username" class="form-input"
+               value="{{ username or '' }}"
                required minlength="3" maxlength="50"
                pattern="[a-zA-Z0-9_]+"
                title="Letters, numbers, and underscores only"
@@ -29,7 +32,7 @@
       <div class="form-group">
         <label class="form-label" for="email">Email</label>
         <input type="email" id="email" name="email" class="form-input"
-               required autocomplete="email">
+               value="{{ email or '' }}" required autocomplete="email">
       </div>
       <div class="form-group">
         <label class="form-label" for="password">Password</label>
@@ -48,7 +51,8 @@
     </form>
 
     <div class="auth-footer">
-      Already have an account? <a href="/login">Sign in</a>
+      Already have an account?
+      <a href="/login{% if next and next != '/' %}?next={{ next|urlencode }}{% endif %}">Sign in</a>
     </div>
   </div>
 </div>

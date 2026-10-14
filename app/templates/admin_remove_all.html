@@ -1,0 +1,42 @@
+{% extends "base_public.html" %}
+{% block title %}Remove all users — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  {% include "partials/admin_nav.html" %}
+
+  <p><a href="/admin/users" class="text-sm">‹ Back to users</a></p>
+
+  <header class="page-head">
+    <h1 class="page-title text-danger">Remove all users</h1>
+  </header>
+
+  <section class="card danger-zone">
+    <p>
+      This permanently deletes <strong>every non-administrator account</strong>
+      ({{ normal_count }} account{{ '' if normal_count == 1 else 's' }}) and all of
+      their content — posts, comments, likes, bookmarks, follows and
+      notifications.
+    </p>
+    <p class="text-sm text-muted">
+      Administrator accounts and system configuration are preserved. This action
+      cannot be undone. It runs as a single transaction: it either completes
+      fully or changes nothing.
+    </p>
+
+    <form method="post" action="/admin/users/remove-all">
+      {{ csrf_input() }}
+      <div class="form-group">
+        <label class="form-label" for="confirm">
+          To confirm, type <strong>REMOVE ALL USERS</strong> below
+        </label>
+        <input type="text" id="confirm" name="confirm" class="form-input" autocomplete="off"
+               placeholder="REMOVE ALL USERS">
+      </div>
+      <button type="submit" class="btn btn-danger">Remove all users</button>
+      <a href="/admin/users" class="btn btn-ghost">Cancel</a>
+    </form>
+  </section>
+</div>
+{% endblock %}

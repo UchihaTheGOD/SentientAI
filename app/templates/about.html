@@ -1,74 +1,77 @@
 {% extends "base_public.html" %}
 {% set user = current_user %}
-{% block title %}About — SentientAI{% endblock %}
-{% block meta_description %}Learn about SentientAI — what it is, how the testing labs work, what Sentinel does, and why lab isolation matters.{% endblock %}
+{% block title %}About — Sentient{% endblock %}
+{% block meta_description %}Sentient is a community for people who write — essays, tutorials, notes and project write-ups, published in the open and discussed in good faith.{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="about-header">
-        <h1>About SentientAI</h1>
-        <p class="about-lead">SentientAI is a cybersecurity learning platform built around isolated labs, structured detection, and a human-verified knowledge pipeline.</p>
+<div class="page-wrap page-wrap--narrow">
+
+  <header class="page-head">
+    <h1 class="page-title">About Sentient</h1>
+    <p class="page-lead">A community for people who write things down.</p>
+  </header>
+
+  <div class="prose">
+    <p>Sentient is a publishing community. People write essays, tutorials, notes,
+    reviews and project write-ups here, and other people read them, respond to
+    them and argue with them. That is the whole idea.</p>
+
+    <p>There is no algorithmic timeline deciding what deserves your attention.
+    You follow the writers you want to hear from, browse the topics you care
+    about, and the rest stays out of your way.</p>
+
+    <h2>How it works</h2>
+    <p>Everything on Sentient starts with someone writing a post.</p>
+    <ul>
+      <li><strong>Write</strong> — drafts are private until you publish them, and
+        you can unpublish or archive anything you have second thoughts about.</li>
+      <li><strong>Discover</strong> — posts are organised by topic and tag, with
+        recent, popular and trending views so good writing does not sink.</li>
+      <li><strong>Follow</strong> — following a writer puts their new posts in
+        your feed. Nothing else does.</li>
+      <li><strong>Discuss</strong> — comments and replies sit under each post.
+        Likes are a signal, not a scoreboard.</li>
+      <li><strong>Save</strong> — bookmark anything you want to come back to.</li>
+    </ul>
+
+    <h2>What we expect</h2>
+    <p>The short version: write in good faith, and assume the same of everyone
+    else.</p>
+    <ul>
+      <li>Publish your own work, and credit the work of others.</li>
+      <li>Disagree with the argument, not the person making it.</li>
+      <li>No harassment, no spam, no impersonation.</li>
+      <li>Do not post other people's private information.</li>
+    </ul>
+    <p>Posts and comments can be reported, and a reported item is reviewed by a
+    human before anything happens to it. Moderation decisions are recorded.</p>
+
+    <h2>Your account</h2>
+    <p>An account needs a username, an email address and a password — that is
+    all. Your email address is never shown on your profile or to other members.
+    Your display name, bio, location and website are optional and are the only
+    profile details anyone else can see.</p>
+    <p>You can change your password at any time from
+    <a href="/account/password">your account settings</a>, and edit or clear any
+    profile field from <a href="/profile/edit">your profile</a>.</p>
+
+    <h2>Getting in touch</h2>
+    <p>Questions, suggestions, or something broken? The
+    <a href="/contact">contact form</a> reaches us directly. If you are reporting
+    a specific post or comment, use the report link on the item itself — it gives
+    us the context we need to act.</p>
+  </div>
+
+  {% if not current_user %}
+  <div class="about-cta">
+    <h2>Start writing</h2>
+    <p>Reading is free and always will be. Writing takes an account.</p>
+    <div class="about-cta-actions">
+      <a href="/register" class="btn btn-primary btn-lg">Create an account</a>
+      <a href="/explore" class="btn btn-ghost btn-lg">Browse posts first</a>
     </div>
+  </div>
+  {% endif %}
 
-    <div class="about-sections">
-        <section class="about-section">
-            <h2>What SentientAI is</h2>
-            <p>SentientAI is a platform for learning cybersecurity through practice. It provides controlled, isolated lab environments where security researchers and learners can safely explore how attacks work — and how to detect and defend against them.</p>
-            <p>The platform is not a scanning tool, not a penetration testing service, and not a way to attack real systems. All activity happens inside sandboxed simulations with no connection to production infrastructure.</p>
-        </section>
-
-        <section class="about-section">
-            <h2>The Testing Environment</h2>
-            <p>The testing environment is a separate area of the platform, accessible only to approved tester accounts. Inside the testing environment, users can:</p>
-            <ul>
-                <li>Browse and launch security labs covering common vulnerability types</li>
-                <li>Submit test inputs against realistic but isolated target applications</li>
-                <li>View structured detection results and telemetry for every interaction</li>
-                <li>Review Sentinel AI analysis that separates observations from inferences</li>
-                <li>Explore the knowledge base that grows from reviewed lab findings</li>
-            </ul>
-            <p>The testing environment looks and feels different from the public website — it is designed for focused, technical security research work.</p>
-        </section>
-
-        <section class="about-section">
-            <h2>What Sentinel is</h2>
-            <p>Sentinel is SentientAI's local cybersecurity analysis model. Currently running <strong>SentinelSmolLM2-360M-V9</strong>, Sentinel analyzes security events from the labs and produces structured assessments.</p>
-            <p>Sentinel's output always distinguishes between three categories:</p>
-            <ul>
-                <li><strong>Observed</strong> — What actually happened, based on telemetry and evidence</li>
-                <li><strong>Inferred</strong> — What the model believes is likely, based on patterns and context</li>
-                <li><strong>Unknown</strong> — What cannot be determined from available evidence</li>
-            </ul>
-            <p>This distinction is fundamental. Sentinel is designed to be honest about what it does and does not know.</p>
-        </section>
-
-        <section class="about-section">
-            <h2>How learning works</h2>
-            <p>When an attack is detected in a lab, the system generates a <em>knowledge candidate</em> — a structured lesson capturing what was observed and analyzed. This candidate goes through a review queue:</p>
-            <ol>
-                <li>Lab event generates telemetry</li>
-                <li>Detection engine and Sentinel analyze the event</li>
-                <li>A knowledge candidate is created with a confidence score</li>
-                <li>A human reviewer approves, edits, or rejects the candidate</li>
-                <li>Approved knowledge enters the platform's learning base</li>
-                <li>Approved examples can be exported for model training</li>
-            </ol>
-            <p>Nothing becomes "knowledge" without human review. The platform never automatically publishes AI-generated content.</p>
-        </section>
-
-        <section class="about-section">
-            <h2>Why labs are isolated</h2>
-            <p>Lab isolation is a hard requirement, not a suggestion. Every lab operates under these constraints:</p>
-            <ul>
-                <li>Labs use simulated data — no real user information, credentials, or system files are involved</li>
-                <li>SQL injection labs query fake in-memory databases, not real database servers</li>
-                <li>XSS labs simulate rendering behavior without executing scripts in real browsers</li>
-                <li>Command injection labs use safe simulators — no real system commands are ever executed</li>
-                <li>Path traversal labs operate on virtual filesystems with no access to real directories</li>
-                <li>No lab can reach the host machine, production databases, or external targets</li>
-            </ul>
-            <p>The goal is education and research, not exploitation.</p>
-        </section>
-    </div>
 </div>
 {% endblock %}

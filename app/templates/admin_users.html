@@ -1,0 +1,71 @@
+{% extends "base_public.html" %}
+{% block title %}Users — Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Users</h1>
+      <p class="page-lead">{{ users.total }} account{{ '' if users.total == 1 else 's' }}.</p>
+    </div>
+    <a href="/admin/users/remove-all" class="btn btn-danger btn-sm">Remove all users…</a>
+  </header>
+
+  {% if done %}
+  <div class="alert alert-success" data-autodismiss>
+    {% if done == 'user-deleted' %}Account deleted.
+    {% elif done.startswith('removed-') %}Removed {{ done[8:] }} account(s). Only administrators remain.
+    {% else %}Done.{% endif %}
+  </div>
+  {% endif %}
+
+  <form method="get" action="/admin/users" class="filter-row" style="margin-bottom: var(--space-md);">
+    <input type="search" name="q" value="{{ q }}" class="form-input" placeholder="Search username or email"
+           style="max-width: 20rem;">
+    <select name="role" class="form-input" style="max-width: 10rem;">
+      <option value="">Any role</option>
+      <option value="user" {% if role == 'user' %}selected{% endif %}>User</option>
+      <option value="admin" {% if role == 'admin' %}selected{% endif %}>Admin</option>
+    </select>
+    <select name="status" class="form-input" style="max-width: 10rem;">
+      <option value="">Any status</option>
+      <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+      <option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Suspended</option>
+    </select>
+    <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+  </form>
+
+  {% if users.items %}
+  <table class="data-table">
+    <thead>
+      <tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for u in users.items %}
+      <tr>
+        <td><a href="/admin/users/{{ u.id }}">{{ u.display }}</a>
+            <div class="text-sm text-muted">@{{ u.username }}</div></td>
+        <td class="text-sm">{{ u.email }}</td>
+        <td>{% if u.role == 'admin' %}<span class="badge badge-yellow">admin</span>{% else %}user{% endif %}</td>
+        <td>
+          {% if u.is_suspended %}<span class="badge badge-red">suspended</span>
+          {% elif not u.is_active %}<span class="badge">inactive</span>
+          {% else %}<span class="badge badge-green">active</span>{% endif %}
+        </td>
+        <td class="text-sm text-muted">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '—' }}</td>
+        <td><a href="/admin/users/{{ u.id }}" class="btn btn-ghost btn-sm">Manage</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% set page = users %}
+  {% include "partials/pagination.html" with context %}
+  {% else %}
+  <div class="empty-state"><p>No accounts match those filters.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

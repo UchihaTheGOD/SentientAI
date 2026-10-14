@@ -1,0 +1,99 @@
+"""Training example curation — score, review, promote, export.
+
+Two rules shape this module.
+
+1. **Nothing is promoted automatically.** A row arrives as `CANDIDATE` and stays
+   there until an admin calls `review_example`. `safe_to_train` is set only by
+   `TrainingExample.apply_review`, which also records who decided and when.
+2. **Rejected rows are kept.** The previous version deleted them, which threw
+   away the only record of what the pipeline got wrong. Rejection is now a
+   status change plus a reason from a fixed vocabulary, so the filtered-out set
+   stays available for error analysis.
+
+Export only ever emits rows where `is_trainable` is true, and only from the
+`train` split, so evaluation data cannot leak into a fine-tune.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import List, Optional
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.models.learning import (
+    APPROVED, CANDIDATE, DUPLICATE, EXAMPLE_STATUSES, NEEDS_EDIT, REJECTED,
+    REJECTION_REASONS, SPLIT_EVAL, SPLIT_TRAIN,
+)
+from app.models.training_example import TrainingExample
+
+PENDING_STATUSES = (CANDIDATE, NEEDS_EDIT)
+
+
+# ---------------------------------------------------------------------------
+# De-duplication
+# ---------------------------------------------------------------------------
+
+def dedup_hash(instruction: str, input_text: str) -> str:
+    """Stable fingerprint of what an example teaches.
+
+    Whitespace and case are normalised so two submissions that differ only in
+    formatting collapse onto one hash. The output text is deliberately excluded:
+    two examples with the same prompt but different answers are a labelling
+    conflict, not two useful rows.
+    """
+    normalised = re.sub(r"\s+", " ", f"{instruction or ''}\n{input_text or ''}").strip().lower()
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
+def find_duplicate(db: Session, digest: str, exclude_id: int | None = None) -> Optional[TrainingExample]:
+    query = db.query(TrainingExample).filter(TrainingExample.dedup_hash == digest)
+    if exclude_id is not None:
+        query = query.filter(TrainingExample.id != exclude_id)
+    return query.order_by(TrainingExample.id.asc()).first()
+
+
+# ---------------------------------------------------------------------------
+# Queries
+# ---------------------------------------------------------------------------
+
+def get_pending_examples(db: Session, limit: int = 50) -> List[TrainingExample]:
+    """Candidates awaiting a human, best-scoring first.
+
+    Ordering by score means a reviewer sees the examples most likely to be worth
+    keeping before the noise, rather than whatever happened to arrive last.
+    """
+    return (
+        db.query(TrainingExample)
+        .filter(TrainingExample.status.in_(PENDING_STATUSES))
+        .order_by(
+            TrainingExample.quality_score.desc(),
+            TrainingExample.created_at.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+
+def get_approved_examples(db: Session, split: str | None = None) -> List[TrainingExample]:
+    """Approved AND human-cleared rows. `safe_to_train` is checked, not assumed."""
+    query = db.query(TrainingExample).filter(
+        TrainingExample.status == APPROVED,
+        TrainingExample.safe_to_train == True,  # noqa: E712 — SQL, not Python
+    )
+    if split is not None:
+        query = query.filter(TrainingExample.split == split)
+    return query.order_by(TrainingExample.created_at.desc()).all()
+
+
+def get_rejected_examples(db: Session, limit: int = 200) -> List[TrainingExample]:
+    """Kept on purpose: this is the record of what was filtered out and why."""
+    return (
+        db.query(TrainingExample)
+        .filter(TrainingExample.status.in_((REJECTED, DUPLICATE)))
+        .order_by(TrainingExample.reviewed_at.desc())
+        .limit(limit)
+        .all()
+    )

@@ -16,6 +16,7 @@
   {% endif %}
 
   <form method="POST" action="/profile/edit" data-once>
+    {{ csrf_input() }}
     <div class="form-group">
       <label class="form-label" for="display_name">Display name</label>
       <input type="text" id="display_name" name="display_name" class="form-input"

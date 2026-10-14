@@ -10,25 +10,7 @@
     {% if recent_posts %}
     <div class="section-title">Recent posts</div>
     {% for post in recent_posts %}
-    <a href="/blog/{{ post.slug }}" style="text-decoration:none;display:block;">
-      <div class="post-card">
-        <div class="post-card-body">
-          <div class="post-card-meta">
-            <div class="post-card-author">
-              <div class="author-avatar">{{ post.author[0]|upper }}</div>
-              <span>{{ post.author }}</span>
-            </div>
-            <span class="post-card-date">{{ post.created_at.strftime('%b %d') if post.created_at else '' }}</span>
-            <span class="tag" style="margin-left:auto;">{{ post.category }}</span>
-          </div>
-          <h2 class="post-card-title">{{ post.title }}</h2>
-          <p class="post-card-excerpt">{{ post.display_excerpt }}</p>
-          <div class="post-card-footer">
-            <span class="post-card-stat">{{ post.reading_time }} min read</span>
-          </div>
-        </div>
-      </div>
-    </a>
+    {% include "partials/post_card.html" with context %}
     {% endfor %}
     <div style="text-align:center;margin-top:var(--space-lg);">
       <a href="/explore" class="btn btn-ghost">Explore more posts →</a>
@@ -77,7 +59,7 @@
         {% for author, count in top_contributors %}
         <a href="/u/{{ author.username }}" class="author-item">
           <div class="author-avatar author-avatar--lg">
-            {% if author.avatar_url %}<img src="{{ author.avatar_url }}" alt="">{% else %}{{ author.display[0]|upper }}{% endif %}
+            {% if author.avatar_url | safe_url %}<img src="{{ author.avatar_url | safe_url }}" alt="">{% else %}{{ author.display[0]|upper }}{% endif %}
           </div>
           <div class="author-item-info">
             <div class="author-item-name">{{ author.display }}</div>

@@ -1,0 +1,10 @@
+# Test-only dependencies. Install with:
+#     pip install -r requirements.txt -r requirements-dev.txt
+#
+# httpx is here rather than in requirements.txt because the only thing that
+# needs it is Starlette's TestClient — the application itself imports httpx
+# solely inside `app/services/cyberllm_client.py`, which falls back to the
+# deterministic mock when the import or the call fails, so a production install
+# without it still runs.
+pytest==8.3.4
+httpx==0.28.1

@@ -1,0 +1,4 @@
+Pydantic is a FastAPI dependency but this codebase does NOT define Pydantic BaseModel schemas for request validation.
+Forms use FastAPI Form(...) with manual validators (_validate_registration, _validate_password, clean_text, safe_next).
+No code is invented here - see app/api/auth.py for the actual validation.
+FastAPI still uses Pydantic internally for query/path validation and for docs generation at /api/docs.

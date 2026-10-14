@@ -10,16 +10,8 @@ ACTIVITY_TYPES = [
     "blog_post_created",
     "blog_post_updated",
     "blog_post_published",
-    "lab_started",
-    "lab_completed",
-    "lab_attempt",
-    "attack_detected",
-    "attack_blocked",
-    "session_terminated",
-    "cyberllm_interaction",
-    "training_example_generated",
-    "training_example_approved",
-    "training_example_rejected",
+    "comment_posted",
+    "followed_user",
     "profile_updated",
 ]
 
@@ -33,7 +25,7 @@ class Activity(Base):
     description = Column(Text, nullable=False, default="")
 
     # Optional references — polymorphic linking to related entities
-    target_type = Column(String(50), nullable=True)   # e.g. "blog_post", "lab_session", "security_event"
+    target_type = Column(String(50), nullable=True)   # e.g. "blog_post", "comment", "user"
     target_id = Column(String(100), nullable=True)     # ID of the related entity (string for uuid compat)
 
     # Privacy: public activities show on public profile, private ones are user-only

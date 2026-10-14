@@ -1,0 +1,1 @@
+"""ATTACT checks package."""

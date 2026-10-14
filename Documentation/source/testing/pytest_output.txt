@@ -1,0 +1,30 @@
+........................................................................ [ 17%]
+........................................................................ [ 34%]
+........................................................................ [ 51%]
+........................................................................ [ 68%]
+........................................................................ [ 86%]
+......................s...................................               [100%]
+============================== warnings summary ===============================
+tests/test_activity.py: 24 warnings
+tests/test_admin.py: 118 warnings
+tests/test_auth.py: 25 warnings
+tests/test_blog_lifecycle.py: 53 warnings
+tests/test_csrf.py: 8 warnings
+tests/test_messages.py: 12 warnings
+tests/test_moderation.py: 79 warnings
+tests/test_password_reset.py: 33 warnings
+tests/test_public_routes.py: 72 warnings
+tests/test_sanitization.py: 19 warnings
+tests/test_scoring.py: 1 warning
+tests/test_social.py: 43 warnings
+tests/test_training_pipeline.py: 32 warnings
+  C:\Users\DARK\Desktop\wild clude\SentientAI\venv\Lib\site-packages\starlette\templating.py:161: DeprecationWarning: The `name` is not the first parameter anymore. The first parameter should be the `Request` instance.
+  Replace `TemplateResponse(name, {"request": request})` by `TemplateResponse(request, name)`.
+    warnings.warn(
+
+tests/test_activity.py::test_me_redirects_to_your_own_public_profile
+  C:\Users\DARK\Desktop\wild clude\SentientAI\venv\Lib\site-packages\passlib\handlers\argon2.py:716: DeprecationWarning: Accessing argon2.__version__ is deprecated and will be removed in a future release. Use importlib.metadata directly to query for argon2-cffi's packaging metadata.
+    _argon2_cffi.__version__, max_version)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+

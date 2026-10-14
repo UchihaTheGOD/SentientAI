@@ -1,0 +1,16 @@
+{% extends "base_public.html" %}
+{% block title %}Slow down — Sentient{% endblock %}
+
+{% block content %}
+<div class="container container--narrow error-page">
+    <p class="error-code">429</p>
+    <h1 class="error-title">You're doing that a bit too often</h1>
+    <p class="error-text">
+        To keep things running smoothly we limit how frequently an action can be
+        repeated. Wait about {{ retry_after or 60 }} seconds and try again.
+    </p>
+    <div class="error-actions">
+        <a href="/" class="btn btn-primary">Back home</a>
+    </div>
+</div>
+{% endblock %}

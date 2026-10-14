@@ -1,0 +1,100 @@
+"""SentientAI management CLI — user and database administration.
+
+Usage:
+    python manage.py create-admin --username X --email Y --password Z
+    python manage.py set-role --username X --role admin
+    python manage.py list-users
+    python manage.py seed-admin              # create the initial admin (idempotent)
+    python manage.py remove-all-users        # delete every non-admin account
+    python manage.py reset-db --yes          # DESTRUCTIVE: drop, recreate, seed one admin
+"""
+import argparse
+import sys
+from app.database import SessionLocal, init_db
+from app.models.user import User
+from app.services.auth_service import hash_password
+
+
+VALID_ROLES = ("user", "admin")
+
+# The initial administrator. These are the project's fixed bootstrap credentials;
+# change the password after first sign-in in any real deployment.
+INITIAL_ADMIN_USERNAME = "admin"
+INITIAL_ADMIN_EMAIL = "admin@12345"
+INITIAL_ADMIN_PASSWORD = "admin@12345"
+
+
+def create_admin(args):
+    """Create a new admin user."""
+    init_db()
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(
+            (User.username == args.username) | (User.email == args.email)
+        ).first()
+        if existing:
+            print(f"[ERROR] User already exists: {existing.username} ({existing.email})")
+            sys.exit(1)
+
+        user = User(
+            username=args.username,
+            email=args.email,
+            password_hash=hash_password(args.password),
+            role="admin",
+        )
+        db.add(user)
+        db.commit()
+        print(f"[OK] Admin user created: {args.username} ({args.email})")
+    finally:
+        db.close()
+
+
+def set_role(args):
+    """Change the role of an existing user."""
+    if args.role not in VALID_ROLES:
+        print(f"[ERROR] Invalid role: {args.role}. Valid: {', '.join(VALID_ROLES)}")
+        sys.exit(1)
+
+    init_db()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == args.username).first()
+        if not user:
+            print(f"[ERROR] User not found: {args.username}")
+            sys.exit(1)
+
+        old_role = user.role
+        user.role = args.role
+        db.commit()
+        print(f"[OK] {args.username}: {old_role} -> {args.role}")
+    finally:
+        db.close()
+
+
+def list_users(args):
+    """List all users with their roles."""
+    init_db()
+    db = SessionLocal()
+    try:
+        users = db.query(User).order_by(User.id).all()
+        if not users:
+            print("No users found.")
+            return
+
+        print(f"{'ID':<6} {'Username':<20} {'Email':<30} {'Role':<10} {'Active':<8}")
+        print("-" * 74)
+        for u in users:
+            print(f"{u.id:<6} {u.username:<20} {u.email:<30} {u.role:<10} {u.is_active!s:<8}")
+    finally:
+        db.close()
+
+
+def _get_or_create_user(db, username, email, display_name, bio):
+    """Fetch a seed author, creating it as a normal user if absent."""
+    user = db.query(User).filter(User.username == username).first()
+    if user:
+        return user
+    user = User(
+        username=username,
+        email=email,
+        password_hash=hash_password("ChangeMe123!"),

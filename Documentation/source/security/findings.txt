@@ -1,0 +1,22 @@
+SentientAI - Security Findings (honest, no invented mitigations)
+
+Verified (code + tests):
+- Argon2id m=19456 t=2 p=1 (OWASP minimum), unique salt per hash; only hash stored.
+- JWT HS256 httpOnly cookie {sub, tv, exp} 60m; token_version bump invalidates prior tokens (logout / password change / reset / suspend / delete).
+- CSRF double-submit HMAC-SHA256, httpOnly Lax 12h, must match cookie vs form field or X-CSRF-Token; /api/health exempt only.
+- require_admin on every /admin route (server-side, not link hiding); _review_redirect allow-list prevents open redirect; safe_next() prevents open redirect on login.
+- sanitize.py escape-first markdown-lite (bold/italic/code/block/blockquote/lists/links http/https/mailto only; safe_url blocks javascript:/data:/vbscript:, protocol-relative //).
+- CSP script-src 'self', X-Frame DENY, X-Content-Type nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy none; SecurityHeadersMiddleware outermost so CSRF rejections also get headers.
+- Password-reset: secrets.token_urlsafe 32B -> SHA-256 hash stored, single-use, 30min expiry, no-enumeration generic UI, no sensitive logging in production.
+- Sliding-window rate limits per bucket+ip+session (e.g. login 12/300s, register 6/900s) - in-memory dict+deque; Retry-After on 429.
+- Audit: audit_events + moderation_actions append-only, no passwords/tokens/cookies, IP stored as salted hash only; activity vs audit separation.
+- 5xx never leaks exception text (errors.py); add_middleware order SecurityHeaders outermost.
+
+Honest gaps:
+- SECRET_KEY dev fallback vs prod fail-fast (correct) but bootstrap admin is admin@12345 / admin@12345 with non-routable email - must be changed after first login.
+- No HSTS header (no https redirect in dev).
+- SQLite single-writer, file-backed; not for high concurrency (by design).
+- Rate limit is per-process in-memory (lost on restart, not shared).
+- Starlette TestClient deprecation warnings (warnings in test run, not failures).
+- Tests via TestClient only (no Playwright/browser tests).
+Claim only executed: pytest 417 passed, 1 skipped, 0 failed (see source/testing/).
