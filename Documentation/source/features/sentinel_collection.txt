@@ -1,0 +1,100 @@
+"""Collect training candidates from human moderation decisions.
+
+This is the *producer* end of the internal Sentinel pipeline — the one place
+that turns activity on the site into a training candidate. It is deliberately
+narrow, because two rules from the data policy meet here:
+
+  1. **A candidate is only ever born from a moderator's explicit decision on
+     reported content.** Never from arbitrary public posts or comments. The
+     material is real and a human has already judged it, which is exactly what
+     makes it worth learning from — and what keeps us clear of "auto-train on
+     whatever users typed."
+  2. **Producing a candidate changes nothing about what is trainable.** Every
+     row is written as ``CANDIDATE`` with ``safe_to_train=False``. The only path
+     to a dataset is still an admin review in ``app/services/training.py``.
+
+The candidate captures what a reviewer needs to judge the label later: the
+reported content (sanitised to plain text), the decision the moderator made,
+and the category the report *claimed* — stored as ``model_prediction``, i.e. a
+guess to be checked at review, never asserted as fact. Scoring (see
+``app/services/scoring.py``) is advisory triage only and cannot promote a row.
+
+Nothing here is imported by a public route handler; the only caller is the
+admin-only moderation flow (``app/api/moderation.py::log_action``).
+"""
+from __future__ import annotations
+
+import logging
+
+from sqlalchemy.orm import Session
+
+from app.models.blog_post import BlogPost
+from app.models.learning import CANDIDATE
+from app.models.moderation import REPORT_REASON_LABELS, Report
+from app.models.social import Comment
+from app.models.training_example import TrainingExample
+from app.services import audit, scoring
+from app.services import training as training_service
+from app.services.sanitize import strip_formatting
+
+logger = logging.getLogger("sentientai.collection")
+
+# The two labels a moderation decision can teach.
+_REMOVE = "remove"
+_KEEP = "keep"
+
+# Which moderation actions map to a clean keep/remove judgement on a single
+# piece of content, and how strong a signal each is for the scorer. Actions not
+# listed here (suspending an account, restoring content, resolving a report
+# administratively) do not label one item, so they produce nothing.
+_ACTION_DECISION = {
+    "post_hidden":      (_REMOVE, scoring.SIGNAL_STRONG),
+    "comment_hidden":   (_REMOVE, scoring.SIGNAL_STRONG),
+    "post_removed":     (_REMOVE, scoring.SIGNAL_STRONG),
+    "report_dismissed": (_KEEP,   scoring.SIGNAL_WEAK),
+}
+
+# Longest content snapshot we keep. A moderation example is about the decision,
+# not the full article body, so a short excerpt is enough and keeps the row lean.
+_MAX_CONTENT = 600
+# Below this the snapshot cannot teach anything; skip rather than store noise.
+_MIN_CONTENT_CHARS = 4
+
+
+def _content_snapshot(db: Session, target_type: str, target_id: int) -> str | None:
+    """Plain-text snapshot of the moderated item.
+
+    Returns ``None`` when there is no single piece of content to learn from
+    (a profile), or the content has since gone.
+    """
+    if target_type == "post":
+        post = db.query(BlogPost).filter(BlogPost.id == target_id).first()
+        if post is None:
+            return None
+        joined = "\n".join(p for p in (post.title or "", post.summary or "") if p)
+        return strip_formatting(joined, _MAX_CONTENT)
+    if target_type == "comment":
+        comment = db.query(Comment).filter(Comment.id == target_id).first()
+        if comment is None:
+            return None
+        return strip_formatting(comment.body, _MAX_CONTENT)
+    return None
+
+
+def _decision_text(verdict: str, target_type: str, reason: str | None,
+                   predicted: str | None) -> str:
+    """The 'answer' a reviewer is judging: what the moderator decided and why.
+
+    Prefers the moderator's own reason. Falls back to a generic, honest summary
+    that names the reported category rather than inventing a rationale.
+    """
+    reason = (reason or "").strip()
+    if verdict == _REMOVE:
+        if reason:
+            return f"Remove this {target_type}. {reason}"
+        label = REPORT_REASON_LABELS.get(predicted, "the community guidelines")
+        return (
+            f"Remove this {target_type}: a moderator reviewed the report "
+            f"(“{label}”) and confirmed it violates the community guidelines."
+        )
+    if reason:

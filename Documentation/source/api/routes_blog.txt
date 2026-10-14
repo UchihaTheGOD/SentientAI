@@ -1,0 +1,100 @@
+"""Blog routes — listing, reading, writing and the post lifecycle.
+
+Visibility is decided in one place (`app/services/content.py`), not per route:
+the listing pages only ever show published, unhidden posts, and the single-post
+page defers to `can_view_post`, so an author can preview their own draft while
+everyone else gets a plain 404 rather than a hint that the post exists.
+
+Post bodies are stored exactly as the author typed them and rendered through the
+`content` filter (escape-first, then a small Markdown subset) — no template in
+this package uses `| safe` on user text.
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.blog_post import (
+    BLOG_CATEGORIES,
+    POST_ARCHIVED,
+    POST_DRAFT,
+    POST_PUBLISHED,
+    BlogPost,
+)
+from app.models.social import Bookmark, Comment, CommentLike, PostLike
+from app.models.tag import Tag
+from app.models.user import User
+from app.services import audit, tags as tag_service
+from app.services import admin_service
+from app.services.activity_service import log_activity
+from app.services.auth_service import get_current_user, get_current_user_optional
+from app.services.content import (
+    can_edit_post,
+    can_view_post,
+    post_card_context,
+    public_posts_query,
+    visible_comments_query,
+)
+from app.services.pagination import clamp_page, paginate
+from app.services.ratelimit import limit_post_write
+from app.services.sanitize import clean_text
+from app.template_env import templates
+
+router = APIRouter(tags=["blog"])
+
+MAX_TITLE = 300
+MIN_TITLE = 5
+MAX_SUMMARY = 300
+MAX_CONTENT = 100_000
+MIN_CONTENT = 20
+PER_PAGE = 10
+
+# What the "Save draft / Publish / Archive" buttons may ask for.
+POST_ACTIONS = {"draft": POST_DRAFT, "publish": POST_PUBLISHED, "archive": POST_ARCHIVED}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _slugify(text: str) -> str:
+    """Generate a URL-safe slug from a title."""
+    slug = (text or "").lower().strip()
+    slug = re.sub(r"[^\w\s-]", "", slug)
+    slug = re.sub(r"[\s_]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug[:190] or "post"
+
+
+def _unique_slug(db: Session, title: str, exclude_id: int | None = None) -> str:
+    base = _slugify(title)
+    slug = base
+    counter = 1
+    while True:
+        clash = db.query(BlogPost.id).filter(BlogPost.slug == slug)
+        if exclude_id is not None:
+            clash = clash.filter(BlogPost.id != exclude_id)
+        if clash.first() is None:
+            return slug
+        slug = f"{base}-{counter}"
+        counter += 1
+
+
+def _estimate_reading_time(content: str) -> int:
+    """Reading time in minutes (~200 wpm)."""
+    return max(1, round(len((content or "").split()) / 200))
+
+
+def _validate(title: str, category: str, content: str) -> list[str]:
+    """Field validation shared by create and edit. Returns human-readable errors."""
+    errors: list[str] = []
+    if len(title.strip()) < MIN_TITLE:
+        errors.append(f"Title must be at least {MIN_TITLE} characters.")
+    if len(title.strip()) > MAX_TITLE:
+        errors.append(f"Title must be under {MAX_TITLE} characters.")
+    # Whitelist check — the category is echoed back into pages, so it may only

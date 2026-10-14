@@ -1,0 +1,100 @@
+"""Advisory quality scoring for training candidates.
+
+This module answers one question — *how much should a human trust this candidate
+before reading it* — and nothing more. It is:
+
+* **Deterministic and rule-based.** No model is consulted, so the score of a
+  given candidate never drifts between runs. The signals are a coarse
+  moderation strength plus cheap, content-agnostic text checks.
+* **Advisory only.** Scoring decides what a reviewer sees first and how a
+  candidate is *triaged*; it never sets ``approved`` or ``safe_to_train``. The
+  only path to a trainable row is still ``TrainingExample.apply_review`` via a
+  human (see ``app/services/training.py``). A score is a hint, never a gate.
+
+The three bands map onto the triage vocabulary:
+
+* ``useful``  — a clear moderation signal and a well-formed answer; most likely
+  worth keeping.
+* ``review``  — ambiguous: no signal, thin evidence, or a duplicate of something
+  already collected. A human should look before it counts.
+* ``noisy``   — junk: empty/too-short input, mostly non-printable, or padded.
+  Kept (never auto-deleted) but sunk to the bottom of the queue.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import List
+
+# Coarse strength of the upstream signal that produced this candidate. The
+# moderation review is the only producer today; the value is deliberately a
+# small vocabulary, not a probability, so scoring stays a stable hint.
+SIGNAL_STRONG = "strong"
+SIGNAL_WEAK = "weak"
+SIGNAL_NONE = "none"
+SIGNALS = (SIGNAL_STRONG, SIGNAL_WEAK, SIGNAL_NONE)
+
+# Triage bands (persisted on TrainingExample.quality_band).
+BAND_USEFUL = "useful"
+BAND_REVIEW = "review"
+BAND_NOISY = "noisy"
+BANDS = (BAND_USEFUL, BAND_REVIEW, BAND_NOISY)
+
+BAND_LABELS = {
+    BAND_USEFUL: "Likely useful",
+    BAND_REVIEW: "Needs a look",
+    BAND_NOISY: "Probably noise",
+}
+
+# Score thresholds. A hard noisy signal (see below) overrides these downward.
+_USEFUL_AT = 65
+_REVIEW_AT = 35
+
+_BASE = 50
+_MIN, _MAX = 0, 100
+
+# Below this many non-whitespace characters the input cannot teach anything.
+_MIN_INPUT_CHARS = 4
+_LONG_INPUT_CHARS = 2000
+# Fraction of control/non-printable characters that marks input as junk.
+_NONPRINTABLE_RATIO = 0.15
+# A helpful answer usually names a concrete action; these are cheap markers.
+_DEFENSE_MARKERS = (
+    "recommend", "remove", "report", "block", "review", "warn", "escalat",
+    "moderat", "guideline", "policy", "context", "because",
+)
+
+
+@dataclass
+class ScoreResult:
+    """The outcome of scoring one candidate."""
+    score: int
+    band: str
+    notes: List[str] = field(default_factory=list)
+
+    @property
+    def notes_text(self) -> str:
+        return "\n".join(self.notes)
+
+
+def _nonprintable_ratio(text: str) -> float:
+    if not text:
+        return 0.0
+    bad = sum(1 for ch in text if ch != "\n" and ch != "\t" and (ord(ch) < 32 or ord(ch) == 127))
+    return bad / len(text)
+
+
+def _looks_padded(text: str) -> bool:
+    """True when the input is dominated by one repeated token.
+
+    A long body made of ``spam spam spam`` teaches the shape of the padding,
+    not anything useful — the eval sets built later should not reward it.
+    """
+    tokens = text.split()
+    if len(tokens) < 8:
+        return False
+    unique = len(set(tokens))
+    return unique / len(tokens) < 0.25
+
+
+def score_candidate(
+    *,

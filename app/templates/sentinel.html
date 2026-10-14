@@ -1,0 +1,72 @@
+{% extends "base_public.html" %}
+{% block title %}Sentinel — Security Analysis{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <header class="page-head">
+    <div><h1 class="page-title">Sentinel — Security Log Analysis</h1><p class="page-lead">Local dual-model analysis. Log text is treated as untrusted data.</p></div>
+    <span class="badge {% if status.ready %}badge-green{% else %}badge-yellow{% endif %}">{% if status.ready %}ready{% else %}not ready: {{ status.reason }}{% endif %}</span>
+  </header>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="text-sm text-muted">Prompt: <code>{{ prompt_preview[:200] }}…</code> · <a href="/api/sentinel/prompt/status">status</a></div>
+    <div class="text-sm text-muted">Model A: {{ status.a }} {% if status.load_ms_a %}({{ status.load_ms_a }}ms){% endif %} · Model B: {{ status.b }} {% if status.load_ms_b %}({{ status.load_ms_b }}ms){% endif %}</div>
+  </div>
+  <div class="card">
+    <form id="analyze-form">
+      <label>Security log / event text
+        <textarea name="log_text" id="log_text" rows="8" maxlength="8000" placeholder="Paste log excerpt (max 8000 chars)" required style="width:100%"></textarea>
+      </label>
+      <label style="margin-top:0.75rem;display:block">Additional prompt (optional, max 2000)
+        <textarea name="extra_prompt" id="extra_prompt" rows="2" maxlength="2000" placeholder="Extra context for this analysis (trusted)" style="width:100%"></textarea>
+      </label>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+        <button type="submit" class="btn btn-primary" id="analyze-btn">Analyze</button>
+        <span id="analyze-status" class="text-sm text-muted"></span>
+      </div>
+    </form>
+  </div>
+  <div id="results" style="margin-top:1rem;display:none">
+    <div class="card">
+      <h3>Fusion verdict</h3>
+      <div id="fusion"></div>
+      <div id="evidence" class="text-sm" style="margin-top:0.5rem"></div>
+      <div id="disagreement" class="text-sm text-muted"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
+      <div class="card"><h4>Model A</h4><pre id="model-a" style="white-space:pre-wrap;word-break:break-word"></pre><div id="model-a-meta" class="text-sm text-muted"></div></div>
+      <div class="card"><h4>Model B</h4><pre id="model-b" style="white-space:pre-wrap;word-break:break-word"></pre><div id="model-b-meta" class="text-sm text-muted"></div></div>
+    </div>
+    <div id="incident-link" class="card" style="margin-top:1rem"></div>
+  </div>
+  {% if recent_incidents %}
+  <div class="card" style="margin-top:1rem"><h3>Recent incidents</h3><ul>{% for inc in recent_incidents %}<li>#{{ inc.id }} {{ inc.fused_verdict }} ({{ inc.fused_score }}) — {{ inc.status }} — {{ inc.created_at }}</li>{% endfor %}</ul><a href="/admin/sentinel/incidents">View all</a></div>
+  {% endif %}
+</div>
+<script>
+document.getElementById('analyze-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn = document.getElementById('analyze-btn');
+  const status = document.getElementById('analyze-status');
+  const log_text = document.getElementById('log_text').value;
+  const extra_prompt = document.getElementById('extra_prompt').value || null;
+  btn.disabled = true; status.textContent = 'Analyzing… (dual-model inference may take ~5-10s)';
+  document.getElementById('results').style.display='none';
+  try{
+    const res = await fetch('/api/sentinel/analyze', {method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': (document.querySelector('meta[name=csrf-token]')?.content||'')}, body: JSON.stringify({log_text, extra_prompt, max_new_tokens:180})});
+    const data = await res.json();
+    if(!res.ok){ status.textContent = 'Error: '+(data.detail||JSON.stringify(data)); return; }
+    document.getElementById('results').style.display='block';
+    document.getElementById('fusion').innerHTML = '<strong>'+(data.verdict||'')+'</strong> (score '+(data.risk_score ?? '')+')';
+    document.getElementById('evidence').innerHTML = (data.evidence||[]).map(ev=>'<div>• '+ev+'</div>').join('');
+    document.getElementById('disagreement').textContent = 'Agreement: '+(data.agreement===true?'agree':'')+(data.agreement===false?'disagree':data.agreement===null?'n/a':'')+' '+(data.agreement_detail||'')+' — '+((data.fusion&&data.fusion.note)||'');
+    document.getElementById('model-a').textContent = (data.model_a && data.model_a.text) || '(no output)';
+    document.getElementById('model-a-meta').textContent = (data.model_a && (data.model_a.status+' '+ (data.model_a.latency_ms||'')+'ms '+(data.model_a.error||''))) || '';
+    document.getElementById('model-b').textContent = (data.model_b && data.model_b.text) || '(no output)';
+    document.getElementById('model-b-meta').textContent = (data.model_b && (data.model_b.status+' '+ (data.model_b.latency_ms||'')+'ms '+(data.model_b.error||''))) || '';
+    const inc = data.incident_id ? '<a href="/admin/sentinel/incidents">Incident #'+data.incident_id+' created — review</a>' : 'No incident created';
+    document.getElementById('incident-link').innerHTML = inc + ' · latency '+ (data.latency_ms||'')+'ms';
+    status.textContent = 'Done';
+  }catch(err){ status.textContent = 'Network error: '+err.message; }
+  finally{ btn.disabled = false; }
+});
+</script>
+{% endblock %}

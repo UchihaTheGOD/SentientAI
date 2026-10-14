@@ -63,6 +63,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
+    # Sentinel: schedule background warm-load so readiness reflects real state
+    # without blocking startup (2-4s / ~1.9 GB). Kept inside lifespan so both
+    # the initial boot and every reload (run.py reload_dirs=["app"]) trigger it.
+    # The endpoint POST /api/sentinel/readiness/load remains the explicit sync path.
+    # Fail-open: missing torch/tokenizers must never crash the app.
+    try:
+        from app.services.sentinel_loader import init_sentinel  # local import: loader pulls config/tokenizer lazily
+        init_sentinel(background=True)
+        logger.info("Sentinel background load scheduled")
+    except Exception as exc:  # pragma: no cover — startup must not crash on model issues
+        logger.warning("sentinel background init failed: %s", exc)
     yield
 
 
@@ -89,7 +100,7 @@ def create_app() -> FastAPI:
 
     from app.api import (
         admin, auth, blog, community, feed, health, messages, moderation,
-        social, users,
+        sentinel, social, users,
     )
     application.include_router(health.router)
     application.include_router(auth.router)
@@ -101,6 +112,7 @@ def create_app() -> FastAPI:
     application.include_router(messages.router)
     application.include_router(moderation.router)
     application.include_router(admin.router)
+    application.include_router(sentinel.router)
 
     _register_error_handlers(application)
     return application

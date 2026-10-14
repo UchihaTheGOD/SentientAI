@@ -1,0 +1,73 @@
+{% extends "base_public.html" %}
+{% block title %}Sentinel Incidents — Admin{% endblock %}
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+  {% include "partials/admin_nav.html" %}
+  <header class="page-head"><div><h1 class="page-title">Sentinel incidents</h1><p class="page-lead">Provisional verdicts require human review before containment.</p></div>
+    <div><a href="/sentinel" class="btn btn-outline btn-sm">Analyze</a></div>
+  </header>
+  <div class="card">
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+      <a href="/admin/sentinel/incidents" class="btn btn-sm {% if not filter_status %}btn-primary{% else %}btn-ghost{% endif %}">All</a>
+      {% for s in ["pending_review","confirmed_threat","false_positive","inconclusive"] %}
+      <a href="/admin/sentinel/incidents?status={{ s }}" class="btn btn-sm {% if filter_status==s %}btn-primary{% else %}btn-ghost{% endif %}">{{ s }}</a>
+      {% endfor %}
+    </div>
+    {% if incidents %}
+    <table class="data-table"><thead><tr><th>ID</th><th>When</th><th>Verdict</th><th>Score</th><th>IP</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+    {% for inc in incidents %}
+    <tr>
+      <td>#{{ inc.id }}</td>
+      <td class="text-sm">{{ inc.created_at.strftime('%Y-%m-%d %H:%M') if inc.created_at else '' }}</td>
+      <td>{{ inc.fused_verdict }}</td>
+      <td>{{ inc.fused_score }}</td>
+      <td class="mono">{{ inc.ip_address or '—' }}</td>
+      <td><span class="badge">{{ inc.status }}</span></td>
+      <td>
+        <form method="post" action="/api/sentinel/incidents/{{ inc.id }}/review" class="inline-form" data-review>
+          <select name="status"><option value="confirmed_threat">confirmed_threat</option><option value="false_positive">false_positive</option><option value="inconclusive">inconclusive</option><option value="pending_review">pending_review</option></select>
+          <input type="text" name="note" placeholder="note" maxlength="500">
+          <button type="submit" class="btn btn-sm">Review</button>
+        </form>
+      </td>
+    </tr>
+    <tr><td colspan="7" class="text-sm" style="max-width:600px;white-space:pre-wrap;word-break:break-word;background:#fafafa">{{ inc.log_excerpt or inc.log_text[:800] }}<div class="text-muted">A: {{ (inc.model_a_text or '')[:200] }} | B: {{ (inc.model_b_text or '')[:200] }}</div></td></tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty-state"><p>No incidents.</p></div>{% endif %}
+  </div>
+  <div class="card" style="margin-top:1rem"><h3>Active temp blocks (application-layer; not firewall)</h3><p class="text-sm text-muted">Enforcement: <strong>account suspension</strong> and <strong>session revocation</strong> are real (DB). IP blocks are application-layer deny-list, not network firewall.</p>
+    <form id="block-form" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin:0.5rem 0">
+      <select name="kind"><option value="ip">ip</option><option value="account">account</option><option value="session">session</option></select>
+      <input name="value" placeholder="value (ip or user id)" required>
+      <input name="ttl_minutes" type="number" min="1" max="1440" value="30" style="width:80px">
+      <input name="reason" placeholder="reason">
+      <button type="submit" class="btn btn-danger btn-sm">Block (temporary)</button>
+    </form>
+    <table class="data-table"><thead><tr><th>ID</th><th>Kind</th><th>Value</th><th>Active</th><th>Expires</th><th></th></tr></thead>
+    <tbody>{% for b in blocks %}<tr><td>{{ b.id }}</td><td>{{ b.kind }}</td><td class="mono">{{ b.value }}</td><td>{{ b.active }}</td><td class="text-sm">{{ b.expires_at }}</td><td>{% if b.active %}<form method="post" action="/api/sentinel/blocks/{{ b.id }}/revoke"><button class="btn btn-sm">Revoke</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+  </div>
+</div>
+<script>
+document.querySelectorAll('form[data-review]').forEach(f=>{
+  f.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(f);
+    const status = fd.get('status'); const note = fd.get('note');
+    const url = f.getAttribute('action');
+    const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': document.querySelector('[name=csrf_token]')?.value || ''}, body: JSON.stringify({status, note})});
+    const data = await res.json();
+    if(res.ok){ location.reload(); } else { alert(data.detail||JSON.stringify(data)); }
+  });
+});
+document.getElementById('block-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {kind: fd.get('kind'), value: fd.get('value'), ttl_minutes: parseInt(fd.get('ttl_minutes')||'30',10), reason: fd.get('reason')||null};
+  const res = await fetch('/api/sentinel/blocks', {method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': document.querySelector('[name=csrf_token]')?.value || ''}, body: JSON.stringify(body)});
+  const data = await res.json();
+  if(res.ok) location.reload(); else alert(data.detail||JSON.stringify(data));
+});
+</script>
+{% endblock %}
