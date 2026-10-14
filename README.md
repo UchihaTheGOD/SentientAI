@@ -180,3 +180,51 @@ database. Key variables:
   messages, comments, …)
 - Security headers on every response (`X-Frame-Options: DENY`, `nosniff`, …)
 - No passwords, hashes, tokens, secrets or API keys are ever written to logs
+
+## ATTACT — Authorized Web Assessment Toolkit
+
+`ATTACT/` is a modular, read-only, low-rate toolkit for checking your own
+locally-running (or explicitly authorized) web app. It never modifies data,
+exfiltrates secrets, or performs DoS. Source and usage live in
+[`ATTACT/README.md`](ATTACT/README.md).
+
+- **Authorization-gated:** requires both `--target <URL>` and `--confirm-authorized`.
+  Default scope is loopback (`127.0.0.1`, `::1`, `localhost`); any other host must be
+  listed in `--allowlist`. Every URL and redirect hop is revalidated via
+  `getaddrinfo` + `ipaddress` (rejects `0.0.0.0`, creds-in-URL, DNS-rebinding).
+- **Safe by construction:** `http`/`https` only, sequential requests, per-request
+  `--timeout`, global `--max-requests`, manual redirect loop (`NoRedirect` +
+  `max_redirects=3`), and evidence redaction.
+- **12 checks (stdlib `urllib` only):** `security_headers`, `cookie_security`, `xss`,
+  `sqli`, `path_traversal`, `auth_session`, `access_control`, `csrf`,
+  `input_validation`, `rate_limit`, `cors`, `info_disclosure`.
+- **Usage:**
+
+  ```bash
+  python -m ATTACT --list-checks
+  python -m ATTACT --target http://127.0.0.1:8000 --confirm-authorized
+  python -m ATTACT --target http://127.0.0.1:8000 --confirm-authorized --checks security_headers,cookie_security --json-out attact-report.json
+  ```
+
+  See `ATTACT/README.md` for the full CLI, JSON schema, and Sentinel adapter
+  (`ATTACT/adapters/sentient.py` — read-only report formatter, admin-only).
+- **Limitations:** no exploitation/chaining/brute-force/DoS; `potential` findings
+  always need human confirmation; not a substitute for manual review or a licensed
+  pentest.
+
+## Sentinel — internal moderation assistant
+
+Sentinel is not a public feature. It runs behind `/admin` and turns a
+moderator's own review decisions into a human-curated dataset.
+
+- Two-model setup (`A`/`B`) with a `prompts/prompt.txt` base prompt plus optional
+  extra prompt; prompt resolution is repo-root-anchored and validated.
+- Readiness at `GET /api/sentinel/readiness` and background warm-load on startup
+  (`lifespan` schedules `init_sentinel(background=True)` fail-open so missing
+  `torch`/`tokenizers` never crashes the app; `POST /api/sentinel/readiness/load`
+  remains the synchronous path). Wiring: `app/database.py` imports
+  `sentinel_incident` so `init_db()` creates the table, `app/main.py` wires the
+  `sentinel` router.
+- Artifacts that must never be committed (covered by `.gitignore`): `local_models/`,
+  `*.pt`/`*.safetensors`/`*.bin`, `training_data*.jsonl`, `ATTACT/reports/` and
+  `attact-*.json`.

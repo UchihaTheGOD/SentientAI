@@ -1,10 +1,14 @@
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 data/*.db
 venv/
 .venv/
@@ -13,3 +17,27 @@ dist/
 build/
 .idea/
 .vscode/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+logs/
+# Sentinel artifacts, model weights, datasets — never commit (large + private)
+local_models/
+*.pt
+*.safetensors
+*.bin
+training_data*.jsonl
+local_models/sentinel/candidates/
+local_models/sentinel/active_candidate.txt
+# ATTACT generated reports
+attact-*.json
+attact-demo.json
+attact-report.json
+ATTACT/reports/
+# Local uploads / temp
+uploads/
+tmp/
+temp/
+*.tmp
+

@@ -1,0 +1,100 @@
+"""Reporting and moderation.
+
+Two tiers, enforced by dependencies rather than by hiding buttons:
+
+  * any signed-in user may *report* content (`/report`) — nothing else;
+  * only `require_admin` accounts may see the queue or act on content.
+
+Every administrative decision writes a `ModerationAction` row and an
+`AuditEvent`, so the queue is auditable after the fact. Hiding is reversible —
+we set `is_hidden` rather than deleting, so a mistaken call can be undone and
+the original content is still there for review.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.blog_post import BlogPost
+from app.models.moderation import (
+    MODERATION_ACTIONS, REPORT_DISMISSED, REPORT_OPEN, REPORT_REASON_LABELS,
+    REPORT_REASONS, REPORT_RESOLVED, REPORT_REVIEWING, REPORT_STATUSES,
+    REPORT_TARGETS, ModerationAction, Report,
+)
+from app.models.social import Comment
+from app.models.user import User
+from app.services import audit, collection
+from app.services.auth_service import get_current_user, require_admin
+from app.services.pagination import clamp_page, paginate
+from app.services.ratelimit import limit_report
+from app.services.sanitize import clean_text, strip_formatting
+from app.template_env import templates
+
+router = APIRouter(tags=["moderation"])
+
+MAX_DETAILS = 1000
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _target_label(db: Session, target_type: str, target_id: int) -> str | None:
+    """A short snapshot of what was reported, so the queue stays readable even
+    if the content is later edited or removed."""
+    if target_type == "post":
+        post = db.query(BlogPost).filter(BlogPost.id == target_id).first()
+        return post.title[:300] if post else None
+    if target_type == "comment":
+        comment = db.query(Comment).filter(Comment.id == target_id).first()
+        return strip_formatting(comment.body, 200) if comment else None
+    if target_type == "profile":
+        user = db.query(User).filter(User.id == target_id).first()
+        return f"@{user.username}" if user else None
+    return None
+
+
+def _target_exists(db: Session, target_type: str, target_id: int) -> bool:
+    model = {"post": BlogPost, "comment": Comment, "profile": User}.get(target_type)
+    if model is None:
+        return False
+    return db.query(model.id).filter(model.id == target_id).first() is not None
+
+
+def _target_url(target_type: str, target_id: int, db: Session) -> str:
+    if target_type == "post":
+        post = db.query(BlogPost).filter(BlogPost.id == target_id).first()
+        return f"/blog/{post.slug}" if post else "/blog"
+    if target_type == "comment":
+        comment = db.query(Comment).filter(Comment.id == target_id).first()
+        if comment:
+            post = db.query(BlogPost).filter(BlogPost.id == comment.post_id).first()
+            if post:
+                return f"/blog/{post.slug}#comment-{comment.id}"
+        return "/blog"
+    if target_type == "profile":
+        user = db.query(User).filter(User.id == target_id).first()
+        return f"/u/{user.username}" if user else "/community"
+    return "/"
+
+
+def log_action(
+    db: Session,
+    moderator: User,
+    action: str,
+    target_type: str,
+    target_id: int,
+    *,
+    reason: str | None = None,
+    report_id: int | None = None,
+    request: Request | None = None,
+) -> None:
+    """Record one moderation decision. Never silently skips an unknown action."""
+    if action not in MODERATION_ACTIONS:
+        raise ValueError(f"Unknown moderation action: {action}")
+    db.add(ModerationAction(
+        moderator_id=moderator.id,

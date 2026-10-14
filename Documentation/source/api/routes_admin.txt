@@ -1,0 +1,100 @@
+"""Admin panel routes.
+
+Every route in this module depends on `require_admin`, so authorization is
+enforced server-side on each endpoint rather than by hiding links — a normal
+user who guesses a URL gets a 403, not a page. The panel is intentionally
+small: overview, user management, content (posts/comments), reports, logs, the
+assistant's review queue, and read-only settings.
+"""
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.database import get_db
+from app.models.audit import AUDIT_EVENT_TYPES
+from app.models.blog_post import POST_PUBLISHED, POST_STATES, BlogPost
+from app.models.learning import EXAMPLE_STATUS_LABELS
+from app.models.moderation import REPORT_OPEN, REPORT_REVIEWING, Report
+from app.models.social import Comment
+from app.models.user import User
+from app.models.learning import NEEDS_EDIT, REJECTION_REASONS
+from app.models.training_example import TrainingExample
+from app.services import audit
+from app.services import admin_service
+from app.services.auth_service import require_admin
+from app.services.pagination import clamp_page, paginate
+from app.services.sanitize import clean_text, strip_formatting
+from app.services import training as training_service
+from app.services.scoring import BAND_LABELS
+from app.template_env import templates
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Where a review action returns to. Restricted to a fixed allow-list so the
+# `next` form field can never be turned into an open redirect.
+_REVIEW_DESTINATIONS = {"/admin", "/admin/training"}
+
+
+def _review_redirect(next_to: str) -> RedirectResponse:
+    dest = next_to if next_to in _REVIEW_DESTINATIONS else "/admin"
+    return RedirectResponse(url=dest, status_code=303)
+
+
+@router.get("", response_class=HTMLResponse)
+def admin_dashboard(
+    request: Request,
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    total_users = db.query(func.count(User.id)).scalar() or 0
+    suspended_users = db.query(func.count(User.id)).filter(
+        User.is_suspended == True).scalar() or 0  # noqa: E712
+    total_posts = db.query(func.count(BlogPost.id)).scalar() or 0
+    published_posts = db.query(func.count(BlogPost.id)).filter(
+        BlogPost.status == POST_PUBLISHED).scalar() or 0
+    total_comments = db.query(func.count(Comment.id)).scalar() or 0
+    open_reports = db.query(func.count(Report.id)).filter(
+        Report.status.in_((REPORT_OPEN, REPORT_REVIEWING))).scalar() or 0
+
+    # Pending training examples awaiting review.
+    pending = training_service.get_pending_examples(db)
+    pending_count = len(pending)
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "user": user,
+        "current_user": user,
+        "stats": {
+            "total_users": total_users,
+            "suspended_users": suspended_users,
+            "total_posts": total_posts,
+            "published_posts": published_posts,
+            "total_comments": total_comments,
+            "open_reports": open_reports,
+            "pending_review": pending_count,
+        },
+        # Kept for backwards compatibility with anything reading these directly.
+        "total_users": total_users,
+        "pending_examples": pending,
+        "pending_count": pending_count,
+        "recent_events": audit.recent(db, limit=12),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Users
+# ---------------------------------------------------------------------------
+
+@router.get("/users", response_class=HTMLResponse)
+def admin_users(
+    request: Request,
+    q: str = Query(""),
+    role: str = Query(""),
+    status: str = Query(""),
+    page: int = Query(1),
+    done: str = Query(""),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
