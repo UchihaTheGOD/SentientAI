@@ -163,6 +163,7 @@ def init_db(bind=None) -> None:
     import app.models.moderation  # noqa: F401
     import app.models.audit  # noqa: F401
     import app.models.sentinel_incident  # noqa: F401
+    import app.models.attact_assessment  # noqa: F401
     target = bind or engine
     Base.metadata.create_all(bind=target)
     _run_migrations(target)

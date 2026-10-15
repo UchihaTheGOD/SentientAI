@@ -20,4 +20,6 @@
      href="/admin/logs">Logs</a>
   <a class="filter-chip {% if path.startswith('/admin/settings') %}filter-chip--active{% endif %}"
      href="/admin/settings">Settings</a>
+  <a class="filter-chip {% if path.startswith('/admin/security') or path.startswith('/admin/sentinel') %}filter-chip--active{% endif %}"
+     href="/admin/security">Security</a>
 </nav>

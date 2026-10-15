@@ -92,9 +92,12 @@ def create_app() -> FastAPI:
     )
 
     # Innermost first: CSRF needs request.state before handlers run, security
-    # headers must wrap everything including CSRF rejections.
+    # headers must wrap everything including CSRF rejections. SecurityEvents
+    # is outermost so it sees correlation_id/duration for all inner responses.
     application.add_middleware(CSRFMiddleware)
     application.add_middleware(SecurityHeadersMiddleware)
+    from app.middleware.security_events import SecurityEventsMiddleware
+    application.add_middleware(SecurityEventsMiddleware)
 
     application.mount("/static", StaticFiles(directory="app/static"), name="static")
 
@@ -102,6 +105,9 @@ def create_app() -> FastAPI:
         admin, auth, blog, community, feed, health, messages, moderation,
         sentinel, social, users,
     )
+    from app.api.security_a import router as security_router
+    import app.api.security_b  # noqa: F401 — registers triage/demo on same router
+    from app.api.admin_security import router as admin_security_router
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
@@ -113,6 +119,8 @@ def create_app() -> FastAPI:
     application.include_router(moderation.router)
     application.include_router(admin.router)
     application.include_router(sentinel.router)
+    application.include_router(security_router)
+    application.include_router(admin_security_router)
 
     _register_error_handlers(application)
     return application

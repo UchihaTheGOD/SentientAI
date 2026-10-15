@@ -1,4 +1,8 @@
-"""Sentinel API — readiness, analysis, prompt admin, incidents & containment."""
+"""Sentinel API — readiness, analysis, prompt admin, incidents & containment.
+
+Extension for spec sections 8-12: structured parsing + fuse_structured + demo enrichment.
+Now also persists SecurityEvent per analyze and reuses incident deduplication logic.
+"""
 from __future__ import annotations
 import time
 import logging
@@ -70,6 +74,31 @@ class AnalyzeRequest(BaseModel):
     extra_prompt: str | None = Field(default=None, max_length=MAX_EXTRA_CHARS)
     max_new_tokens: int = Field(default=180, ge=16, le=256)
     create_incident: bool = Field(default=True)
+
+def _dedup_incident_key(db: Session, ip: str | None, log_text: str) -> str | None:
+    """Hash of (ip, log head) for 10-min dedup window."""
+    import hashlib
+    key = hashlib.sha256(f"{ip or ''}:{(log_text or '')[:600]}".encode()).hexdigest()[:24]
+    # look for recent incident with same key in last 10 min
+    from datetime import datetime, timezone, timedelta
+    from app.models.sentinel_incident import SentinelIncident
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+    # dedup via containment_meta marker (lightweight, non-destructive)
+    rows = db.query(SentinelIncident).filter(SentinelIncident.created_at >= cutoff).all()
+    for r in rows:
+        if r.containment_meta and key in (r.containment_meta or ""):
+            return r.id  # signal duplicate
+    return None
+
+def _structured_or_fallback(req_text: str, inference: dict):
+    try:
+        from app.services.sentinel_schema import fuse_structured
+        return fuse_structured(req_text, inference)
+    except Exception as e:
+        logger.warning("fuse_structured failed: %s", e)
+        from app.services.sentinel_fusion import fuse, evaluate_rules
+        legacy = fuse(req_text, inference)
+        return {"legacy_fusion": legacy, "fused_verdict": legacy.get("fused_verdict"), "fused_score": legacy.get("fused_score"), "rules": legacy.get("rules"), "components": legacy.get("components")}
 
 @router.post("/api/sentinel/analyze")
 def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db), user: User | None = Depends(get_current_user)):

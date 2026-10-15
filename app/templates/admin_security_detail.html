@@ -1,0 +1,11 @@
+﻿{% extends "base_public.html" %}
+{% block title %}Assessment Detail{% endblock %}
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+  {% include "partials/admin_nav.html" %}
+  <h1>Assessment #{{ assessment.id }} {{ assessment.run_id }}</h1>
+  <p class="text-sm">{{ assessment.target }} — {{ assessment.request_count }} req</p>
+  <table class="data-table"><thead><tr><th>Check</th><th>Status</th><th>Sev</th><th>Summary</th><th>Triage</th></tr></thead>
+  <tbody>{% for f in findings %}<tr><td>{{ f.check_name }}</td><td>{{ f.status }}</td><td>{{ f.severity }}</td><td class="text-sm" style="max-width:420px">{{ f.summary[:300] }}</td><td>{{ f.triage_status }}</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}
