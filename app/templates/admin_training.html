@@ -41,6 +41,10 @@
         <span class="mono text-sm">score {{ ex.quality_score }}</span>
         {% if ex.state == 'needs_edit' %}<span class="badge badge-yellow">Needs editing</span>{% endif %}
         <span class="text-muted text-sm">predicted “{{ ex.model_prediction or '—' }}”</span>
+        {% if ex.sentinel_status %}
+        <span class="badge {% if ex.sentinel_label=='likely_threat' %}badge-red{% elif ex.sentinel_label=='needs_review' %}badge-yellow{% elif ex.sentinel_label=='likely_benign' %}badge-green{% else %}badge-yellow{% endif %}">AI: {{ ex.sentinel_label or ex.sentinel_status }}{% if ex.sentinel_category %} · {{ ex.sentinel_category }}{% endif %}{% if ex.sentinel_confidence %} · conf {{ ex.sentinel_confidence }}{% endif %}</span>
+        {% if ex.sentinel_status in ['empty','error','skipped_not_ready','unavailable','timeout','repetition','pad_immediate'] %}<span class="text-muted text-sm">model {{ ex.sentinel_status }} — human review required</span>{% endif %}
+        {% endif %}
       </div>
     </div>
 

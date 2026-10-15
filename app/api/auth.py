@@ -15,6 +15,7 @@ from app.services.auth_service import (
     create_access_token, get_current_user, get_current_user_optional,
     hash_password, verify_password,
 )
+from app.services.security_events import log_event as _sec_log_event
 from app.services import password_reset as reset_service
 from app.services.ratelimit import limit_login, limit_password, limit_register
 from app.template_env import templates
@@ -176,6 +177,60 @@ def login(
         # Deliberately identical message for "no such user" and "wrong password"
         # so the form cannot be used to enumerate accounts.
         audit.record(db, "auth.login_failed", detail=f"username={username[:50]}", request=request)
+        try:
+            # SecurityEvents audit trail: do NOT reveal existence, store only existence-flag in evidence (redacted)
+            _sec_log_event(
+                db,
+                event_type="auth.login_failed",
+                category="auth",
+                severity="medium",
+                confidence="high",
+                source="auth",
+                request=request,
+                route="/login",
+                method="POST",
+                http_status=400,
+                evidence=f"failed login username_len={len(username)} exists={bool(user)}",
+                meta={"username_exists": bool(user)},
+            )
+        except Exception:
+            pass
+        # Repeated failed-login pattern (brute-force) using security_events as store
+        try:
+            from datetime import datetime, timezone, timedelta
+            from app.services.security_events import trusted_client_ip
+            from app.models.attact_assessment import SecurityEvent as _SE2
+            ip = None
+            try:
+                ip = trusted_client_ip(request)
+            except Exception:
+                ip = None
+            window_since = datetime.now(timezone.utc) - timedelta(minutes=10)
+            q = db.query(_SE2).filter(_SE2.event_type == "auth.login_failed", _SE2.created_at >= window_since)
+            if ip:
+                q = q.filter(_SE2.ip_address == ip)
+            recent_count = q.count()
+            if recent_count >= 5:
+                last_bf = db.query(_SE2).filter(_SE2.event_type == "auth.brute_force", _SE2.created_at >= window_since)
+                if ip:
+                    last_bf = last_bf.filter(_SE2.ip_address == ip)
+                if last_bf.first() is None:
+                    _sec_log_event(
+                        db,
+                        event_type="auth.brute_force",
+                        category="auth",
+                        severity="high",
+                        confidence="medium",
+                        source="auth",
+                        request=request,
+                        route="/login",
+                        method="POST",
+                        http_status=400,
+                        evidence=f"repeated failed logins {recent_count} in 10m from {ip or 'unknown'} threshold 5",
+                        meta={"failed_count": recent_count, "window_minutes": 10},
+                    )
+        except Exception:
+            pass
         return fail("Incorrect username or password.")
 
     if not user.is_active:

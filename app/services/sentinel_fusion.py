@@ -15,20 +15,83 @@ def _extract_ips(text: str) -> list[str]:
         except Exception:
             pass
     return list(dict.fromkeys(out))
+
+def _segment_log_text(text: str) -> list[str]:
+    if not text or not text.strip():
+        return []
+    tmp = text
+    tmp = re.sub(r'\s*\|\s*', '\n', tmp)
+    tmp = re.sub(r'\s*;\s*', '\n', tmp)
+    tmp = re.sub(r'\}\s*\{', '}\n{', tmp)
+    tmp = re.sub(r'\}\s*,\s*\{', '}\n{', tmp)
+    tmp = re.sub(r'(?=\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', '\n', tmp)
+    tmp = re.sub(r'(?=\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', '\n', tmp)
+    segments = [s.strip() for s in tmp.splitlines() if s.strip()]
+    if len(segments) == 1 and len(text) > 200:
+        alt = re.sub(r'(?=\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b.*?(?:failed|401|403))', '\n', tmp, flags=re.IGNORECASE)
+        alt_segs = [s.strip() for s in alt.splitlines() if s.strip()]
+        if len(alt_segs) > len(segments):
+            segments = alt_segs
+    return segments if segments else [text.strip()]
+
+def _segment_has_failed(seg: str) -> bool:
+    t = seg.lower()
+    if re.search(r'\blogin failed\b|\bauthentication failed\b|\bfailed login\b|\bfailed\b|\binvalid\b|\bunauthorized\b', t):
+        return True
+    if re.search(r'\b401\b|\b403\b', t):
+        return True
+    return False
+
 def _count_failed_logins(text: str) -> int:
-    t = (text or "").lower()
-    lines = t.splitlines()
-    c = 0
-    for ln in lines:
-        if any(k in ln for k in ["failed", "invalid", "unauthorized", " 401", " 403", "login failed", "authentication failed"]):
-            c += 1
-    return c
+    """Count failed-login events robustly across formatting variants."""
+    if not text or not text.strip():
+        return 0
+    segments = _segment_log_text(text)
+    if len(segments) > 1:
+        return sum(1 for s in segments if _segment_has_failed(s))
+    seg = segments[0] if segments else ""
+    if not seg:
+        return 0
+    t = seg.lower()
+    pattern = re.compile(r'login failed|authentication failed|failed login|failed|invalid|unauthorized|\b401\b|\b403\b')
+    hits = [(m.start(), m.end(), m.group(0)) for m in pattern.finditer(t)]
+    if not hits:
+        return 0
+    collapsed = 0
+    i = 0
+    while i < len(hits):
+        collapsed += 1
+        cur_end = hits[i][1]
+        j = i + 1
+        while j < len(hits) and hits[j][0] - cur_end < 40:
+            cur_type = "status" if hits[j][2] in ("401", "403") else "primary" if hits[i][2] not in ("401","403") else "status"
+            hit_type = "status" if hits[i][2] in ("401","403") else "primary"
+            nxt_type = "status" if hits[j][2] in ("401","403") else "primary"
+            if hit_type != nxt_type:
+                gap = t[cur_end:hits[j][0]]
+                if "} " in gap or "}{" in gap:
+                    break
+                cur_end = hits[j][1]
+                j += 1
+            else:
+                # same type nearby: count as separate event (e.g. "login failed login failed")
+                break
+        i = j
+    return collapsed
+
 def _success_after_fail(text: str) -> bool:
     t = (text or "").lower()
-    lines = t.splitlines()
-    fail_idx = next((i for i,l in enumerate(lines) if any(k in l for k in ["failed","invalid","unauthorized"," 401"," 403"])), -1)
-    succ_idx = next((i for i,l in enumerate(lines) if any(k in l for k in ["login success","authenticated"," 200"," success"])), -1)
-    return succ_idx > fail_idx and fail_idx != -1 and succ_idx != -1
+    if not t.strip():
+        return False
+    fail_pat = re.compile(r"failed|invalid|unauthorized|\b401\b|\b403\b|login failed|authentication failed")
+    succ_pat = re.compile(r"login success|authenticated|\b200\b| success")
+    fail_m = fail_pat.search(t)
+    if not fail_m:
+        return False
+    for sm in succ_pat.finditer(t):
+        if sm.start() > fail_m.start():
+            return True
+    return False
 def _port_scan_indicators(text: str) -> tuple[bool, list[str]]:
     t = (text or "")
     ports = re.findall(r"port\s+(\d{1,5})", t, re.IGNORECASE)

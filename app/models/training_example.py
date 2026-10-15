@@ -62,6 +62,17 @@ class TrainingExample(Base):
     provenance = Column(String(60), default="moderation_flag", nullable=False)
     dedup_hash = Column(String(64), nullable=True, index=True)
 
+    # ---- Sentinel moderation (honest: actual model output, never fabricated) --
+    # Saved separately from deterministic score/band; never gates approval.
+    sentinel_status = Column(String(30), nullable=True)
+    sentinel_raw_text = Column(Text, nullable=True)
+    sentinel_parsed_json = Column(Text, nullable=True)  # validated JSON string or None
+    sentinel_label = Column(String(30), nullable=True)
+    sentinel_category = Column(String(30), nullable=True)
+    sentinel_confidence = Column(String(20), nullable=True)
+    sentinel_latency_ms = Column(Integer, nullable=True)
+    sentinel_model = Column(String(10), nullable=True)
+
     # -- helpers -----------------------------------------------------------
     @property
     def state(self) -> str:

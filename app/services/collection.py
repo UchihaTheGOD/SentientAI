@@ -161,6 +161,33 @@ def collect_from_moderation(
             is_duplicate=is_duplicate,
         )
 
+        # Honest Sentinel moderation: only if ready + budget; save actual result separately.
+        sentinel_info = None
+        try:
+            from app.services.sentinel_loader import get_status as _sent_status
+            _st = _sent_status()
+            _ready = bool(_st.ready)
+            # Budget guard: respect max_pos
+            if _ready:
+                from app.services import sentinel_moderation as _sm
+                # Invoke on the reported content snapshot (untrusted data as data)
+                sentinel_info = _sm.run_moderation_for_text(content, max_new_tokens=_sm.MAX_MODERATION_TOKENS, timeout_s=_sm.TIMEOUT_S)
+            else:
+                sentinel_info = {"status": "skipped_not_ready", "json_valid": False, "parsed": None, "error": "model_not_ready", "raw_text": "", "text": "", "tokens": 0, "latency_ms": 0}
+        except Exception as exc:
+            logger.warning("sentinel moderation invocation failed: %s", exc)
+            sentinel_info = {"status": "error", "json_valid": False, "parsed": None, "error": str(exc)[:300], "raw_text": "", "text": "", "tokens": 0, "latency_ms": 0}
+        # Prepare sentinel columns for storage (honest, may be not-ready/empty)
+        _sent_status_val = (sentinel_info or {}).get("status")
+        _sent_raw = (sentinel_info or {}).get("raw_text") or (sentinel_info or {}).get("text") or ""
+        _sent_parsed = (sentinel_info or {}).get("parsed")
+        import json as _json
+        _sent_parsed_json = _json.dumps(_sent_parsed) if _sent_parsed else None
+        _sent_label = (_sent_parsed or {}).get("label") if _sent_parsed else None
+        _sent_category = (_sent_parsed or {}).get("category") if _sent_parsed else None
+        _sent_conf = str((_sent_parsed or {}).get("confidence")) if _sent_parsed and (_sent_parsed or {}).get("confidence") is not None else None
+        _sent_lat = (sentinel_info or {}).get("latency_ms")
+        _sent_model = (sentinel_info or {}).get("model")
         example = TrainingExample(
             instruction=instruction,
             input_text=input_text,
@@ -175,6 +202,14 @@ def collect_from_moderation(
             quality_band=result.band,
             quality_notes=result.notes_text or None,
             dedup_hash=digest,
+            sentinel_status=_sent_status_val,
+            sentinel_raw_text=_sent_raw[:2000] if _sent_raw else None,
+            sentinel_parsed_json=_sent_parsed_json,
+            sentinel_label=_sent_label,
+            sentinel_category=_sent_category,
+            sentinel_confidence=_sent_conf,
+            sentinel_latency_ms=_sent_lat,
+            sentinel_model=_sent_model,
         )
         db.add(example)
         db.commit()

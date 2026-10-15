@@ -1,0 +1,2069 @@
+{
+  "meta": {
+    "n_cases": 26,
+    "with_models": false,
+    "timestamp": "20261015_233304",
+    "model": "sentinel_best_model.pt + best_autolab_checkpoint.pt, vocab 7053, max_pos 768"
+  },
+  "cases": [
+    {
+      "id": "benign-01",
+      "category": "benign",
+      "subcategory": "word_contains_select",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:00 INFO user alice viewed SELECTION committee report 200",
+      "log_len": 73,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-02",
+      "category": "benign",
+      "subcategory": "normal_fetch",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:01 INFO user bob fetched /blog/hello-world 200",
+      "log_len": 63,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-03",
+      "category": "benign",
+      "subcategory": "passwd_no_traversal",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:02 INFO backup stored etc/passwd snapshot without traversal 200",
+      "log_len": 80,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-04",
+      "category": "benign",
+      "subcategory": "single_401",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:03 WARN 192.168.1.50 GET /login 401 one failure",
+      "log_len": 64,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 1,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [
+            "192.168.1.50"
+          ],
+          "failed_count": 1,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-05",
+      "category": "benign",
+      "subcategory": "task_failed_disk",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:04 ERROR Task failed: disk full on host db01",
+      "log_len": 61,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 1,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 1,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-06",
+      "category": "benign",
+      "subcategory": "normal_api_200",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:05 INFO 10.0.0.5 GET /api/posts 200 duration 12ms",
+      "log_len": 66,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [
+            "10.0.0.5"
+          ],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-07",
+      "category": "benign",
+      "subcategory": "nmap_doc",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:06 INFO docs: nmap is discussed in chapter 3",
+      "log_len": 61,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 35,
+        "evidence": [
+          "port scan keyword present"
+        ],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 35,
+          "verdict": "needs_review",
+          "evidence": [
+            "port scan keyword present"
+          ],
+          "risks": [
+            "port_scan"
+          ],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": true
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 35,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 35,
+            "evidence": [
+              "port scan keyword present"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "benign-08",
+      "category": "benign",
+      "subcategory": "failed_fetch_resource",
+      "ground_truth": "benign",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:07 WARN failed to fetch resource /blog/hello-world 200",
+      "log_len": 71,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 25,
+        "evidence": [
+          "successful login after repeated failures (possible brute-force success)"
+        ],
+        "failed_count": 1,
+        "latency_ms": 0,
+        "raw": {
+          "score": 25,
+          "verdict": "likely_benign",
+          "evidence": [
+            "successful login after repeated failures (possible brute-force success)"
+          ],
+          "risks": [
+            "success_after_fail"
+          ],
+          "ips": [],
+          "failed_count": 1,
+          "success_after_fail": true,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 25,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 25,
+            "evidence": [
+              "successful login after repeated failures (possible brute-force success)"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "susp-01",
+      "category": "benign",
+      "subcategory": "two_failures",
+      "ground_truth": "suspicious",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:12 WARN 192.168.1.10 login failed 401\n2024-01-01 10:00:12 WARN 192.168.1.10 login failed 401",
+      "log_len": 109,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 2,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 2,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "susp-02",
+      "category": "benign",
+      "subcategory": "win_ini_no_dots",
+      "ground_truth": "suspicious",
+      "expected_verdict": "likely_benign",
+      "is_positive_gt": false,
+      "log_text": "2024-01-01 10:00:13 INFO user viewed win.ini docs 200",
+      "log_len": 53,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-01",
+      "category": "auth_abuse",
+      "subcategory": "brute_newline_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:00 WARN 192.168.1.10 login failed for user admin 401\n2024-01-01 10:00:01 WARN 192.168.1.10 login failed for user admin 401\n2024-01-01 10:00:02 WARN 192.168.1.10 login failed for user admin 401\n2024-01-01 10:00:03 WARN 192.168.1.10 login failed for user admin 401\n2024-01-01 10:00:04 WARN 192.168.1.10 login failed for user admin 401\n2024-01-01 10:00:05 WARN 192.168.1.10 login failed for user admin 401",
+      "log_len": 419,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-02",
+      "category": "auth_abuse",
+      "subcategory": "brute_singleline_space_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401",
+      "log_len": 329,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-03",
+      "category": "auth_abuse",
+      "subcategory": "brute_comma_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401, 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401, 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401, 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401, 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401, 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401",
+      "log_len": 334,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-04",
+      "category": "auth_abuse",
+      "subcategory": "brute_pipe_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 | 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 | 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 | 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 | 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401 | 2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401",
+      "log_len": 339,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-05",
+      "category": "auth_abuse",
+      "subcategory": "brute_json_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "{\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"} {\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"} {\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"} {\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"} {\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"} {\"event\":\"login\",\"status\":401,\"msg\":\"login failed\",\"ip\":\"192.168.1.10\"}",
+      "log_len": 431,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-06",
+      "category": "auth_abuse",
+      "subcategory": "brute_syslog_6",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "Jan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22\nJan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22\nJan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22\nJan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22\nJan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22\nJan 15 10:00:00 host sshd[123]: Failed password for admin from 192.168.1.10 port 22",
+      "log_len": 503,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-07",
+      "category": "auth_abuse",
+      "subcategory": "brute_mixed_ts",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01T10:00:00Z 192.168.1.10 login failed 401\nJan 15 10:00:05 host sshd: Failed password for root from 192.168.1.10\n2024-01-01 10:00:10 WARN 192.168.1.10 login failed 401\n2024-01-01 10:00:11 WARN 192.168.1.10 login failed 401\n2024-01-01 10:00:12 WARN 192.168.1.10 login failed 401\n2024-01-01 10:00:13 WARN 192.168.1.10 login failed 401",
+      "log_len": 340,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 40,
+        "evidence": [
+          "repeated failed logins: 6 occurrences (threshold 5)",
+          "single IP 192.168.1.10 repeated failures"
+        ],
+        "failed_count": 6,
+        "latency_ms": 0,
+        "raw": {
+          "score": 40,
+          "verdict": "needs_review",
+          "evidence": [
+            "repeated failed logins: 6 occurrences (threshold 5)",
+            "single IP 192.168.1.10 repeated failures"
+          ],
+          "risks": [
+            "auth_abuse"
+          ],
+          "ips": [
+            "192.168.1.10"
+          ],
+          "failed_count": 6,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 40,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 40,
+            "evidence": [
+              "repeated failed logins: 6 occurrences (threshold 5)",
+              "single IP 192.168.1.10 repeated failures"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-bf-08",
+      "category": "auth_abuse",
+      "subcategory": "success_after_fail_singleline",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "login failed 401 login failed 401 login failed 401 login failed 401 login failed 401 login success 200",
+      "log_len": 102,
+      "rules": {
+        "verdict": "likely_threat",
+        "score": 65,
+        "evidence": [
+          "repeated failed logins: 5 occurrences (threshold 5)",
+          "successful login after repeated failures (possible brute-force success)"
+        ],
+        "failed_count": 5,
+        "latency_ms": 0,
+        "raw": {
+          "score": 65,
+          "verdict": "likely_threat",
+          "evidence": [
+            "repeated failed logins: 5 occurrences (threshold 5)",
+            "successful login after repeated failures (possible brute-force success)"
+          ],
+          "risks": [
+            "auth_abuse",
+            "success_after_fail"
+          ],
+          "ips": [],
+          "failed_count": 5,
+          "success_after_fail": true,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_threat",
+        "score": 65,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_threat",
+            "score": 65,
+            "evidence": [
+              "repeated failed logins: 5 occurrences (threshold 5)",
+              "successful login after repeated failures (possible brute-force success)"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-scan-01",
+      "category": "port_scan",
+      "subcategory": "nmap_ports",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "nmap scan port 8000 open port 8001 open port 8002 open port 8003 open port 8004 open port 8005 open port 8006 open port 8007 open port 8008 open port 8009 open port 8010 open port 8011 open port 8012 open port 8013 open port 8014 open",
+      "log_len": 234,
+      "rules": {
+        "verdict": "needs_review",
+        "score": 35,
+        "evidence": [
+          "15 distinct ports probed: 8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010, 8011"
+        ],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 35,
+          "verdict": "needs_review",
+          "evidence": [
+            "15 distinct ports probed: 8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010, 8011"
+          ],
+          "risks": [
+            "port_scan"
+          ],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": true
+        }
+      },
+      "fusion": {
+        "verdict": "needs_review",
+        "score": 35,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "needs_review",
+            "score": 35,
+            "evidence": [
+              "15 distinct ports probed: 8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010, 8011"
+            ]
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-xss-01",
+      "category": "xss",
+      "subcategory": "reflected_tag",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:20 INFO GET /search?q=<script>alert(1)</script> 200",
+      "log_len": 68,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-sqli-01",
+      "category": "sqli",
+      "subcategory": "union_select",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:21 INFO GET /search?q=' UNION SELECT * FROM users-- 500",
+      "log_len": 72,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-trav-01",
+      "category": "traversal",
+      "subcategory": "dots_etc_passwd",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:22 INFO GET /download?file=../../etc/passwd 200",
+      "log_len": 64,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-cmdi-01",
+      "category": "cmdi",
+      "subcategory": "command_injection",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:30 INFO GET /api/run?cmd=; cat /etc/passwd 200",
+      "log_len": 63,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-ssrf-01",
+      "category": "ssrf",
+      "subcategory": "metadata_ip",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:31 INFO GET /fetch?url=http://169.254.169.254/latest/meta-data/ 200",
+      "log_len": 84,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [
+            "169.254.169.254"
+          ],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-ssti-01",
+      "category": "ssti",
+      "subcategory": "template",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:32 INFO GET /render?tpl={{7*7}} 200",
+      "log_len": 52,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    },
+    {
+      "id": "attack-upload-01",
+      "category": "upload",
+      "subcategory": "null_byte",
+      "ground_truth": "attack",
+      "expected_verdict": "likely_threat",
+      "is_positive_gt": true,
+      "log_text": "2024-01-01 10:00:33 INFO POST /upload filename=shell.php%00.jpg 200",
+      "log_len": 67,
+      "rules": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "evidence": [],
+        "failed_count": 0,
+        "latency_ms": 0,
+        "raw": {
+          "score": 0,
+          "verdict": "likely_benign",
+          "evidence": [],
+          "risks": [],
+          "ips": [],
+          "failed_count": 0,
+          "success_after_fail": false,
+          "port_scan": false
+        }
+      },
+      "fusion": {
+        "verdict": "likely_benign",
+        "score": 0,
+        "components": [
+          {
+            "source": "rules",
+            "verdict": "likely_benign",
+            "score": 0,
+            "evidence": []
+          },
+          {
+            "source": "model_a",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          },
+          {
+            "source": "model_b",
+            "verdict": null,
+            "score": null,
+            "evidence": [
+              "no verdict keyword in output"
+            ],
+            "status": "skipped"
+          }
+        ]
+      },
+      "model_a": null,
+      "model_b": null,
+      "agreement": null,
+      "fusion_latency_ms": 0
+    }
+  ],
+  "metrics": {
+    "rules": {
+      "n": 26,
+      "tp": 9,
+      "fp": 1,
+      "tn": 9,
+      "fn": 7,
+      "precision": 0.9,
+      "recall": 0.5625,
+      "f1": 0.6923076923076923,
+      "empty": 0,
+      "invalid_json": null,
+      "per_category": {
+        "benign": {
+          "tp": 0,
+          "fp": 1,
+          "tn": 9,
+          "fn": 0,
+          "n": 10
+        },
+        "auth_abuse": {
+          "tp": 8,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "n": 8
+        },
+        "port_scan": {
+          "tp": 1,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "n": 1
+        },
+        "xss": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "sqli": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "traversal": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "cmdi": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssrf": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssti": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "upload": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        }
+      }
+    },
+    "model_a": {
+      "n": 26,
+      "tp": 0,
+      "fp": 0,
+      "tn": 10,
+      "fn": 16,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null,
+      "empty": 26,
+      "invalid_json": 26,
+      "per_category": {
+        "benign": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 10,
+          "fn": 0,
+          "n": 10
+        },
+        "auth_abuse": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 8,
+          "n": 8
+        },
+        "port_scan": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "xss": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "sqli": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "traversal": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "cmdi": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssrf": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssti": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "upload": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        }
+      }
+    },
+    "model_b": {
+      "n": 26,
+      "tp": 0,
+      "fp": 0,
+      "tn": 10,
+      "fn": 16,
+      "precision": null,
+      "recall": 0.0,
+      "f1": null,
+      "empty": 26,
+      "invalid_json": 26,
+      "per_category": {
+        "benign": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 10,
+          "fn": 0,
+          "n": 10
+        },
+        "auth_abuse": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 8,
+          "n": 8
+        },
+        "port_scan": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "xss": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "sqli": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "traversal": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "cmdi": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssrf": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssti": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "upload": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        }
+      }
+    },
+    "fusion": {
+      "n": 26,
+      "tp": 9,
+      "fp": 1,
+      "tn": 9,
+      "fn": 7,
+      "precision": 0.9,
+      "recall": 0.5625,
+      "f1": 0.6923076923076923,
+      "empty": 0,
+      "invalid_json": null,
+      "per_category": {
+        "benign": {
+          "tp": 0,
+          "fp": 1,
+          "tn": 9,
+          "fn": 0,
+          "n": 10
+        },
+        "auth_abuse": {
+          "tp": 8,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "n": 8
+        },
+        "port_scan": {
+          "tp": 1,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "n": 1
+        },
+        "xss": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "sqli": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "traversal": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "cmdi": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssrf": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "ssti": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        },
+        "upload": {
+          "tp": 0,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "n": 1
+        }
+      }
+    }
+  }
+}

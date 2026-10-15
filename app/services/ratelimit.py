@@ -85,7 +85,7 @@ def reset() -> None:
 # Shared limit definitions — one place to tune them.
 # ---------------------------------------------------------------------------
 
-limit_login = rate_limit("login", 12, 300)
+limit_login = rate_limit("login", 30, 300)
 limit_register = rate_limit("register", 6, 900)
 limit_password = rate_limit("password", 6, 900)
 limit_comment = rate_limit("comment", 20, 300)
