@@ -2,7 +2,7 @@
   "meta": {
     "n_cases": 26,
     "with_models": false,
-    "timestamp": "20261015_233304",
+    "timestamp": "20261017_215420",
     "model": "sentinel_best_model.pt + best_autolab_checkpoint.pt, vocab 7053, max_pos 768"
   },
   "cases": [
@@ -47,18 +47,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -108,18 +116,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -169,18 +185,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -232,18 +256,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -293,18 +325,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -356,18 +396,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -425,18 +473,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -494,18 +550,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -557,18 +621,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -618,18 +690,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -692,18 +772,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -766,18 +854,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -840,18 +936,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -914,18 +1018,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -988,18 +1100,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1062,18 +1182,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1136,18 +1264,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1209,18 +1345,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1278,18 +1422,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1339,18 +1491,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1400,18 +1560,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1461,18 +1629,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1522,18 +1698,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1585,18 +1769,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1646,18 +1838,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },
@@ -1707,18 +1907,26 @@
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           },
           {
             "source": "model_b",
             "verdict": null,
             "score": null,
             "evidence": [
-              "no verdict keyword in output"
+              "empty output"
             ],
-            "status": "skipped"
+            "status": "skipped",
+            "structured_valid": false,
+            "validation_errors": [
+              "empty output"
+            ]
           }
         ]
       },

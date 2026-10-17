@@ -1,5 +1,6 @@
 {% extends "base_public.html" %}
 {% block title %}Security Center{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
 {% block content %}
 <div class="page-wrap page-wrap--wide">
   {% include "partials/admin_nav.html" %}
@@ -39,6 +40,57 @@
     {% if events %}<table class="data-table"><thead><tr><th>When</th><th>Type</th><th>Sev</th><th>Source</th><th>Evidence</th></tr></thead>
     <tbody>{% for e in events %}<tr><td class="text-sm">{{ e.created_at }}</td><td class="mono text-sm">{{ e.event_type }}</td><td>{{ e.severity }}</td><td>{{ e.source }}</td><td class="text-sm" style="max-width:400px;white-space:pre-wrap">{{ (e.evidence or "")[:350] }}</td></tr>{% endfor %}</tbody></table>{% else %}<p class="text-sm">No events.</p>{% endif %}
   </div>
+  <!-- Security Test Lab -->
+  <div class="card" style="margin-top:1rem" id="lab-card">
+    <h3>Security Test Lab</h3>
+    <p class="text-sm text-muted">Select a controlled test (A–G). Real HTTP via in-process TestClient (target must be local), bounded requests, admin-only. Synthetic tests clearly labeled synthetic — never a real attack.</p>
+    <form id="lab-form" style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:end;margin-top:0.6rem">
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Test type</span>
+        <select name="test_type" id="lab-test-type" class="form-select" style="min-width:160px">
+          <option value="xss">A. XSS detection</option>
+          <option value="sqli">B. SQLi detection</option>
+          <option value="traversal">C. Path traversal</option>
+          <option value="login_fail">D. Repeated login failure</option>
+          <option value="port_scan">E. Port-scan evidence (synthetic)</option>
+          <option value="bruteforce">F. Brute-force evidence (synthetic)</option>
+          <option value="custom">G. Custom safe test</option>
+        </select></label>
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Target URL (local only)</span>
+        <input name="target_url" id="lab-target" placeholder="http://127.0.0.1:8000/search or /login" style="min-width:280px" class="form-input" value="http://127.0.0.1:8000/search" /></label>
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Custom string / count (G/D)</span>
+        <input name="custom_string" id="lab-custom" placeholder="bounded <=300 chars; for D: count=4" style="min-width:220px" class="form-input" maxlength="300" /></label>
+      <button class="btn btn-primary btn-sm" type="submit" id="lab-run-btn">Run Test</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="lab-clear-btn">Clear Results</button>
+      <span id="lab-status" class="text-sm"></span>
+    </form>
+    <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap">
+      <button class="btn btn-sm" id="lab-refresh-runs">Refresh runs</button>
+      <span class="text-xs text-muted">Default origin: local app. Only 127.0.0.1/localhost/::1/testserver or SECURITY_LAB_ALLOWLIST.</span>
+    </div>
+    <div id="lab-result" style="margin-top:0.6rem;white-space:pre-wrap;word-break:break-word;font-size:0.82rem;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.6rem;min-height:60px">No test run yet.</div>
+    <div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap">
+      <button class="btn btn-sm" id="lab-analyze-btn">Analyze with Sentinel (selected events)</button>
+      <span class="text-xs text-muted">Select event IDs from last run (comma-separated) or use last run.</span>
+      <input id="lab-analyze-ids" placeholder="event IDs e.g. 12,13" style="width:160px" class="form-input text-sm" />
+    </div>
+    <div id="lab-analyze-result" style="margin-top:0.5rem;white-space:pre-wrap;word-break:break-word;font-size:0.82rem;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.6rem;min-height:40px">No analysis yet.</div>
+    <div style="margin-top:0.5rem" class="text-xs">Last runs (most recent first):</div>
+    <div id="lab-runs-list" class="text-sm" style="margin-top:0.3rem"></div>
+  </div>
+  <!-- Log Analyzer -->
+  <div class="card" style="margin-top:1rem" id="log-analyzer-card">
+    <h3>Log Analyzer</h3>
+    <p class="text-sm text-muted">Paste log (<=8000 chars) or upload text file (<=64 KB). Reuses same Sentinel pipeline. Clearly shows model A/B raw output, truncation, fusion.</p>
+    <textarea id="log-input" class="form-textarea" style="min-height:140px" placeholder="Paste log excerpt here — will be treated as untrusted data" maxlength="8000"></textarea>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;align-items:center">
+      <input type="file" id="log-file" accept=".txt,.log,text/plain" />
+      <button class="btn btn-sm" id="log-sample-btn">Sample log</button>
+      <button class="btn btn-primary btn-sm" id="log-analyze-btn">Analyze</button>
+      <button class="btn btn-ghost btn-sm" id="log-clear-btn">Clear</button>
+      <span id="log-status" class="text-sm"></span>
+    </div>
+    <div id="log-result" style="margin-top:0.5rem;white-space:pre-wrap;word-break:break-word;font-size:0.82rem;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.6rem;min-height:40px">No analysis yet.</div>
+  </div>
   <div class="card" style="margin-top:1rem">
     <h3>Demo — 10 categories (real routes -> Sentinel -> ground truth)</h3>
     <table class="data-table"><thead><tr><th>Case</th><th>Cat</th><th>Run</th><th>Ground truth</th><th>Result</th></tr></thead>
@@ -61,4 +113,7 @@ document.querySelectorAll(".demo-btn").forEach(b=>{b.addEventListener("click", a
   try{const r=await fetch("/api/security/demo/run/"+id,{method:"POST",headers:{"X-CSRF-Token":document.querySelector("meta[name=csrf-token]")?.content||""}}); const j=await r.json(); el.textContent=JSON.stringify({gt:j.ground_truth,app:j.app_status,fusion:j.fusion?.fused_verdict},null,1);}catch(e){el.textContent=e.message;} b.disabled=false;
 });});
 </script>
+<script src="/static/js/security_lab_part1.js"></script>
+<script src="/static/js/security_lab_init.js"></script>
+<script src="/static/js/security_lab_analyze.js"></script>
 {% endblock %}

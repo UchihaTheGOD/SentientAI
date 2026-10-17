@@ -225,3 +225,119 @@ def collect_from_moderation(
         detail=f"band={example.quality_band}; from={action}", request=request,
     )
     return example
+# ---------------------------------------------------------------------------
+# Sentinel incident -> sanitized TrainingExample (bridge target)
+# ---------------------------------------------------------------------------
+
+_MAX_INCIDENT_INPUT = 1800
+_MAX_INCIDENT_OUTPUT = 1200
+
+def _redact_for_training(text: str) -> str:
+    try:
+        from app.services.security_events import redact
+        return redact(text) or text
+    except Exception:
+        return text
+
+def _incident_instruction(fused_verdict: str | None) -> str:
+    return "Classify the security log: respond with likely_threat, needs_review, or likely_benign and explain why."
+
+def _incident_output_text(incident) -> str:
+    verdict = (incident.fused_verdict or "needs_review").strip()
+    score = incident.fused_score
+    ev = []
+    try:
+        import json as _js
+        raw = incident.evidence
+        if raw:
+            parsed = _js.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(parsed, list):
+                ev = [str(x)[:200] for x in parsed[:6] if x]
+    except Exception:
+        ev = []
+    lines = [f"verdict: {verdict}"]
+    if score is not None:
+        lines[0] += f" (score {score})"
+    if ev:
+        lines.append("evidence: " + "; ".join(ev[:4]))
+    lines.append("requires human review before training")
+    txt = "\n".join(lines)
+    return txt[:_MAX_INCIDENT_OUTPUT]
+
+def collect_from_incident(db, incident, actor=None, request=None):
+    try:
+        from app.models.training_example import TrainingExample
+        from app.models.learning import CANDIDATE
+        if incident is None or not getattr(incident, "log_text", None):
+            return None
+        log_raw = (incident.log_text or "").strip()
+        if len(log_raw) < 4:
+            return None
+        log_clean = _redact_for_training(log_raw)[:_MAX_INCIDENT_INPUT]
+        try:
+            from app.services.sanitize import strip_formatting
+            maybe = strip_formatting(log_clean, _MAX_INCIDENT_INPUT)
+            if maybe and len(maybe.strip()) >= 4:
+                log_clean = maybe
+        except Exception:
+            pass
+        instruction = _incident_instruction(getattr(incident, "fused_verdict", None))
+        input_text = f"Log excerpt: {log_clean}"
+        output_text = _incident_output_text(incident)
+        provenance = "sentinel_incident"
+        source = "sentinel"
+        from app.services import training as training_service
+        digest = training_service.dedup_hash(instruction, input_text)
+        is_dup = training_service.find_duplicate(db, digest) is not None
+        if is_dup:
+            existing = training_service.find_duplicate(db, digest)
+            return existing
+        verdict = (incident.fused_verdict or "").lower()
+        if verdict == "likely_threat":
+            signal = scoring.SIGNAL_STRONG
+        elif verdict == "needs_review":
+            signal = scoring.SIGNAL_WEAK
+        else:
+            signal = scoring.SIGNAL_NONE
+        result = scoring.score_candidate(signal=signal, instruction=instruction, input_text=input_text, output_text=output_text, is_duplicate=False)
+        sent_raw = ((incident.model_a_text or "") + "\n" + (incident.model_b_text or "")).strip()[:2000]
+        example = TrainingExample(
+            instruction=instruction,
+            input_text=input_text,
+            output_text=output_text,
+            source=source,
+            provenance=provenance,
+            status=CANDIDATE,
+            approved=False,
+            safe_to_train=False,
+            model_prediction=verdict or None,
+            quality_score=result.score,
+            quality_band=result.band,
+            quality_notes=result.notes_text or None,
+            dedup_hash=digest,
+            sentinel_status=incident.model_a_status or incident.model_b_status or None,
+            sentinel_raw_text=sent_raw or None,
+            sentinel_parsed_json=None,
+            sentinel_label=verdict or None,
+            sentinel_category=None,
+            sentinel_confidence=str(incident.fused_score) if incident.fused_score is not None else None,
+            sentinel_latency_ms=None,
+            sentinel_model=None,
+        )
+        db.add(example)
+        db.commit()
+        db.refresh(example)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        import logging as _lg
+        _lg.getLogger("sentientai.collection").exception("collect_from_incident failed")
+        return None
+    try:
+        audit.record(db, "training.candidate_created", user=actor, target_type="training_example", target_id=str(example.id), detail=f"band={example.quality_band}; from=sentinel_incident:{getattr(incident, 'id', '?')}", request=request)
+    except Exception:
+        pass
+    return example
+

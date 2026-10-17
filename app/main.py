@@ -43,7 +43,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # style attributes used throughout the templates.
         response.headers.setdefault("Content-Security-Policy", "; ".join([
             "default-src 'self'",
-            "script-src 'self'",
+            "script-src 'self' 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: https:",
@@ -107,7 +107,10 @@ def create_app() -> FastAPI:
     )
     from app.api.security_a import router as security_router
     import app.api.security_b  # noqa: F401 — registers triage/demo on same router
+    import app.api.security_lab_api_b  # noqa: F401 — registers lab run + analyze + log-analyze
     from app.api.admin_security import router as admin_security_router
+    from app.api.security_lab_api_a import router as lab_router
+    from app.api.theme import router as theme_router
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
@@ -120,7 +123,9 @@ def create_app() -> FastAPI:
     application.include_router(admin.router)
     application.include_router(sentinel.router)
     application.include_router(security_router)
+    application.include_router(lab_router)
     application.include_router(admin_security_router)
+    application.include_router(theme_router)
 
     _register_error_handlers(application)
     return application

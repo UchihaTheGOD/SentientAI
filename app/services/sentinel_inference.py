@@ -35,27 +35,40 @@ def _generate_for_model(model, tokenizer, prompt: str, config: dict, max_new_tok
         bos = config.get("bos_token_id", 2)
         eos = config.get("eos_token_id", 3)
         pad = config.get("pad_token_id", 0)
-        eout = 9  # </output> id — tokenizer added_token
-        # Try to resolve from tokenizer if available
+        # Prompt ends with <output> (id 8); generation ends with </output> (id 9) or EOS.
+        # Preserve <output> so model stays in generation mode — previously checked
+        # only </output>==9, which caused ids[-1]==9 to be False for a normal prompt
+        # (last id is 8). Truncation via ids[-budget:] still kept tail by slicing
+        # the end, but middle-drop path never triggered; now check correctly.
+        eout = 8  # <output> id
+        eout_close = 9  # </output> id
         try:
-            _eout = tokenizer.token_to_id("</output>")
+            _eout = tokenizer.token_to_id("<output>")
             if _eout is not None:
                 eout = int(_eout)
+            _eout2 = tokenizer.token_to_id("</output>")
+            if _eout2 is not None:
+                eout_close = int(_eout2)
         except Exception:
             pass
         max_pos = config.get("max_position_embeddings", 768)
         # Preserve the critical <output> tail: truncate from middle/front, not end.
         # The prompt must end with <output> for the model to be in generation mode.
         budget = max(64, max_pos - max_new_tokens - 4)
+        truncated = False
+        trunc_detail = None
         if len(ids) > budget:
-            # If ids ends with </output> (9) we must keep it
+            truncated = True
             tail_keep = 8  # keep at least 8 tail tokens including <output>
             if ids[-1] == eout and len(ids) > tail_keep:
-                # Keep prefix + tail; drop middle
+                # Keep prefix + tail; drop middle — report explicitly
                 head = budget - tail_keep
                 ids = ids[:head] + ids[-tail_keep:]
+                trunc_detail = f"middle-drop head={head} tail={tail_keep} orig>{budget}"
             else:
                 ids = ids[-budget:]
+                trunc_detail = f"tail-slice orig={len(ids)+budget-len(ids) if False else '>{budget}'} budget={budget}"
+            logger.warning("prompt truncated: %s ids %s->%s last_is_output=%s", trunc_detail, ">" + str(budget), len(ids), ids[-1] == eout if ids else False)
         input_ids = [bos] + ids
         if len(input_ids) > max_pos:
             # Again preserve tail
@@ -64,6 +77,8 @@ def _generate_for_model(model, tokenizer, prompt: str, config: dict, max_new_tok
                 input_ids = input_ids[-max_pos:]
             else:
                 input_ids = input_ids[-max_pos:]
+            if truncated or len(input_ids) == max_pos:
+                logger.warning("input_ids truncated to max_pos=%s", max_pos)
         device = next(model.parameters()).device if hasattr(model, "parameters") else torch.device("cpu")  # type: ignore
         model.eval()
         generated = input_ids[:]

@@ -32,6 +32,11 @@ class User(Base):
     suspension_reason = Column(String(255), nullable=True)
     suspended_at = Column(DateTime, nullable=True)
 
+    # Theme preference — null/system means follow OS; light/dark are explicit.
+    # Persisted for authenticated users so another device restores the same
+    # choice; anonymous visitors rely on localStorage only.
+    theme_preference = Column(String(20), nullable=True, default=None)
+
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"

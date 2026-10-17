@@ -1297,6 +1297,10 @@ a:hover .post-card-title { color: var(--accent); }
    Admin — training-example review
    ============================================================ */
 .admin-nav { margin-bottom: var(--space-lg); }
+/* Security Lab: ensure long evidence wraps and tables scroll */
+#lab-result, #lab-analyze-result, #log-result { word-break: break-word; overflow-wrap: anywhere; }
+.data-table { display: block; max-width: 100%; overflow-x: auto; }
+.data-table td { max-width: 520px; white-space: pre-wrap; word-break: break-word; }
 .mono { font-family: var(--font-mono, ui-monospace, monospace); }
 .candidate-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-lg); margin-bottom: var(--space-md); }
 .candidate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-md); flex-wrap: wrap; }

@@ -12,6 +12,7 @@ __pycache__/
 data/*.db
 venv/
 .venv/
+env/
 *.egg-info/
 dist/
 build/
@@ -35,9 +36,24 @@ attact-*.json
 attact-demo.json
 attact-report.json
 ATTACT/reports/
+attact-full-report.json
 # Local uploads / temp
 uploads/
 tmp/
 temp/
 *.tmp
+# Temporary evaluation / test outputs (keep only latest.json + moderation_latest.json)
+evaluation/results_*.json
+_pytest_out.txt
+_tok_check.txt
+# Local generated reports (track chosen reports explicitly; ignore the rest)
+reports/*
+!reports/security_integration_audit.md
+!reports/security_test_lab_report.md
+!reports/theme_implementation_report.md
+# OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*~
 

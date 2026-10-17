@@ -1,0 +1,30 @@
+/* theme_dark_extras.css — contrast/override fixes that reference dark palette
+   Split from theme.css to keep file size small; loaded after public.css. */
+:root[data-theme="dark"] .notif-item.unread { background: #232346; border-color: #4c3a8a; }
+:root[data-theme="dark"] .alert-success { background: #0f2e22; border-color: #1a6b4a; color: #a7f3d0; }
+:root[data-theme="dark"] .alert-error   { background: #2e1212; border-color: #7a2a2a; color: #fecaca; }
+:root[data-theme="dark"] .alert-info    { background: #12213a; border-color: #1e4a7a; color: #bfdbfe; }
+:root[data-theme="dark"] .notice--warning { background: #2a2010; }
+:root[data-theme="dark"] .notice--danger  { background: #2a1414; }
+:root[data-theme="dark"] .notice--info    { background: #121a2e; }
+:root[data-theme="dark"] .badge-purple { background: #2a2250; color: #c4b5fd; }
+:root[data-theme="dark"] .badge-green  { background: #0f2e22; color: #6ee7b7; }
+:root[data-theme="dark"] .badge-yellow { background: #2a2010; color: #fcd34d; }
+:root[data-theme="dark"] .badge-red    { background: #2a1414; color: #fca5a5; }
+:root[data-theme="dark"] .badge--warning { background: #2a2010; color: #fcd34d; }
+:root[data-theme="dark"] .badge--reason  { background: #2a1414; color: #fca5a5; }
+:root[data-theme="dark"] .action-btn.liked { background: #0f2e22; }
+:root[data-theme="dark"] .action-btn.bookmarked { background: #1e1640; }
+:root[data-theme="dark"] .data-table tr:hover td { background: var(--hover-bg); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .notif-item.unread { background: #232346; border-color: #4c3a8a; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .alert-success { background: #0f2e22; border-color: #1a6b4a; color: #a7f3d0; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .alert-error   { background: #2e1212; border-color: #7a2a2a; color: #fecaca; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .alert-info    { background: #12213a; border-color: #1e4a7a; color: #bfdbfe; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .notice--warning { background: #2a2010; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .notice--danger  { background: #2a1414; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge-purple { background: #2a2250; color: #c4b5fd; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge-green  { background: #0f2e22; color: #6ee7b7; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge-yellow { background: #2a2010; color: #fcd34d; }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge-red    { background: #2a1414; color: #fca5a5; }
+}

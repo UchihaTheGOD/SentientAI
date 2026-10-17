@@ -32,7 +32,7 @@
         </form>
       </td>
     </tr>
-    <tr><td colspan="7" class="text-sm" style="max-width:600px;white-space:pre-wrap;word-break:break-word;background:#fafafa">{{ inc.log_excerpt or inc.log_text[:800] }}<div class="text-muted">A: {{ (inc.model_a_text or '')[:200] }} | B: {{ (inc.model_b_text or '')[:200] }}</div></td></tr>
+    <tr><td colspan="7" class="text-sm" style="max-width:600px;white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle)">{{ inc.log_excerpt or inc.log_text[:800] }}<div class="text-muted">A: {{ (inc.model_a_text or '')[:200] }} | B: {{ (inc.model_b_text or '')[:200] }}</div></td></tr>
     {% endfor %}
     </tbody></table>
     {% else %}<div class="empty-state"><p>No incidents.</p></div>{% endif %}
