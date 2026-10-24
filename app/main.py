@@ -105,11 +105,9 @@ def create_app() -> FastAPI:
         admin, auth, blog, community, feed, health, messages, moderation,
         sentinel, social, users,
     )
-    from app.api.security_a import router as security_router
-    import app.api.security_b  # noqa: F401 — registers triage/demo on same router
-    import app.api.security_lab_api_b  # noqa: F401 — registers lab run + analyze + log-analyze
+    from app.api.security import router as security_router
     from app.api.admin_security import router as admin_security_router
-    from app.api.security_lab_api_a import router as lab_router
+    from app.api.security_lab_api import router as lab_router
     from app.api.theme import router as theme_router
     application.include_router(health.router)
     application.include_router(auth.router)
@@ -126,6 +124,51 @@ def create_app() -> FastAPI:
     application.include_router(lab_router)
     application.include_router(admin_security_router)
     application.include_router(theme_router)
+    # alias /admin/reports/security -> same handler as /admin/security/reports/security (Phase 2 nav)
+    from fastapi import Depends as _Dep
+    from fastapi import Request as _Req2
+    from fastapi.responses import HTMLResponse as _HR2
+    from sqlalchemy.orm import Session as _Sess2
+    from app.database import get_db as _get_db2
+    from app.services.auth_service import require_admin as _req_admin2
+    from app.models.user import User as _User2
+    from app.template_env import templates as _tmpl2
+    from fastapi import APIRouter as _APIR2
+    _reports_alias = _APIR2(prefix="/admin/reports", tags=["admin-security-alias"])
+    @_reports_alias.get("/security", response_class=_HR2)
+    def _alias_reports_security(request: _Req2, db: _Sess2 = _Dep(_get_db2), user: _User2 = _Dep(_req_admin2)):  # type: ignore
+        return _tmpl2.TemplateResponse("admin_reports_security.html", {"request": request, "current_user": user, "user": user, "filters": {"test_type": "", "status": "", "severity": ""}})
+    @_reports_alias.get("/security/{rid}", response_class=_HR2)
+    def _alias_reports_security_detail(rid: int, request: _Req2, db: _Sess2 = _Dep(_get_db2), user: _User2 = _Dep(_req_admin2)):  # type: ignore
+        from app.models.security_lab import SecurityLabRun as _RL
+        from app.models.attact_assessment import SecurityEvent as _SE
+        import json as _j
+        run = db.query(_RL).filter(_RL.id == rid).first()
+        if not run:
+            from fastapi import HTTPException as _HE; raise _HE(status_code=404)
+        try: eids=_j.loads(run.event_ids or "[]")
+        except Exception: eids=[]
+        events=[]
+        if eids:
+            rows=db.query(_SE).filter(_SE.id.in_(eids)).all()
+            events=[{"id": x.id, "event_type": x.event_type, "category": x.category, "severity": x.severity, "source": x.source, "evidence": (x.evidence or "")[:1200], "correlation_id": x.correlation_id, "created_at": x.created_at} for x in rows]
+        incident=None; candidate=None
+        try:
+            if getattr(run,"incident_id",None):
+                from app.models.sentinel_incident import SentinelIncident as _SI
+                incident=db.query(_SI).filter(_SI.id==run.incident_id).first()
+        except Exception: pass
+        try:
+            if getattr(run,"training_candidate_id",None):
+                from app.models.training_example import TrainingExample as _TE
+                candidate=db.query(_TE).filter(_TE.id==run.training_candidate_id).first()
+        except Exception: pass
+        try: meta=_j.loads(run.meta_json or "{}")
+        except Exception: meta={}
+        try: fusion=_j.loads(run.fusion_json) if getattr(run,"fusion_json",None) else None
+        except Exception: fusion=None
+        return _tmpl2.TemplateResponse("admin_reports_security_detail.html", {"request": request, "current_user": user, "user": user, "run": run, "events": events, "incident": incident, "candidate": candidate, "meta": meta, "fusion": fusion})
+    application.include_router(_reports_alias)
 
     _register_error_handlers(application)
     return application

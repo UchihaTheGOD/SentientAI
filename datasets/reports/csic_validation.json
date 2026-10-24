@@ -1,0 +1,112 @@
+{
+  "raw_path": "datasets/raw/web/csic_database.csv",
+  "sha256": "c420f0bc0464376de75b6c419a0ac226fe69fe12c8ac4908843273721e44e637",
+  "sha256_match": true,
+  "rows": 61065,
+  "columns": [
+    "",
+    "Method",
+    "User-Agent",
+    "Pragma",
+    "Cache-Control",
+    "Accept",
+    "Accept-encoding",
+    "Accept-charset",
+    "language",
+    "host",
+    "cookie",
+    "content-type",
+    "connection",
+    "lenght",
+    "content",
+    "classification",
+    "URL"
+  ],
+  "columns_match_expected": true,
+  "encoding": "utf-8",
+  "malformed_rows": 0,
+  "malformed_index_sample": [],
+  "duplicate_rows": 0,
+  "distinct_rows": 61065,
+  "missing_values": {
+    "": 0,
+    "Method": 0,
+    "User-Agent": 0,
+    "Pragma": 0,
+    "Cache-Control": 0,
+    "Accept": 397,
+    "Accept-encoding": 0,
+    "Accept-charset": 0,
+    "language": 0,
+    "host": 0,
+    "cookie": 0,
+    "content-type": 43088,
+    "connection": 0,
+    "lenght": 43088,
+    "content": 43088,
+    "classification": 0,
+    "URL": 0
+  },
+  "missing_investigation": {
+    "content_type_empty": 43088,
+    "content_length_empty": 43088,
+    "content_empty": 43088,
+    "accept_empty": 397,
+    "by_label": {
+      "0": {
+        "content-type": 28000,
+        "lenght": 28000,
+        "content": 28000
+      },
+      "1": {
+        "content-type": 15088,
+        "lenght": 15088,
+        "content": 15088,
+        "Accept": 397
+      }
+    },
+    "interpretation": "Empty content/content-type/lenght occurs in 28000/36000 benign (77.8%) and 15088/25065 anomalous (60.2%) \u2014 common in GET without body, not a reliable malicious signal. Empty Accept occurs only in 397 anomalous rows, all PUT \u2014 correlated but not classified as malicious by missing alone. Validation does not label missing fields as malicious."
+  },
+  "label_distribution": {
+    "0": 36000,
+    "1": 25065
+  },
+  "label_mapping": {
+    "0": "benign",
+    "1": "anomalous"
+  },
+  "normalized_path": "datasets/normalized/csic_normalized.jsonl",
+  "normalized_rows": 61064,
+  "rejected_path": "datasets/rejected/csic_rejected.jsonl",
+  "rejected_rows": 1,
+  "token_length": {
+    "count": 61065,
+    "min": 223,
+    "max": 779,
+    "mean": 280.22584131662984,
+    "over_budget_740": 13,
+    "over_768": 1
+  },
+  "license": {
+    "kaggle_licenses_field": [
+      {
+        "name": "copyright-authors"
+      }
+    ],
+    "status": "restricted/unverified - copyright-authors; redistribution NOT permitted without explicit permission",
+    "redistribution_permitted": false,
+    "evidence": "tmp/dataset-metadata.json licenses=[{name: copyright-authors}]; Kaggle expectedUpdateFrequency not specified; no open license (MIT/CC-BY/etc) declared; do not assume permission",
+    "action_required": "Verify upstream ISI CSIC terms before any redistribution; treat as restricted for training use only on this device"
+  },
+  "limitations": [
+    "Web-only HTTP traffic (Method/URL/headers/content); not authentication/network/application/benign ambiguity datasets",
+    "Vintage 2010; not representative of modern WAF payloads",
+    "Column lenght is typo for length; 43088 rows have empty content/content-type/lenght (no body)",
+    "43088 rows lack request body; 397 rows lack Accept header",
+    "First column is unnamed index (empty header) from CSV export",
+    "Single binary label; attack subtypes (sqli/xss/etc) not separated in this CSV",
+    "Synthetic/normal traffic generation; class balance 36000 benign / 25065 attack may not reflect production",
+    "No PII scrub audit performed in this phase; raw not modified"
+  ],
+  "raw_modified": false
+}

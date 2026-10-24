@@ -46,6 +46,21 @@ temp/
 evaluation/results_*.json
 _pytest_out.txt
 _tok_check.txt
+# PDF builder debris (one-shot cover/markdown appenders; canonical guide kept)
+Documentation/make_*.py
+Documentation/partA.py
+Documentation/pdf_builder.py
+Documentation/build_guide*.py
+Documentation/build_pdf*.py
+Documentation/g2.py
+Documentation/gen_init.py
+Documentation/r1.py
+Documentation/r2a.py
+Documentation/append*.py
+_story*.pkl
+_story_cover_done.txt
+filelist.txt
+it old didn't work.bat
 # Local generated reports (track chosen reports explicitly; ignore the rest)
 reports/*
 !reports/security_integration_audit.md

@@ -1,0 +1,71 @@
+{% extends "base_public.html" %}
+{% block title %}Security Report #{{ run.id }}{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+  {% include "partials/admin_nav.html" %}
+  <nav class="breadcrumb" aria-label="Breadcrumb"><a href="/admin">Admin</a> <span class="breadcrumb-sep">›</span> <a href="/admin/reports/security">Security Reports</a> <span class="breadcrumb-sep">›</span> <span>#{{ run.id }}</span></nav>
+  <header class="page-head"><div>
+    <h1 class="page-title">Report #{{ run.id }} — {{ run.test_type }}</h1>
+    <p class="page-lead mono" style="word-break:break-word">{{ run.target_url or "—" }}</p>
+  </div><div><a class="btn btn-ghost btn-sm" href="/admin/reports/security">Back to list</a></div></header>
+
+  <div class="card" style="padding:0.8rem">
+    <h3>Identification</h3>
+    <div class="text-sm" style="display:grid;grid-template-columns:160px 1fr;gap:0.35rem 0.8rem">
+      <span class="text-muted">Run ID</span><span class="mono">{{ run.id }}</span>
+      <span class="text-muted">Timestamp</span><span>{{ run.created_at }} {% if run.completed_at %}→ {{ run.completed_at }}{% endif %}</span>
+      <span class="text-muted">Test type</span><span class="mono">{{ run.test_type }}</span>
+      <span class="text-muted">Target URL</span><span class="mono" style="word-break:break-all">{{ run.target_url or "Unavailable" }}</span>
+      <span class="text-muted">Execution status</span><span>{{ run.status or "Unavailable" }} {% if run.error_message %}<span style="color:var(--danger)">{{ run.error_message[:600] }}</span>{% endif %}</span>
+      <span class="text-muted">HTTP</span><span>requests {{ run.request_count or 0 }}, responses {{ run.response_count or 0 }}, statuses {{ run.http_statuses or "Not recorded" }}</span>
+      <span class="text-muted">Detection</span><span>{{ run.detection_result or "Not recorded" }} {% if run.is_synthetic %}<span class="badge badge-yellow">synthetic</span><span class="text-xs text-muted"> — simulated evidence, not a real attack</span>{% else %}<span class="badge badge-gray">real</span>{% endif %}</span>
+      <span class="text-muted">Analyzed at</span><span>{{ run.analyzed_at or "Not run" }}</span>
+      {% if run.analysis_error %}<span class="text-muted">Analysis error</span><span style="color:var(--danger)">{{ run.analysis_error[:800] }}</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0.8rem;padding:0.8rem">
+    <h3>Findings and evidence</h3>
+    {% if events %}
+      <table class="data-table" style="margin-top:0.4rem"><thead><tr><th>When</th><th>Type</th><th>Sev</th><th>Source</th><th>Evidence</th></tr></thead>
+      <tbody>{% for e in events %}<tr><td class="text-sm">{{ e.created_at }}</td><td class="mono text-sm">{{ e.event_type }}</td><td>{{ e.severity or "—" }}</td><td>{{ e.source or "—" }}</td><td class="text-sm" style="max-width:520px;white-space:pre-wrap;word-break:break-word">{{ e.evidence or "Not recorded" }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}
+      <p class="text-sm text-muted">No SecurityEvents recorded for this run. Synthetic tests still log a <span class="mono">lab.synthetic.*</span> event — its absence indicates the run did not capture evidence.</p>
+      {% if meta %}<p class="text-xs text-muted" style="margin-top:0.4rem">meta: synthetic_evidence={{ (meta.get('synthetic_evidence') or '—')[:400] }} | events_window={{ meta.get('events_window','—') }} | target={{ meta.get('target_normalized','—') }}</p>{% endif %}
+    {% endif %}
+    <div class="text-sm" style="margin-top:0.5rem"><strong>Severity / confidence:</strong> {% if fusion and (fusion.get('rules') or {}).get('severity') %}{{ (fusion.get('rules') or {}).get('severity') }} / {{ (fusion.get('rules') or {}).get('confidence') or '—' }}{% elif run.fused_verdict %}fused {{ run.fused_verdict }} (score {{ run.fused_score if run.fused_score is not none else '—' }}){% else %}Unavailable{% endif %} — deterministic rules shown even when models did not run.</div>
+  </div>
+  <div class="card" style="margin-top:0.8rem;padding:0.8rem">
+    <h3>Sentinel assessment (honest: empty/unavailable shown explicitly)</h3>
+    {% if run.fused_verdict is none and not run.model_a_text and not run.model_b_text and not run.analysis_error %}
+      <p class="text-sm text-muted" style="white-space:pre-wrap;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.6rem">No Sentinel assessment has been run for this report. Use Analyze with Sentinel in the lab, or API POST /api/security/lab/analyze with lab_run_id={{ run.id }}. Model outputs will appear here once an analysis is performed.</p>
+    {% else %}
+      {% set ma = run.model_a_text or '' %}{% set mb = run.model_b_text or '' %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-top:0.35rem">
+        <div><div class="text-xs" style="display:flex;gap:0.4rem;align-items:center"><strong>Model A</strong> <span class="badge {% if run.model_a_status=='ok' %}badge-green{% elif run.model_a_status in ['empty','unavailable','timeout','error'] %}badge-yellow{% else %}badge-gray{% endif %}">{{ run.model_a_status or 'Not run' }}</span></div>
+          <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.55rem;margin-top:0.3rem;min-height:88px;font-size:0.82rem">{% if ma %}{{ ma[:4000] }}{% elif run.model_a_status in ['empty','unavailable','timeout','error'] %}No usable output ({{ run.model_a_status }}){% else %}Not recorded{% endif %}</pre></div>
+        <div><div class="text-xs" style="display:flex;gap:0.4rem;align-items:center"><strong>Model B</strong> <span class="badge {% if run.model_b_status=='ok' %}badge-green{% elif run.model_b_status in ['empty','unavailable','timeout','error'] %}badge-yellow{% else %}badge-gray{% endif %}">{{ run.model_b_status or 'Not run' }}</span></div>
+          <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.55rem;margin-top:0.3rem;min-height:88px;font-size:0.82rem">{% if mb %}{{ mb[:4000] }}{% elif run.model_b_status in ['empty','unavailable','timeout','error'] %}No usable output ({{ run.model_b_status }}){% else %}Not recorded{% endif %}</pre></div>
+      </div>
+      <div class="text-sm" style="margin-top:0.55rem"><strong>Fusion / rules:</strong> {% if fusion %}verdict <span class="mono">{{ fusion.get('fused_verdict') or 'Unavailable' }}</span>, score {{ fusion.get('fused_score') if fusion.get('fused_score') is not none else '—' }}, agreement {{ run.agreement if run.agreement is not none else '—' }}{% elif run.fused_verdict %}verdict {{ run.fused_verdict }}, score {{ run.fused_score if run.fused_score is not none else '—' }}{% else %}Unavailable{% endif %}</div>
+      {% if fusion %}
+        <details style="margin-top:0.45rem"><summary class="text-sm" style="cursor:pointer">Full fusion payload</summary>
+        <pre style="white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle);border:1px solid var(--border-light);border-radius:8px;padding:0.55rem;margin-top:0.3rem;font-size:0.78rem">{{ fusion | tojson(indent=2) if fusion is mapping else fusion }}</pre></details>
+      {% endif %}
+      {% if run.fused_verdict is not none %}
+        <p class="text-sm" style="margin-top:0.4rem"><strong>Final assessment:</strong> {{ run.fused_verdict }} ({{ run.fused_score if run.fused_score is not none else '—' }}){% if fusion and fusion.get('note') %} — <span class="text-muted">{{ fusion.get('note') }}</span>{% endif %}</p>
+        <p class="text-xs text-muted">Provisional — requires human review before any training or containment.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+  <div class="card" style="margin-top:0.8rem;padding:0.8rem">
+    <h3>Links</h3>
+    <div class="text-sm" style="display:grid;grid-template-columns:160px 1fr;gap:0.35rem 0.8rem">
+      <span class="text-muted">Incident</span><span>{% if incident %}<a href="/admin/sentinel/incidents?status={{ incident.status }}">#{{ incident.id }} — {{ incident.fused_verdict }} ({{ incident.status }})</a> <a class="btn btn-ghost btn-sm" href="/admin/sentinel/incidents">view</a>{% else %}Not created{% if run.fused_verdict=='likely_benign' %} — rules decided benign; no incident is expected{% endif %}{% endif %}</span>
+      <span class="text-muted">Training candidate</span><span>{% if candidate %}<a href="/admin/training">#{{ candidate.id }} — {{ candidate.status }}</a> {% if candidate.safe_to_train %}<span class="badge badge-green">trainable (human-approved)</span>{% else %}<span class="badge badge-yellow">{{ candidate.status }}</span> — awaiting human review (not trainable){% endif %}{% else %}Not created — candidates are only produced when an incident is eligible and never auto-approved{% endif %}</span>
+      <span class="text-muted">Manual review</span><span>{% if incident %}{{ incident.status }} — {% if incident.status=='pending_review' %}<span class="badge badge-yellow">pending</span> human review in Incidents{% elif incident.status=='confirmed_threat' %}approved as threat{% elif incident.status=='false_positive' %}rejected as false positive{% else %}{{ incident.status }}{% endif %}{% elif run.fused_verdict is none %}Unavailable — no incident to review{% else %}Not available (no incident){% endif %}</span>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,6 +1,7 @@
 """Admin Security Center page."""
 from __future__ import annotations
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import BackgroundTasks
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -27,6 +28,42 @@ def admin_security(request: Request, category: str | None = None, severity: str 
         events = [e for e in events if (e.ip_address or "") == ip]
     blocks = db.query(TempBlock).order_by(TempBlock.created_at.desc()).limit(20).all()
     return templates.TemplateResponse("admin_security.html", {"request": request, "current_user": user, "user": user, "assessments": assessments, "incidents": incidents, "events": events, "blocks": blocks, "demo_cases": catalog(), "filters": {"category": category, "severity": severity, "ip": ip}})
+
+@router.get("/reports/security", response_class=HTMLResponse)
+def admin_security_reports(request: Request, test_type: str | None = None, status: str | None = None, severity: str | None = None, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    return templates.TemplateResponse("admin_reports_security.html", {"request": request, "current_user": user, "user": user, "filters": {"test_type": test_type or "", "status": status or "", "severity": severity or ""}})
+
+@router.get("/reports/security/{rid}", response_class=HTMLResponse)
+def admin_security_report_detail(rid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    from app.models.security_lab import SecurityLabRun
+    from app.models.attact_assessment import SecurityEvent
+    import json as _j
+    run = db.query(SecurityLabRun).filter(SecurityLabRun.id == rid).first()
+    if not run:
+        raise HTTPException(status_code=404)
+    try: eids=_j.loads(run.event_ids or "[]")
+    except Exception: eids=[]
+    events=[]
+    if eids:
+        rows=db.query(SecurityEvent).filter(SecurityEvent.id.in_(eids)).all()
+        events=[{"id": x.id, "event_type": x.event_type, "category": x.category, "severity": x.severity, "source": x.source, "evidence": (x.evidence or "")[:1200], "correlation_id": x.correlation_id, "created_at": x.created_at} for x in rows]
+    # linked incident / candidate
+    incident=None; candidate=None
+    try:
+        if getattr(run,"incident_id",None):
+            from app.models.sentinel_incident import SentinelIncident
+            incident=db.query(SentinelIncident).filter(SentinelIncident.id==run.incident_id).first()
+    except Exception: pass
+    try:
+        if getattr(run,"training_candidate_id",None):
+            from app.models.training_example import TrainingExample
+            candidate=db.query(TrainingExample).filter(TrainingExample.id==run.training_candidate_id).first()
+    except Exception: pass
+    try: meta=_j.loads(run.meta_json or "{}")
+    except Exception: meta={}
+    try: fusion=_j.loads(run.fusion_json) if getattr(run,"fusion_json",None) else None
+    except Exception: fusion=None
+    return templates.TemplateResponse("admin_reports_security_detail.html", {"request": request, "current_user": user, "user": user, "run": run, "events": events, "incident": incident, "candidate": candidate, "meta": meta, "fusion": fusion})
 
 @router.get("/assessments/{aid}", response_class=HTMLResponse)
 def assessment_detail(aid: int, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):

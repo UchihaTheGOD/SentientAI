@@ -37,7 +37,7 @@ def readiness():
         "vocab_size": s.tokenizer_vocab_size,
         "config_vocab": (s.config or {}).get("vocab_size") if s.config else None,
         "rss_mb": s.rss_mb,
-        "prompt_path": str(PROMPT_PATH),
+        "prompt_path": PROMPT_PATH.name,
         "prompt_chars": prompt_chars,
         "phase": "phase_1" if s.ready else "phase_0_placeholder",
         "load_ms_a": s.load_ms_a,
@@ -72,7 +72,7 @@ def prompt_reload(user: User = Depends(require_admin)):
 class AnalyzeRequest(BaseModel):
     log_text: str = Field(..., min_length=1, max_length=MAX_LOG_CHARS)
     extra_prompt: str | None = Field(default=None, max_length=MAX_EXTRA_CHARS)
-    max_new_tokens: int = Field(default=180, ge=16, le=256)
+    max_new_tokens: int = Field(default=96, ge=16, le=256)
     create_incident: bool = Field(default=True)
 
 def _dedup_incident_key(db: Session, ip: str | None, log_text: str) -> str | None:

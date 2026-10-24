@@ -1,0 +1,59 @@
+{% extends "base_public.html" %}
+{% block title %}Security Reports{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+  {% include "partials/admin_nav.html" %}
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Security Reports</h1>
+      <p class="page-lead">Persisted Security Lab results with honest Sentinel assessment. Real runs are never substituted with samples.</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+      <a class="btn btn-ghost btn-sm" href="/admin/security">Security Lab</a>
+      <button class="btn btn-sm" id="rep-refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <div class="card" style="padding:0.8rem">
+    <form id="rep-filters" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end">
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Test type</span>
+        <select name="test_type" id="f-test" class="form-select" style="min-width:150px">
+          <option value="">All</option>
+          <option value="xss">xss</option><option value="sqli">sqli</option><option value="traversal">traversal</option>
+          <option value="login_fail">login_fail</option><option value="port_scan">port_scan</option>
+          <option value="bruteforce">bruteforce</option><option value="custom">custom</option>
+        </select></label>
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Execution status</span>
+        <select name="status" id="f-status" class="form-select" style="min-width:140px">
+          <option value="">All</option><option value="completed">completed</option><option value="failed">failed</option>
+        </select></label>
+      <label style="display:flex;flex-direction:column;gap:4px"><span class="text-xs">Verdict / severity</span>
+        <select name="severity" id="f-sev" class="form-select" style="min-width:150px">
+          <option value="">All</option><option value="likely_threat">likely_threat</option>
+          <option value="needs_review">needs_review</option><option value="likely_benign">likely_benign</option>
+          <option value="Unavailable">Unavailable</option>
+        </select></label>
+      <button class="btn btn-primary btn-sm" type="submit">Apply</button>
+      <button class="btn btn-ghost btn-sm" id="rep-clear" type="button">Clear</button>
+      <span id="rep-status" class="text-sm text-muted"></span>
+    </form>
+    <p class="text-xs text-muted" style="margin-top:0.35rem">Filters are reflected in the URL and use the persisted verdict (`fused_verdict`) — not invented values. “Unavailable” shows runs never assessed by Sentinel.</p>
+  </div>
+
+  <div class="card" style="margin-top:0.8rem;overflow:auto">
+    <div id="rep-loading" class="text-sm" style="padding:0.6rem">Loading reports…</div>
+    <div id="rep-error" class="text-sm" style="display:none;color:var(--danger);padding:0.6rem"></div>
+    <div id="rep-empty" class="empty-state" style="display:none"><p id="rep-empty-msg">No security test reports yet.</p><p class="text-sm text-muted">Run a test in <a href="/admin/security#lab-card">Security Lab</a> — report history appears here. No sample data is fabricated.</p></div>
+    <div id="rep-wrap" style="display:none">
+      <table class="data-table"><thead><tr>
+        <th>ID / When</th><th>Type</th><th>Target</th><th>Status</th><th>HTTP</th><th>Findings</th>
+        <th>Severity / Verdict</th><th>Sentinel (honest)</th><th>Incident / Candidate</th><th></th>
+      </tr></thead><tbody id="rep-tbody"></tbody></table>
+      <p class="text-xs text-muted" style="margin-top:0.4rem">Actual findings vs simulated: <span class="badge badge-yellow">synthetic</span> = synthetic evidence (port_scan/bruteforce). All other rows are real TestClient requests.</p>
+    </div>
+  </div>
+  <p class="text-xs text-muted" style="margin-top:0.5rem">Model A/B outputs below are shown exactly as returned. “Not run” / “Unavailable” means the model did not produce usable output — the deterministic rules result is still shown separately.</p>
+</div>
+<script src="/static/js/security_reports.js"></script>
+{% endblock %}

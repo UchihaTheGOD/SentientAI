@@ -1,0 +1,24 @@
+{
+  "last_phase": "phase2",
+  "phase2_status": "PASS",
+  "phase2_report": "datasets/reports/csic_validation.json",
+  "phase2_log": "TESTv1/training_factory/logs/phase2_status.json",
+  "phase2_verified": {
+    "sha256": "c420f0bc0464376de75b6c419a0ac226fe69fe12c8ac4908843273721e44e637",
+    "rows": 61065,
+    "label_distribution": {
+      "0": 36000,
+      "1": 25065
+    },
+    "malformed": 0,
+    "dups": 0
+  },
+  "next_step": "PASS - Phase 2 verified. Normalized schema (source_row+provenance) validated, missing-field investigation complete (not classified as malicious), token-length spec verified. Do NOT create train/val/test splits until label semantics reviewed. Await instruction for Phase 3. No training/Kaggle started.",
+  "constraints": "raw unchanged; checkpoints/db untouched; no training; no Kaggle upload; splits not created",
+  "phase2_quarantine": {
+    "over_768": 1,
+    "over_740": 13,
+    "quarantined_row": 51536,
+    "rejected_path": "datasets/rejected/csic_rejected.jsonl"
+  }
+}

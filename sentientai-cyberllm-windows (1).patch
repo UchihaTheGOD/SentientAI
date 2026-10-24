@@ -1,0 +1,1741 @@
+diff --git a/.env.example b/.env.example
+index 3395236..24e2d0f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -28,3 +28,18 @@ SMTP_PASSWORD=
+ SMTP_FROM=
+ SMTP_USE_TLS=true
+ PASSWORD_RESET_TOKEN_EXPIRE_MINUTES=30
++
++# --- CyberLLM (pilot v8: Qwen3-1.7B + data-v3.2 LoRA adapter) --------------
++# `app/config.py` loads `.env` at startup (before any router import), so
++# these reach the loader without PowerShell `$env:` lines. A variable
++# already set in the shell takes precedence over `.env`.
++# Paths below are the Windows layout from CYBERLLM_WINDOWS_SETUP.md;
++# on Linux/macOS, point these at the equivalent local directories.
++CYBERLLM_BASE_DIR=D:\CyberLLM\models\Qwen3-1.7B
++CYBERLLM_ADAPTER_DIR=D:\CyberLLM\models\cyberllm-v8
++CYBERLLM_ADAPTER_SHA256=d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1
++# auto = CUDA when torch reports it, else CPU. Set to cpu to force CPU.
++CYBERLLM_DEVICE=cuda
++# 8-bit CUDA fallback for tight VRAM (needs bitsandbytes; untested on
++# Windows — if it fails, delete this line and use CYBERLLM_DEVICE=cpu).
++# CYBERLLM_LOAD_IN_8BIT=1
+diff --git a/CYBERLLM_INTEGRATION.md b/CYBERLLM_INTEGRATION.md
+new file mode 100644
+index 0000000..91e9a80
+--- /dev/null
++++ b/CYBERLLM_INTEGRATION.md
+@@ -0,0 +1,97 @@
++# CyberLLM integration into SentientAI (branch: cyberllm-integration)
++
++No new website, dashboard, or frontend was built. CyberLLM is exposed
++through SentientAI's existing FastAPI backend, following the existing
++Sentinel integration's patterns (lazy loading, auth-gated analysis,
++fail-open when torch is absent, human-review honesty rules).
++
++## What changed (5 new files, 1 edited)
++
++| File | What it does |
++|---|---|
++| `app/services/cyberllm_loader.py` | Lazy base + LoRA adapter loader (mirrors `sentinel_loader.py`). Verifies the adapter sha256 before loading; records load failures instead of crashing the app. Env: `CYBERLLM_BASE_DIR`, `CYBERLLM_BASE_MODEL`, `CYBERLLM_BASE_REVISION`, `CYBERLLM_ADAPTER_DIR`, `CYBERLLM_ADAPTER_SHA256`. |
++| `app/services/cyberllm_inference.py` | Greedy generation with the frozen eval prompt templates, verbatim (pilot v8 is prompt-sensitive). Budgets: 320 tokens log/HTTP/URL, 512 vulnerability. Reports truncation. |
++| `app/services/cyberllm_rules.py` | Deterministic rules that run before the model: cloud-metadata SSRF, private/loopback fetch targets, credential-file probes, repeated probing. Every firing cites its evidence. |
++| `app/services/cyberllm_schema.py` | JSON extraction + schema validation. Unknown keys are dropped. There is deliberately NO MITRE ATT&CK field: exact-ID performance is 0.000–0.025 across all pilots, so IDs are never presented as confirmed findings. |
++| `app/api/cyberllm.py` | `GET /api/cyberllm/readiness`, `POST /api/cyberllm/readiness/load` (admin), `POST /api/cyberllm/screen` (rules only), `POST /api/cyberllm/analyze` (authenticated, `validate_log_text` 8000-char cap). |
++| `app/main.py` (edited) | Registers `cyberllm.router` next to `sentinel.router`. Two lines. |
++
++`tests/test_cyberllm_api.py` covers auth, validation, the screen rules,
++the SSRF override, truncated-output degradation, and the 503 path.
++
++## Safety contract
++
++- Unparseable/truncated output -> `needs_review`, confidence low, raw text
++  preserved, no fabricated classification.
++- Low-confidence output -> `needs_review`.
++- A high-severity deterministic finding can override a benign model verdict
++  to `likely_threat`, transparently (`model_classification` keeps the
++  model's answer; the override and its evidence are returned).
++- Nothing submitted in a log is ever executed.
++- No MITRE IDs are returned, confirmed or otherwise.
++
++## Checkpoint selection
++
++- Leading candidate: pilot v8 (Qwen3-1.7B, data-v3.2, adapter sha256
++  `d624ed79…5a5b1`). Load it by pointing the env vars at the base model
++  and the v8 adapter (see below).
++- Fallback: pilot v3 (Qwen3-0.6B, data-v2, adapter sha256 `384d296a…8967`),
++  the overall reference. Use `CYBERLLM_BASE_MODEL=Qwen/Qwen3-0.6B`,
++  `CYBERLLM_BASE_REVISION=c1899de…`, `CYBERLLM_ADAPTER_DIR=<v3 adapter>`,
++  `CYBERLLM_ADAPTER_SHA256=384d296a4ad5afb7b1523a8f2f3b8e0c07ad7a1ac7faf1b27d36436084bd8967`.
++- Checkpoints are never modified. The loader only reads them; a sha
++  mismatch refuses the load.
++
++## Run it
++
++```bash
++# 1. Python deps (SentientAI's own requirements + model stack)
++python3 -m venv .venv
++.venv/bin/pip install -r requirements.txt
++.venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch
++.venv/bin/pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0
++
++# 2. Point at a base model + adapter (symlinks keep checkpoints untouched)
++ln -s <path-to-Qwen3-1.7B> local_models/cyberllm/base-1.7b   # or set env vars
++ln -s <path-to-v8-adapter> local_models/cyberllm/v8
++CYBERLLM_BASE_DIR=local_models/cyberllm/base-1.7b \
++CYBERLLM_ADAPTER_DIR=local_models/cyberllm/v8 \
++  .venv/bin/python run.py   # serves http://127.0.0.1:8000
++
++# 3. Load (admin) and check
++curl http://127.0.0.1:8000/api/cyberllm/readiness
++```
++
++Then, logged in as any user, POST to `/api/cyberllm/analyze`:
++
++```bash
++curl -X POST http://127.0.0.1:8000/api/cyberllm/analyze \
++  -H 'Content-Type: application/json' -H "X-CSRF-Token: $TOKEN" \
++  --cookie "session=$SESSION" \
++  -d '{"log_text": "Oct 24 07:12:01 web-1 sudo: deploy : TTY=pts/0 ; COMMAND=/usr/bin/systemctl restart nginx"}'
++```
++
++(Use the browser while logged in, or the test client's login helper, for
++the session + CSRF token — same mechanism as the existing Sentinel UI.)
++
++## Resource requirements (measured)
++
++See `CYBERLLM_INTEGRATION_REPORT.md` for the measured load/inference
++numbers on the hardware used for verification. Local pilot v8 inference
++needs ~3.4 GB for bf16 weights plus the torch runtime; pilot v3 needs
++~1.2 GB. The API stays up and returns 503 with the real reason when the
++model cannot load.
++
++## What the existing website still needs
++
++Website form: `GET /cyberllm` (login required, same auth + CSRF as
++`/sentinel`) renders `app/templates/cyberllm.html`, a form that POSTs
++to `/api/cyberllm/analyze` and renders `classification`, `confidence`,
++`summary`, `indicators`, `reasoning`, `limitations`,
++`recommended_actions`, deterministic findings, and the `needs_review`
++banner. It adds no new API surface.
++
++Windows local run (GTX 1660 / 6 GB VRAM, float16 on CUDA, 8-bit and
++CPU fallbacks): see `CYBERLLM_WINDOWS_SETUP.md` — base + adapter
++download commands, file sizes, checksums, launch commands, and the
++six-case website test battery.
+diff --git a/CYBERLLM_INTEGRATION_REPORT.md b/CYBERLLM_INTEGRATION_REPORT.md
+new file mode 100644
+index 0000000..6a3cfed
+--- /dev/null
++++ b/CYBERLLM_INTEGRATION_REPORT.md
+@@ -0,0 +1,205 @@
++# CyberLLM × SentientAI — integration report (branch: cyberllm-integration)
++
++Date: 2026-10-24. No training runs, no paid compute, no checkpoint
++overwrites, no EXP-CLLM-008, nothing published. All model artifacts stayed
++private and read-only; the loader refuses to load on a sha256 mismatch.
++
++## A. Existing application audit (verified, not assumed)
++
++SentientAI (`github.com/UchihaTheGOD/SentientAI`) is a FastAPI 0.115.6 +
++Jinja2 + SQLAlchemy 2.0 community publishing platform (posts, comments,
++likes, follows, messages, notifications, search) with a private admin
++panel. Auth: JWT sessions (python-jose HS256), Argon2id passwords, CSRF
++double-submit middleware, in-process sliding-window rate limiting, audit
++log. Config: `app/config.py` Settings from environment / `.env`
++(`SECRET_KEY` required in production). Entry point: `run.py` → uvicorn
++`app.main:app` on 127.0.0.1:8000; app factory `create_app()` in
++`app/main.py`, lifespan runs `init_db()` + Sentinel background warm-load
++(fail-open without torch). DB: SQLite file, model-driven migrations.
++
++Frontend: server-rendered Jinja2 templates (`app/templates`) + static
++CSS/JS. No React/SPA. The frontend talks to the backend through normal
++form posts and `fetch` calls carrying the CSRF token, same mechanism the
++new endpoint uses.
++
++Existing AI integration (the seam this work reuses): the Sentinel stack —
++`app/services/sentinel_loader.py` (dual-checkpoint CPU loader, ~1.9 GB
++RSS), `sentinel_inference.py` (greedy, semaphore 2, 12 s budget),
++`sentinel_fusion.py` (deterministic brute-force/port-scan rules + fusion),
++`sentinel_moderation.py` (structured JSON contract + human-review gate),
++router `app/api/sentinel.py` (`POST /api/sentinel/analyze`, auth-gated,
++`validate_log_text` 8000-char cap, incident persistence). Per the repo's
++own README, Sentinel checkpoints load but produce 0% valid JSON today, so
++fusion falls back to rules and human review remains the gate. CyberLLM
++plugs into the same shape with a much stronger model.
++
++Routes added by this branch (registered in `app/main.py`, 2 lines):
++`GET /api/cyberllm/readiness`, `POST /api/cyberllm/readiness/load`
++(admin), `POST /api/cyberllm/screen`, `POST /api/cyberllm/analyze`,
++plus the website form page `GET /cyberllm` (login required, same CSRF
++pattern as `/sentinel`).
++
++## B. Model assessment
++
++Two checkpoints were loaded with REAL weights and REAL inference through
++the integration's own loader/inference code (not recorded outputs):
++
++| Checkpoint | Base (pinned revision) | Adapter sha256 | Load | Verdict |
++|---|---|---|---|---|
++| Pilot v8 (leading candidate) | Qwen/Qwen3-1.7B @ 70d244cc… | d624ed79…5a5b1 | 16.3 s, RSS 1.12 GB after load | **RUNNING — live inference verified** |
++| Pilot v3 (overall reference, fallback) | Qwen/Qwen3-0.6B @ c1899de… | 384d296a…8967 | 13.0–19.6 s, RSS 0.80–1.12 GB after load | **RUNNING — live inference verified** |
++
++Both adapters were hash-verified before loading (the loader refuses on
++mismatch). Pilot v6 was not loaded live; it remains the log-analysis
++specialist on the strength of its frozen-eval record, untouched.
++
++Limitations found live:
++- A real integration bug was caught and fixed during testing: omitting
++  `enable_thinking=False` made Qwen3 emit a `<think>` trace that consumed
++  the whole token budget, so every output was unparseable. The frozen eval
++  harness passes `enable_thinking=False`; the integration now does too.
++  After the fix, all live outputs parsed as valid JSON.
++- CPU speed on this 2-core VM is slow (see E). This is a dev-demo speed,
++  not interactive-production speed; a GPU would cut latencies to seconds.
++- Peak RSS during generation reached 4.53 GB (v8) / 2.28 GB (v3). The
++  machine running inference needs that much free RAM, not just the load
++  figure. The API stays up and returns 503 with the real reason when the
++  model cannot load.
++- MITRE ATT&CK exact-ID performance (0.000–0.025 across all pilots) is
++  unreliable. The API has NO MITRE field at all, so no ID can be presented
++  as a confirmed finding. EXP-CLLM-008 remains deferred.
++
++## C. Integration results (files changed, branch cyberllm-integration)
++
++| File | Change |
++|---|---|
++| `app/services/cyberllm_loader.py` (new) | Lazy base + LoRA loader mirroring `sentinel_loader.py`: sha verification, torch-optional fail-open, status dataclass, RSS reporting. Env: `CYBERLLM_BASE_DIR`, `CYBERLLM_BASE_MODEL`, `CYBERLLM_BASE_REVISION`, `CYBERLLM_ADAPTER_DIR`, `CYBERLLM_ADAPTER_SHA256`, plus `CYBERLLM_DEVICE` (auto/cpu/cuda; CUDA loads float16 — Turing cards such as the GTX 1660 have no bfloat16 support) and `CYBERLLM_LOAD_IN_8BIT` (bitsandbytes fallback for tight VRAM; untested on Windows). |
++| `app/services/cyberllm_inference.py` (new) | Greedy generation with the frozen eval templates verbatim (`enable_thinking=False`), budgets 320 (log/HTTP/URL) / 512 (vulnerability), truncation flag, semaphore 2. |
++| `app/services/cyberllm_rules.py` (new) | Deterministic rules: cloud-metadata SSRF, private/loopback fetch targets, credential-file probes, repeated probing. Each firing cites its evidence. |
++| `app/services/cyberllm_schema.py` (new) | JSON extraction + schema validation; unknown keys dropped; no MITRE field; failures degrade to needs_review with raw text preserved. |
++| `app/api/cyberllm.py` (new) | Readiness, admin load, screen, analyze (auth-gated, `validate_log_text` cap). Unparseable → needs_review; low confidence → needs_review; high-severity deterministic finding escalates a benign/needs-review model verdict to likely_threat transparently (`model_classification` preserved). Model unavailable → 503 with reason + screen findings. Also serves the `GET /cyberllm` form page (login required, redirect to `/login` otherwise). |
++| `app/templates/cyberllm.html` (new) | Analyze form reusing the existing base layout and CSRF double-submit pattern; renders classification, confidence, summary, indicators, reasoning, limitations, recommended actions, deterministic findings, and the `needs_review` banner. |
++| `.env.example` (new) | Copy-to-`.env` template (`.env` itself is gitignored) with the CyberLLM Windows paths and the adapter sha256; `app/config.py` loads `.env` before any router import, so these reach the loader. |
++| `app/main.py` (edited) | Registers `cyberllm.router` next to `sentinel.router`. |
++| `tests/test_cyberllm_api.py` (new) | 12 tests: auth, validation, screen rules, SSRF override, truncation degradation, 503 path, escalation logic, readiness quantization field, form-page login redirect + render. |
++| `scripts/cyberllm_live_test.py` (new) | Live battery runner (real weights, integration code path). |
++| `CYBERLLM_INTEGRATION.md` (new) | Runbook: deps, model placement, start commands, curl example. |
++| `CYBERLLM_WINDOWS_SETUP.md` (new) | Windows local run: GTX 1660 / 6 GB VRAM analysis, exact base + adapter downloads, sizes, checksums, launch commands, six-case website battery, v3 fallback. |
++
++No existing file besides `app/main.py` was modified. No existing route,
++template, or behaviour was changed; the only frontend addition is the
++single `cyberllm.html` form page above, not a new app.
++Evaluation JSON files touched by running the repo's own test suite were
++restored (`git checkout`) so the branch contains only the above.
++
++## D. Test results
++
++Live = real weights through the integration code. Recorded = pilot v8
++frozen-eval raw generations fed through the endpoint code. Mocked =
++synthetic model output testing endpoint logic only (labelled as such).
++
++| Test | Input category | Expected | Actual | Status | Mode |
++|---|---|---|---|---|---|
++| v8 battery: benign sudo log | benign log | likely_benign | likely_benign, medium conf, valid JSON, 216 tok | PASS | LIVE v8 |
++| v8 battery: single SSH failure | review log | needs_review | needs_review, low conf, valid JSON, 237 tok | PASS | LIVE v8 |
++| v8 battery: 3-line web scan | threat log | likely_threat | likely_threat, high conf, valid JSON, 287 tok (+ credential/repeated-probe findings) | PASS | LIVE v8 |
++| v8 battery: SSRF metadata request | threat HTTP | likely_threat | likely_threat, high conf, valid JSON, 221 tok (+ metadata_endpoint finding) | PASS | LIVE v8 |
++| v8 battery: CVE-2017-0142 description | vulnerability | valid JSON or safe degradation | needs_review, low conf, valid JSON, 455 tok, no truncation | PASS | LIVE v8 |
++| v3 battery: same 5 cases | mixed | benign/review/threat handling | benign ✓, review ✓, scan → needs_review (safe; deterministic findings fired), SSRF → likely_threat, CVE → needs_review, all valid JSON | PASS | LIVE v3 |
++| Live server: register → login → analyze | benign log, real uvicorn | 200 + likely_benign | 200, likely_benign, source=model, parse=True, wall 123.6 s (cold: load + generation) | PASS | LIVE v8 via HTTP |
++| Live server: unauthenticated analyze | auth | 401/403, no verdict | 403 (CSRF middleware, before auth) without token | PASS | LIVE server |
++| Endpoint: SSRF override | threat HTTP | deterministic_override to likely_threat, model verdict preserved | exactly that | PASS | RECORDED v8 |
++| Endpoint: CVE truncation | vulnerability | needs_review, parse_ok False, raw preserved | exactly that | PASS | RECORDED v8 |
++| Endpoint: benign / validation / 503 / escalation | mixed | correct codes + verdicts | all as specified | PASS | RECORDED + logic |
++| Full repo suite | regression | no new failures | 7 failures, all pre-existing (proven identical on a pristine clone: missing gitignored `local_models/sentinel/` checkpoints + tokenizer) | PASS (no regressions) | — |
++| Browser workflow (click-through in a real browser) | end-to-end UI | — | NOT RUN: no browser session for localhost in this environment | BLOCKED (stated, not claimed) | — |
++
++Notes on honest discrepancies:
++- Frozen v8 eval recorded the SSRF item as likely_benign (the known miss);
++  the live CPU run classified the same text likely_threat. Greedy decoding
++  on CPU bf16 vs GPU fp16 can flip close decisions; the deterministic
++  layer flags it either way, so the endpoint verdict is likely_threat in
++  both worlds.
++- Frozen v8 eval truncated the CVE item at 512 tokens; the live CPU run
++  produced valid JSON at 455 tokens. Same numerics caveat; the endpoint
++  degrades safely in both worlds.
++- v3 live called the web scan needs_review while v8 live called it
++  likely_threat. needs_review routes to human review — safe, not a miss —
++  and the endpoint now escalates needs_review + high-severity findings to
++  likely_threat.
++
++## E. Performance (measured on this 2-CPU VM, CPU inference)
++
++| Measurement | Pilot v8 (1.7B) | Pilot v3 (0.6B) |
++|---|---|---|
++| Model load | 16.3 s | 13.0–19.6 s |
++| RSS after load | 1.12 GB | 0.80–1.12 GB |
++| Peak RSS during generation | 4.53 GB | 2.28 GB |
++| Per-request latency (216–455 tok) | 116–241 s (~1.5–1.9 tok/s) | 48–98 s (~4.4 tok/s) |
++| Live HTTP cold first request (load + benign analysis) | 123.6 s wall | — |
++| Readiness / screen endpoints | < 0.1 s (no model needed) | same |
++
++## F. Current usability (evidence-based)
++
++- [x] Model loads and inference works independently — v8 AND v3, live.
++- [x] Backend integration works — new endpoints live in SentientAI,
++  tested via TestClient and via real uvicorn + real login.
++- [x] Existing website integration works — `GET /cyberllm` serves a form
++  in the existing layout that posts to `/api/cyberllm/analyze` with the
++  existing CSRF mechanism; covered by page tests (login redirect +
++  render). What is NOT yet verified is a human click-through in a real
++  browser.
++- [ ] Full end-to-end workflow verified — the API leg and the page leg
++  are verified; the browser click-through leg is not (no browser
++  session here).
++
++## G. How to use it
++
++```bash
++cd <sentientai-checkout> && git checkout cyberllm-integration
++python3 -m venv .venv
++.venv/bin/pip install -r requirements.txt
++.venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch
++.venv/bin/pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0
++
++# Point at the models (symlinks keep checkpoints untouched; or set the env vars)
++CYBERLLM_BASE_DIR=<path-to-Qwen3-1.7B> \
++CYBERLLM_ADAPTER_DIR=<path-to-v8-adapter> \
++CYBERLLM_ADAPTER_SHA256=d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1 \
++  .venv/bin/python run.py   # http://127.0.0.1:8000
++
++# Check readiness, then load (admin) if needed:
++curl http://127.0.0.1:8000/api/cyberllm/readiness
++```
++
++While logged into SentientAI in the browser, POST `{"log_text": "..."}`
++to `/api/cyberllm/analyze` with the session cookie + `X-CSRF-Token`
++header (exactly like the existing Sentinel analyze call). The response
++carries `classification`, `confidence`, `needs_review`,
++`decision_source`, `summary`, `indicators`, `reasoning`, `limitations`,
++`recommended_actions`, and `deterministic_findings`. Treat
++`needs_review: true` as "a human must look at this" — that is the safe
++state, not an error.
++
++For the lighter fallback (v3, ~2.3 GB peak instead of ~4.5 GB):
++`CYBERLLM_BASE_MODEL=Qwen/Qwen3-0.6B`,
++`CYBERLLM_BASE_REVISION=c1899de289a04d12100db370d81485cdf75e47ca`,
++`CYBERLLM_ADAPTER_DIR=<v3-adapter>`,
++`CYBERLLM_ADAPTER_SHA256=384d296a4ad5afb7b1523a8f2f3b8e0c07ad7a1ac7faf1b27d36436084bd8967`.
++
++## H. Remaining work (only actual blockers/improvements)
++
++1. Browser click-through verification: run the `/cyberllm` form
++   workflow in a real browser (the page and its tests exist; a human
++   click-through has not been run).
++3. Speed: CPU inference is 1.5–4.4 tok/s here. For interactive use, run
++   the same code on a GPU host (the code is device-agnostic: CUDA is
++   picked up automatically when torch sees it) or accept ~2-minute
++   analyses on CPU.
++4. The 7 pre-existing test failures (missing gitignored Sentinel
++   checkpoints/tokenizer in a fresh clone) are unrelated to this branch
++   but will fail for anyone else cloning fresh; restoring
++   `local_models/sentinel/` fixes them.
++5. MITRE attribution stays out of scope until EXP-CLLM-008 (deferred by
++   you) is explicitly authorized; the API will not present technique IDs
++   until then.
+diff --git a/CYBERLLM_WINDOWS_SETUP.md b/CYBERLLM_WINDOWS_SETUP.md
+new file mode 100644
+index 0000000..9e7cf93
+--- /dev/null
++++ b/CYBERLLM_WINDOWS_SETUP.md
+@@ -0,0 +1,325 @@
++# CyberLLM on Windows — download, configure, run, test
++
++Goal: run the already-trained CyberLLM model locally on a Windows PC
++through the existing SentientAI website. No retraining, no new website,
++no Docker/Kubernetes, no paid services, no publishing.
++
++## 1. Which model was selected, and why
++
++**Selected: pilot v8** — Qwen3-1.7B base + data-v3.2 LoRA adapter.
++It is the leading development candidate: it resolved the threat
++assertiveness / benign calibration / abstention trade-off seen at 0.6B
++scale, with frozen T5 perfect, T3b abstention 1.00, T2 0.95 and
++val_v3_log accuracy 0.9583. It is NOT fully promoted, because frozen
++T1 is 0.9583 (one SSRF miss) and T4 schema is 0.80 (one CVE truncation)
++— see the honest caveats in section 8. Do not present it as
++production-ready solely because it loads.
++
++**Fallback: pilot v3** — Qwen3-0.6B + data-v2 adapter, the overall
++reference checkpoint. Use it if v8 fails to load or behaves badly
++(section 7). Never overwrite either checkpoint.
++
++**Adapter, not merged model.** The trained artifact is a LoRA/PEFT
++adapter (`peft_type: LORA`, r16, alpha 32, trained on Qwen3-1.7B).
++It does NOT contain the base weights, so you must download BOTH the
++exact base model revision AND the adapter. The loader merges the
++adapter onto the base in memory at load time; nothing is written back
++to disk.
++
++## 2. Your hardware, and the loading configuration
++
++- GPU: NVIDIA GTX 1660 OC — **6 GB VRAM** (confirm with
++  `nvidia-smi --query-gpu=name,memory.total --format=csv`).
++- RAM: 32 GB. CPU: Intel i5-12600K. OS: Windows.
++
++Why float16 on this GPU: Turing cards (GTX 16 series) have no
++bfloat16 tensor-core support, while float16 works. The loader already
++does this automatically: CUDA → float16, CPU → bfloat16. Do not force
++bfloat16 on this card.
++
++VRAM math for pilot v8 in float16: weights ~3.4 GB + CUDA context,
++KV cache and activations ~1 GB → roughly **4.5 GB peak**, which fits
++6 GB but is tight if the desktop/browser also hold VRAM. Plan:
++1. Try `CYBERLLM_DEVICE=cuda` (or unset = auto) first.
++2. If you get a CUDA out-of-memory failure (readiness state `failed`,
++   or a 503 with an OOM reason), retry with
++   `CYBERLLM_LOAD_IN_8BIT=1` after `pip install bitsandbytes`.
++   Official bitsandbytes ships Windows CUDA builds (11.7–12.4 per its
++   v0.43.2 installation docs), and CUDA 12.1 is inside that range, so
++   the install is worth trying — but the 8-bit load path itself is
++   still UNTESTED on this PC (the author has no GPU), so if the
++   install or the load fails, skip straight to step 3. Do not
++   substitute the unofficial `bitsandbytes-windows` fork.
++3. If that also fails, `CYBERLLM_DEVICE=cpu`. 32 GB RAM is plenty
++   (CPU peak was ~4.5 GB in testing); it is just slower.
++
++Speed: on a 2-CPU Linux VM without a GPU, v8 took 116–241 s per
++request. On your GTX 1660 expect much faster responses, but no exact
++figure is promised here — measure it with the latency shown on the
++`/cyberllm` results card and treat the CPU numbers as the ceiling.
++
++## 3. What changes in the SentientAI repo
++
++Nothing in this setup touches GitHub settings, and nothing was pushed
++to `https://github.com/UchihaTheGOD/SentientAI` by the author. You
++apply the `cyberllm-integration` branch changes to your own clone:
++
++- NEW `app/services/cyberllm_loader.py` — lazy base+adapter loader,
++  adapter sha256 verification, fail-open without torch.
++- NEW `app/services/cyberllm_inference.py` — greedy generation with
++  the frozen eval prompt templates verbatim, `enable_thinking=False`.
++- NEW `app/services/cyberllm_rules.py` — deterministic SSRF /
++  credential-probe / repeated-probe rules with cited evidence.
++- NEW `app/services/cyberllm_schema.py` — JSON extraction/validation.
++  Deliberately NO MITRE ATT&CK field: exact technique-ID prediction
++  measured 0.000–0.025, so IDs must never be presented as findings.
++- NEW `app/api/cyberllm.py` — `GET /api/cyberllm/readiness`,
++  `POST /api/cyberllm/readiness/load` (admin),
++  `POST /api/cyberllm/screen`, `POST /api/cyberllm/analyze`
++  (login required), plus the `GET /cyberllm` website form page.
++- NEW `app/templates/cyberllm.html` — the analyze form, reusing the
++  existing base layout and the existing CSRF double-submit pattern
++  (same `X-CSRF-Token` header mechanism as the `/sentinel` page).
++- EDIT `app/main.py` — two lines: register `cyberllm.router`.
++- NEW `tests/test_cyberllm_api.py` — 11 endpoint/page tests.
++- NEW `scripts/cyberllm_live_test.py` — scripted live battery.
++- NEW `CYBERLLM_INTEGRATION.md`, `CYBERLLM_INTEGRATION_REPORT.md`,
++  and this file.
++
++Apply with the supplied patch file (see section 4), or merge the
++`cyberllm-integration` branch if you have it. Auth, authorization
++and CSRF protections are unchanged: analyze/screen require login,
++the load endpoint requires admin, and the form page redirects
++anonymous visitors to `/login`.
++
++## 4. Apply the code changes to your clone (PowerShell)
++
++```powershell
++git clone https://github.com/UchihaTheGOD/SentientAI
++cd SentientAI
++git apply sentientai-cyberllm-windows.patch
++git status --short
++```
++
++If `git apply` fails because upstream `main` has moved since the
++patch was made, apply the files listed in section 3 by hand — the
++patch is only a delivery vehicle, and every file above is new except
++the two-line change in `app/main.py`.
++
++## 5. Install Python dependencies (PowerShell)
++
++Python 3.12 is recommended. From the `SentientAI` directory:
++
++```powershell
++py -3.12 -m venv .venv
++.\.venv\Scripts\Activate.ps1
++pip install -r requirements.txt
++pip install torch --index-url https://download.pytorch.org/whl/cu121
++pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0 psutil httpx pytest
++```
++
++Notes: the CUDA 12.1 torch wheel supports Turing (compute 7.5).
++`psutil` is only for RSS reporting; the loader works without it.
++If you ever see a `torchao` ImportError from peft, run
++`pip uninstall -y torchao` — that conflict was observed in Kaggle
++kernels, not in a fresh install, but the fix is the same.
++
++Create a `.env` file next to `run.py` with a private secret (local
++use only; never commit it):
++
++```powershell
++@"
++SECRET_KEY=replace-this-with-a-long-random-string
++ENVIRONMENT=development
++"@ | Out-File -Encoding utf8 .env
++```
++
++## 6. Download the model files
++
++### 6a. Base model — Qwen/Qwen3-1.7B, revision pinned (Hugging Face)
++
++Qwen3-1.7B is Apache-2.0 and ungated: no license approval, no token
++needed. The revision below is the exact one the pilots trained and
++evaluated against. Do not substitute `main` or another revision —
++weights can change under a moving branch.
++
++```powershell
++pip install huggingface_hub
++huggingface-cli download Qwen/Qwen3-1.7B `
++  --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e `
++  --local-dir D:\CyberLLM\models\Qwen3-1.7B `
++  --local-dir-use-symlinks False
++```
++
++Files you should end up with (~4.1 GB total):
++
++| File | Size (bytes) |
++|---|---|
++| `model-00001-of-00002.safetensors` | 3,441,185,608 |
++| `model-00002-of-00002.safetensors` | 622,329,984 |
++| `model.safetensors.index.json` | 25,605 |
++| `config.json`, `generation_config.json` | small |
++| `tokenizer.json`, `tokenizer_config.json`, `vocab.json`, `merges.txt` | ~15 MB |
++
++Hugging Face downloads resume automatically after an interruption —
++just re-run the same command. It also verifies file hashes itself.
++
++### 6b. Trained adapter — pilot v8, from your private Kaggle dataset
++
++Authoritative source: your private Kaggle dataset
++`uchihamadarum/cyber-llm-artifacts` (version 14). Only the six
++`adapter_17b_datav32_*` files are pilot v8. **Warning: do NOT pick
++`adapter_17b_datav2_*` — that is pilot v4 (1.7B, data-v2), a different
++checkpoint with the same file size.** `adapter_datav2_*` is the 0.6B
++pilot v3 fallback, not v8.
++
++```powershell
++pip install kaggle
++# Put your kaggle.json at $env:USERPROFILE\.kaggle\kaggle.json first
++# (Kaggle account page -> API -> Create New Token). Never share it.
++kaggle datasets download -d uchihamadarum/cyber-llm-artifacts -f adapter_17b_datav32_adapter_config.json   -p D:\CyberLLM\models\cyberllm-v8
++kaggle datasets download -d uchihamadarum/cyber-llm-artifacts -f adapter_17b_datav32_adapter_model.safetensors -p D:\CyberLLM\models\cyberllm-v8
++kaggle datasets download -d uchihamadarum/cyber-llm-artifacts -f adapter_17b_datav32_chat_template.jinja    -p D:\CyberLLM\models\cyberllm-v8
++kaggle datasets download -d uchihamadarum/cyber-llm-artifacts -f adapter_17b_datav32_tokenizer.json         -p D:\CyberLLM\models\cyberllm-v8
++kaggle datasets download -d uchihamadarum/cyber-llm-artifacts -f adapter_17b_datav32_tokenizer_config.json  -p D:\CyberLLM\models\cyberllm-v8
++```
++
++The Kaggle CLI does not resume interrupted downloads, but these
++files total only ~82 MB, so re-running a failed download is cheap.
++Rename the downloads to the canonical adapter filenames the loader
++expects:
++
++```powershell
++cd D:\CyberLLM\models\cyberllm-v8
++Rename-Item adapter_17b_datav32_adapter_config.json   adapter_config.json
++Rename-Item adapter_17b_datav32_adapter_model.safetensors adapter_model.safetensors
++Rename-Item adapter_17b_datav32_chat_template.jinja    chat_template.jinja
++Rename-Item adapter_17b_datav32_tokenizer.json         tokenizer.json
++Rename-Item adapter_17b_datav32_tokenizer_config.json  tokenizer_config.json
++```
++
++Verify the weights — the loader refuses to load on a mismatch, and
++this hash was re-verified against the Kaggle bundle copy:
++
++```powershell
++(Get-FileHash D:\CyberLLM\models\cyberllm-v8\adapter_model.safetensors -Algorithm SHA256).Hash
++# must equal: D624ED793A45A64CB541577441C87C7D2FEB83C37A84DA057D1C15E58E45A5B1
++```
++
++Adapter total: ~82 MB (weights 69,782,384 bytes + tokenizer
++11,422,650 bytes + small files). **Combined download: ~4.2 GB.**
++
++## 7. Launch SentientAI with CyberLLM enabled (PowerShell)
++
++Environment variables only — no Linux paths are hard-coded anywhere
++in the code; the defaults are repo-relative and every path below is
++an override. These last for the PowerShell session; use `setx` only
++if you want them persistent (a new terminal is then required).
++
++```powershell
++cd SentientAI
++.\.venv\Scripts\Activate.ps1
++$env:CYBERLLM_BASE_DIR = "D:\CyberLLM\models\Qwen3-1.7B"
++$env:CYBERLLM_ADAPTER_DIR = "D:\CyberLLM\models\cyberllm-v8"
++$env:CYBERLLM_ADAPTER_SHA256 = "d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1"
++$env:CYBERLLM_DEVICE = "cuda"
++python run.py
++```
++
++Then open http://127.0.0.1:8000 and check readiness (no login
++needed for this one):
++
++```powershell
++Invoke-RestMethod http://127.0.0.1:8000/api/cyberllm/readiness
++```
++
++Before any analysis it reports `state: not_loaded` — that is the
++lazy-load design, not an error. The model loads on the first
++analysis, or explicitly via the admin endpoint
++`POST /api/cyberllm/readiness/load`. After loading, readiness shows
++`ready: true`, `device: cuda`, `quantization: none`, and `load_ms`.
++
++If readiness reports `failed`, read `reason` — it is the real error
++(missing file, hash mismatch, OOM). Missing files and load failures
++return 503 from `/api/cyberllm/analyze` with that reason and any
++deterministic findings, never a fabricated verdict.
++
++## 8. Test it through the existing website
++
++Register or log in, then open **http://127.0.0.1:8000/cyberllm**.
++Run each case (kind selector + text), and compare:
++
++| # | Kind | Input | Expected (live v8 behavior) |
++|---|---|---|---|
++| 1 | log | `Oct 24 07:12:01 web-1 sudo: deploy : TTY=pts/0 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx` | likely_benign |
++| 2 | log | `Oct 24 07:10:22 proxy-9 sshd[310]: Failed password for ruth from 203.0.113.124 port 22 ssh2` | needs_review (single failure is not enough evidence — the `needs_review` banner must show) |
++| 3 | log | Three lines from `203.0.113.153`: `GET /wp-login.php`, `GET /.env`, `GET /.git/config` (404s) | likely_threat (deterministic credential-probe findings must appear) |
++| 4 | http_request | `GET /fetch?u=http://169.254.169.254/latest/meta-data/ HTTP/1.1` | likely_threat. Note: the frozen eval recorded v8 calling this likely_benign; the deterministic metadata rule must override it transparently (`decision_source: deterministic_override`, model verdict preserved). If you see likely_benign here, the rules layer is broken. |
++| 5 | vulnerability | The SMBv1 / CVE-2017-0142 description (Windows Vista SP2 … Server 2016, remote code execution via crafted packets) | Valid JSON needs_review, OR needs_review with `parse_ok: false` if output truncates at 512 tokens (v8 truncated this item in frozen eval). Either is a safe degradation; a confident fabricated verdict is not. |
++| 6 | any | Empty text, or text over 8000 chars | 422 validation error, no analysis |
++| 7 | — | With the model directory temporarily renamed, submit any analysis | 503 `model_unavailable` with the real reason — proves failures stay honest |
++
++Also run the automated integration tests (these use recorded
++generations, not live weights — they verify the endpoint contract,
++not the model):
++
++```powershell
++python -m pytest tests/test_cyberllm_api.py -q
++```
++
++And the scripted live battery (real inference, same six cases):
++
++```powershell
++$env:CYBERLLM_BASE_DIR = "D:\CyberLLM\models\Qwen3-1.7B"
++$env:CYBERLLM_ADAPTER_DIR = "D:\CyberLLM\models\cyberllm-v8"
++$env:CYBERLLM_ADAPTER_SHA256 = "d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1"
++python scripts/cyberllm_live_test.py
++```
++
++## 9. Fallback: pilot v3 (0.6B, data-v2)
++
++If v8 fails to load or misbehaves, switch to the overall reference
++checkpoint. Download the 0.6B base and the `adapter_datav2_*` files
++(the same Kaggle dataset, different filenames), rename them the same
++way, and launch with:
++
++```powershell
++huggingface-cli download Qwen/Qwen3-0.6B `
++  --revision c1899de289a04d12100db370d81485cdf75e47ca `
++  --local-dir D:\CyberLLM\models\Qwen3-0.6B `
++  --local-dir-use-symlinks False
++# Kaggle files: adapter_datav2_adapter_config.json, adapter_datav2_adapter_model.safetensors,
++# adapter_datav2_chat_template.jinja, adapter_datav2_tokenizer.json, adapter_datav2_tokenizer_config.json
++# -> rename to adapter_config.json, adapter_model.safetensors, chat_template.jinja, tokenizer.json, tokenizer_config.json
++$env:CYBERLLM_BASE_DIR = "D:\CyberLLM\models\Qwen3-0.6B"
++$env:CYBERLLM_ADAPTER_DIR = "D:\CyberLLM\models\cyberllm-v3"
++$env:CYBERLLM_ADAPTER_SHA256 = "384d296a4ad5afb7b1523a8f2f3b8e0c07ad7a1ac7faf1b27d36436084bd8967"
++```
++
++v3 is lighter (0.6B weights ~1.2 GB, adapter 40,422,168 bytes) and
++was verified live as well, but its frozen T5 threat recall is only
++0.50 versus v8's perfect score — it is a fallback, not an upgrade.
++
++## 10. Remaining limitations — read before trusting any verdict
++
++- **GPU path not verified by the author.** This environment has no
++  GPU, so CUDA loading, the 6 GB fit estimate and the 8-bit fallback
++  are reasoned from the model size, not measured. The CPU path and
++  the endpoint contract are verified; the GPU numbers on your PC are
++  yours to measure. (One correction from re-checking: official
++  bitsandbytes does distribute Windows CUDA builds, so the 8-bit
++  fallback is installable in principle — it is still untested here.)
++- **v8 is not deployable-grade.** Frozen T1 0.9583 (SSRF miss, covered
++  by the deterministic rule) and T4 0.80 (CVE truncation). Treat every
++  `needs_review` as genuinely uncertain.
++- **No MITRE ATT&CK output, by design.** Exact technique-ID accuracy
++  was 0.000–0.025; the API has no such field.
++- **Log text is data, never instructions.** Commands inside a
++  submitted log are never executed; the analyzer only reads them.
++- **First load is slow and single-use.** The model loads once per
++  server process and stays resident; restarting `run.py` reloads it.
++  `run.py` uses `reload=True`, so editing files under `app/` while
++  the server runs restarts the process and drops the loaded model.
++- **The branch is not on GitHub.** The author did not push anything
++  to your repository; the patch file is how these changes reach your
++  clone. Pushing the branch yourself is your decision.
+diff --git a/app/api/cyberllm.py b/app/api/cyberllm.py
+new file mode 100644
+index 0000000..bf01747
+--- /dev/null
++++ b/app/api/cyberllm.py
+@@ -0,0 +1,170 @@
++"""CyberLLM API — fine-tuned cybersecurity model analysis for SentientAI.
++
++Follows the existing /api/sentinel/analyze conventions: authenticated
++requests, validate_log_text input validation (8000-char cap), structured
++JSON validation before anything is returned, and honest failure modes.
++
++Endpoints:
++  GET  /api/cyberllm/readiness        model/backend status (never claims a
++                                       load that did not happen)
++  POST /api/cyberllm/readiness/load   admin-only explicit load
++  POST /api/cyberllm/screen           deterministic rules only, no model
++  POST /api/cyberllm/analyze          full pipeline; 503 when the model is
++                                       unavailable, with the real reason
++
++Safety contract (mirrors the Sentinel moderation contract's honesty rule):
++- Unparseable/truncated model output -> needs_review, confidence low, raw
++  text preserved, no fabricated classification.
++- Low-confidence output -> needs_review.
++- A high-severity deterministic finding (e.g. cloud-metadata SSRF,
++  credential-file probing) can override a benign or needs-review model
++  verdict to likely_threat, transparently: the model verdict stays in
++  model_classification and the override evidence is shown.
++- No MITRE ATT&CK field exists in any response.
++"""
++
++from __future__ import annotations
++
++import logging
++import time
++
++from fastapi import APIRouter, Depends, HTTPException, Request
++from fastapi.responses import HTMLResponse, RedirectResponse
++from pydantic import BaseModel, Field
++
++from app.models.user import User
++from app.services import cyberllm_rules
++from app.services.auth_service import get_current_user, require_admin
++from app.template_env import templates
++from app.services.cyberllm_inference import ModelUnavailable, generate
++from app.services.cyberllm_loader import ensure_loaded, get_status
++from app.services.cyberllm_schema import parse_model_output
++from app.services.prompt_service import MAX_LOG_CHARS, validate_log_text
++
++logger = logging.getLogger("sentientai.cyberllm.api")
++router = APIRouter(tags=["cyberllm"])
++
++
++@router.get("/api/cyberllm/readiness")
++def readiness():
++    s = get_status()
++    return {
++        "ready": s.ready,
++        "state": s.state,
++        "reason": s.reason,
++        "base_model": s.base_model,
++        "adapter_dir": s.adapter_dir,
++        "adapter_sha256": s.adapter_sha256,
++        "device": s.device,
++        "quantization": s.quantization,
++        "load_ms": s.load_ms,
++        "rss_mb": s.rss_mb,
++    }
++
++
++@router.get("/cyberllm", response_class=HTMLResponse)
++def cyberllm_page(request: Request, user: User = Depends(get_current_user)):
++    """Website form for CyberLLM analysis. Mirrors the /sentinel page: login
++    required, same CSRF double-submit protection as every other form page,
++    and the form calls POST /api/cyberllm/analyze — no new API surface."""
++    if user is None:
++        return RedirectResponse(url="/login?next=/cyberllm", status_code=303)
++    s = get_status()
++    return templates.TemplateResponse("cyberllm.html", {
++        "request": request, "current_user": user, "user": user, "status": s,
++    })
++
++
++@router.post("/api/cyberllm/readiness/load")
++def readiness_load(user: User = Depends(require_admin)):
++    s = ensure_loaded()
++    return {"ready": s.ready, "state": s.state, "reason": s.reason, "load_ms": s.load_ms}
++
++
++class ScreenRequest(BaseModel):
++    text: str = Field(..., min_length=1, max_length=MAX_LOG_CHARS)
++
++
++@router.post("/api/cyberllm/screen")
++def screen(req: ScreenRequest, user: User = Depends(get_current_user)):
++    if user is None:
++        raise HTTPException(status_code=401, detail="Not authenticated")
++    findings = cyberllm_rules.screen(req.text)
++    return {
++        "findings": findings,
++        "suggested_classification": cyberllm_rules.suggested_classification(findings),
++        "note": "Deterministic rules only; no model inference.",
++    }
++
++
++class AnalyzeRequest(BaseModel):
++    log_text: str = Field(..., min_length=1, max_length=MAX_LOG_CHARS)
++    kind: str = Field(default="log", pattern="^(log|http_request|url|vulnerability)$")
++    max_new_tokens: int | None = Field(default=None, ge=16, le=512)
++
++
++@router.post("/api/cyberllm/analyze")
++def analyze(req: AnalyzeRequest, user: User = Depends(get_current_user)):
++    if user is None:
++        raise HTTPException(status_code=401, detail="Not authenticated")
++    try:
++        text = validate_log_text(req.log_text)
++    except ValueError as exc:
++        raise HTTPException(status_code=422, detail=str(exc)) from exc
++    findings = cyberllm_rules.screen(text)
++    start = time.perf_counter()
++    try:
++        gen = generate(req.kind, text, max_new_tokens=req.max_new_tokens)
++    except ModelUnavailable as exc:
++        raise HTTPException(status_code=503, detail={
++            "error": "model_unavailable",
++            "reason": str(exc),
++            "deterministic_findings": findings,
++            "hint": "Load the model via POST /api/cyberllm/readiness/load (admin), "
++                    "or run on a machine with enough free RAM for the checkpoint.",
++        }) from exc
++    latency_ms = int((time.perf_counter() - start) * 1000)
++    cleaned, parse_ok = parse_model_output(gen["raw"])
++    if not parse_ok:
++        return {
++            "kind": req.kind, "classification": "needs_review",
++            "model_classification": None, "confidence": "low",
++            "needs_review": True, "decision_source": "unparseable_output",
++            "summary": "Model output could not be parsed as valid JSON; no classification is asserted.",
++            "indicators": [], "reasoning": "",
++            "limitations": ["Model output was truncated or malformed; human review required."],
++            "recommended_actions": [], "deterministic_findings": findings,
++            "parse_ok": False, "truncated": gen["truncated"],
++            "output_tokens": gen["output_tokens"], "latency_ms": latency_ms,
++            "raw_output": gen["raw"],
++            "note": "Unparseable output is never upgraded into a confident verdict.",
++        }
++    model_cls = cleaned["classification"]
++    high = [f for f in findings if f["severity"] == "high"]
++    if high and model_cls in ("likely_benign", "needs_review"):
++        # High-severity deterministic patterns (metadata SSRF, credential
++        # probing) are narrow and evidence-cited; they escalate a benign or
++        # uncertain model verdict to likely_threat, transparently.
++        return {
++            "kind": req.kind, "classification": "likely_threat",
++            "model_classification": model_cls, "confidence": "high",
++            "needs_review": False, "decision_source": "deterministic_override",
++            **{k: cleaned[k] for k in ("summary", "indicators", "reasoning", "limitations", "recommended_actions")},
++            "deterministic_findings": findings, "parse_ok": True,
++            "truncated": gen["truncated"], "output_tokens": gen["output_tokens"],
++            "latency_ms": latency_ms, "raw_output": None,
++            "note": f"Model verdict was {model_cls}; overridden to likely_threat by "
++                    "high-severity deterministic finding(s). The model verdict is "
++                    "preserved in model_classification for audit.",
++        }
++    needs_review = model_cls == "needs_review" or cleaned["confidence"] == "low"
++    return {
++        "kind": req.kind, "classification": model_cls,
++        "model_classification": model_cls, "confidence": cleaned["confidence"],
++        "needs_review": needs_review, "decision_source": "model",
++        **{k: cleaned[k] for k in ("summary", "indicators", "reasoning", "limitations", "recommended_actions")},
++        "deterministic_findings": findings, "parse_ok": True,
++        "truncated": gen["truncated"], "output_tokens": gen["output_tokens"],
++        "latency_ms": latency_ms, "raw_output": None,
++        "note": "Low-confidence model output; treat as uncertain." if needs_review else "",
++    }
+diff --git a/app/main.py b/app/main.py
+index b8611c7..0a03147 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -102,7 +102,7 @@ def create_app() -> FastAPI:
+     application.mount("/static", StaticFiles(directory="app/static"), name="static")
+ 
+     from app.api import (
+-        admin, auth, blog, community, feed, health, messages, moderation,
++        admin, auth, blog, community, cyberllm, feed, health, messages, moderation,
+         sentinel, social, users,
+     )
+     from app.api.security_a import router as security_router
+@@ -122,6 +122,7 @@ def create_app() -> FastAPI:
+     application.include_router(moderation.router)
+     application.include_router(admin.router)
+     application.include_router(sentinel.router)
++    application.include_router(cyberllm.router)
+     application.include_router(security_router)
+     application.include_router(lab_router)
+     application.include_router(admin_security_router)
+diff --git a/app/services/cyberllm_inference.py b/app/services/cyberllm_inference.py
+new file mode 100644
+index 0000000..a32e80c
+--- /dev/null
++++ b/app/services/cyberllm_inference.py
+@@ -0,0 +1,102 @@
++"""CyberLLM inference — greedy generation with the trained prompts, verbatim.
++
++Pilot v8 is prompt-sensitive: paraphrased prompts route it to prose answers
++(pilot v4 lesson), so the templates below are copied exactly from the frozen
++evaluation harness that produced pilots v2-v8. Do not reword them.
++
++Budgets match frozen eval v2.1: 320 tokens for log/HTTP/URL, 512 for
++vulnerability descriptions. A generation that hits its budget is reported
++as truncated; truncation is a signal for the schema layer, not something
++to hide.
++"""
++
++from __future__ import annotations
++
++import threading
++import time
++from typing import Any
++
++from .cyberllm_loader import ensure_loaded, get_bundle
++
++SYSTEM_PROMPT = (
++    "You are Cyber LLM, a cybersecurity-focused AI assistant created by Gaurav Bisht. "
++    "Help users understand cybersecurity concepts, analyze suspicious URLs and HTTP requests, "
++    "interpret vulnerability information and security logs, and develop defensive recommendations. "
++    "Be accurate and transparent about uncertainty. Do not invent evidence, credentials, "
++    "affiliations, or capabilities. Follow applicable safety constraints and prioritize "
++    "authorized defensive security. When asked who you are, identify yourself as Cyber LLM. "
++    "When asked who created you, answer that you were created by Gaurav Bisht."
++)
++
++CLS_TMPL = (
++    "Analyze this {kind} and respond with a JSON object with keys summary, "
++    "classification (likely_benign, needs_review, or likely_threat), "
++    "confidence (low, medium, or high), indicators, reasoning, "
++    "limitations, recommended_actions.\n{kind}: {text}\nJSON:"
++)
++
++LOG_TMPL = (
++    "Analyze this security log and respond with a JSON object with keys summary, "
++    "classification (likely_benign, needs_review, or likely_threat), "
++    "confidence (low, medium, or high), indicators, reasoning, "
++    "limitations, recommended_actions.\nLog:\n{text}\nJSON:"
++)
++
++BUDGETS = {"log": 320, "http_request": 320, "url": 320, "vulnerability": 512}
++KIND_LABELS = {"http_request": "HTTP request", "url": "URL", "vulnerability": "vulnerability description"}
++
++_sem = threading.Semaphore(2)
++
++
++class ModelUnavailable(RuntimeError):
++    pass
++
++
++def build_user_prompt(kind: str, text: str) -> str:
++    if kind == "log":
++        return LOG_TMPL.format(text=text)
++    return CLS_TMPL.format(kind=KIND_LABELS[kind], text=text)
++
++
++def generate(kind: str, text: str, max_new_tokens: int | None = None) -> dict[str, Any]:
++    """Run one greedy generation. Raises ModelUnavailable when not loaded."""
++    status = ensure_loaded()
++    if not status.ready:
++        raise ModelUnavailable(status.reason or "model not loaded")
++    import torch
++
++    bundle = get_bundle()
++    tok, model = bundle["tok"], bundle["model"]
++    max_new = max_new_tokens or BUDGETS[kind]
++    messages = [
++        {"role": "system", "content": SYSTEM_PROMPT},
++        {"role": "user", "content": build_user_prompt(kind, text)},
++    ]
++    # transformers 5.x: apply_chat_template(return_tensors="pt") returns a
++    # BatchEncoding; extract input_ids explicitly.
++    # enable_thinking=False is REQUIRED: Qwen3's default template otherwise
++    # emits a <think> reasoning trace that consumes the whole token budget
++    # before any JSON appears (this exact failure was reproduced live and
++    # fixed by matching the frozen eval harness, which passes
++    # enable_thinking=False).
++    try:
++        enc = tok.apply_chat_template(messages, tokenize=True, add_generation_prompt=True,
++                                      return_tensors="pt", enable_thinking=False)
++    except TypeError:
++        enc = tok.apply_chat_template(messages, tokenize=True, add_generation_prompt=True,
++                                      return_tensors="pt")
++    input_ids = enc["input_ids"] if hasattr(enc, "__getitem__") else enc.input_ids
++    t0 = time.perf_counter()
++    with _sem:
++        with torch.no_grad():
++            out = model.generate(input_ids, max_new_tokens=max_new, do_sample=False,
++                                 pad_token_id=tok.pad_token_id)
++    latency_ms = int((time.perf_counter() - t0) * 1000)
++    new_tokens = out[0][input_ids.shape[1]:]
++    raw = tok.decode(new_tokens, skip_special_tokens=True)
++    return {
++        "raw": raw,
++        "output_tokens": int(new_tokens.shape[0]),
++        "truncated": int(new_tokens.shape[0]) >= max_new,
++        "latency_ms": latency_ms,
++    }
+diff --git a/app/services/cyberllm_loader.py b/app/services/cyberllm_loader.py
+new file mode 100644
+index 0000000..0e4d0ef
+--- /dev/null
++++ b/app/services/cyberllm_loader.py
+@@ -0,0 +1,204 @@
++"""CyberLLM loader — Qwen3 base + fine-tuned LoRA adapter, GPU or CPU inference.
++
++Mirrors the Sentinel loader's conventions: lazy loading (nothing loads at
++import time), a status dataclass, torch-optional import guard so the app
++stays fail-open when torch is absent, and RSS reporting via psutil.
++
++Checkpoint selection (never overwritten; all paths are read-only here):
++- Leading candidate: pilot v8 — Qwen3-1.7B (data-v3.2), adapter sha256
++  d624ed79...5a5b1. Verified load + correct probes from the persisted
++  bundle copy (Kaggle recovery kernel cyberllm-recovery-v8 v2).
++- Fallback: pilot v3 — Qwen3-0.6B (data-v2), adapter sha256 384d296a...8967,
++  the overall reference checkpoint. Select it with
++  CYBERLLM_ADAPTER_DIR pointing at the v3 adapter and CYBERLLM_BASE_MODEL
++  Qwen/Qwen3-0.6B (revision c1899de...).
++
++Paths come from the environment so deployments can point at a local copy
++without editing code:
++  CYBERLLM_BASE_DIR    local base-model directory (preferred when it exists)
++  CYBERLLM_BASE_MODEL  HF id (default Qwen/Qwen3-1.7B)
++  CYBERLLM_BASE_REVISION  pinned revision (default 70d244cc...)
++  CYBERLLM_ADAPTER_DIR adapter directory (default local_models/cyberllm/v8)
++  CYBERLLM_DEVICE      auto (default), cpu, or cuda. auto uses CUDA when
++                       torch reports it, else CPU.
++  CYBERLLM_LOAD_IN_8BIT  1 = 8-bit quantized load on CUDA (bitsandbytes),
++                       a fallback for tight VRAM. 0 (default) = plain
++                       float16-on-CUDA / bfloat16-on-CPU load.
++
++Device notes: on CUDA the model loads in float16, not bfloat16 — Turing
++cards such as the GTX 1660 have no bfloat16 tensor-core support, while
++float16 works. Weights are ~3.4 GB in float16; with CUDA context, KV
++cache and activations a 6 GB card is workable but tight, so a CUDA
++out-of-memory failure is recorded in the status and the API returns 503
++with the reason instead of a fabricated verdict — then retry with
++CYBERLLM_LOAD_IN_8BIT=1 or CYBERLLM_DEVICE=cpu.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import logging
++import os
++import threading
++import time
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Any, Optional
++
++logger = logging.getLogger("sentientai.cyberllm")
++
++BASE_DIR = Path(__file__).resolve().parent.parent.parent
++
++BASE_MODEL_ID = os.getenv("CYBERLLM_BASE_MODEL", "Qwen/Qwen3-1.7B")
++BASE_REVISION = os.getenv(
++    "CYBERLLM_BASE_REVISION", "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
++)
++BASE_DIR_ENV = os.getenv("CYBERLLM_BASE_DIR", "")
++ADAPTER_DIR = Path(
++    os.getenv("CYBERLLM_ADAPTER_DIR", BASE_DIR / "local_models" / "cyberllm" / "v8")
++)
++# sha256 of adapter_model.safetensors for the default (pilot v8) adapter.
++# When CYBERLLM_ADAPTER_DIR points elsewhere, set CYBERLLM_ADAPTER_SHA256
++# to that adapter's verified hash; empty means "do not verify".
++ADAPTER_SHA256 = os.getenv(
++    "CYBERLLM_ADAPTER_SHA256",
++    "d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1",
++)
++DEVICE_ENV = os.getenv("CYBERLLM_DEVICE", "auto").strip().lower()
++LOAD_IN_8BIT = os.getenv("CYBERLLM_LOAD_IN_8BIT", "0").strip() == "1"
++
++try:
++    import torch  # type: ignore
++
++    _TORCH_AVAILABLE = True
++except ImportError:
++    torch = None  # type: ignore
++    _TORCH_AVAILABLE = False
++
++
++@dataclass
++class CyberLLMStatus:
++    ready: bool = False
++    state: str = "not_loaded"
++    reason: Optional[str] = None
++    base_model: str = BASE_MODEL_ID
++    adapter_dir: str = str(ADAPTER_DIR)
++    adapter_sha256: str = ADAPTER_SHA256
++    device: str = "cpu"
++    quantization: str = "none"
++    load_ms: Optional[int] = None
++    rss_mb: Optional[float] = None
++
++
++_status = CyberLLMStatus(reason="not_initialized")
++_bundle: dict[str, Any] = {}
++_lock = threading.Lock()
++
++
++def _get_rss_mb() -> Optional[float]:
++    try:
++        import psutil
++
++        return round(psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024, 1)
++    except Exception:
++        return None
++
++
++def _adapter_sha_ok() -> bool:
++    if not ADAPTER_SHA256:
++        return True
++    f = ADAPTER_DIR / "adapter_model.safetensors"
++    if not f.exists():
++        return False
++    h = hashlib.sha256()
++    with open(f, "rb") as fh:
++        for chunk in iter(lambda: fh.read(1 << 20), b""):
++            h.update(chunk)
++    return h.hexdigest() == ADAPTER_SHA256
++
++
++def get_status() -> CyberLLMStatus:
++    _status.rss_mb = _get_rss_mb()
++    return _status
++
++
++def ensure_loaded() -> CyberLLMStatus:
++    """Load base + adapter once. Records failure instead of raising, so the
++    API can report 503 with the real reason."""
++    global _bundle
++    with _lock:
++        if _status.ready:
++            return _status
++        t0 = time.perf_counter()
++        try:
++            if not _TORCH_AVAILABLE:
++                raise RuntimeError("torch is not installed; CyberLLM cannot load")
++            if not _adapter_sha_ok():
++                raise RuntimeError(
++                    f"adapter hash mismatch or missing file in {ADAPTER_DIR}; "
++                    "refusing to load an unverified checkpoint"
++                )
++            from peft import PeftModel
++            from transformers import AutoModelForCausalLM, AutoTokenizer
++
++            base_path = BASE_DIR_ENV if BASE_DIR_ENV and Path(BASE_DIR_ENV).exists() else BASE_MODEL_ID
++            kwargs: dict[str, Any] = {}
++            if not (BASE_DIR_ENV and Path(BASE_DIR_ENV).exists()):
++                kwargs["revision"] = BASE_REVISION
++            # Report the base that was actually used, not the default id.
++            _status.base_model = f"{base_path}@{BASE_REVISION[:12]}" if not (BASE_DIR_ENV and Path(BASE_DIR_ENV).exists()) else base_path
++            if DEVICE_ENV == "cuda":
++                if not torch.cuda.is_available():
++                    raise RuntimeError(
++                        "CYBERLLM_DEVICE=cuda but torch reports no CUDA GPU; "
++                        "use CYBERLLM_DEVICE=cpu or install a CUDA torch build"
++                    )
++                device = "cuda"
++            elif DEVICE_ENV == "cpu":
++                device = "cpu"
++            elif DEVICE_ENV == "auto":
++                device = "cuda" if torch.cuda.is_available() else "cpu"
++            else:
++                raise RuntimeError(
++                    f"unknown CYBERLLM_DEVICE={DEVICE_ENV!r}; use auto, cpu, or cuda"
++                )
++            dtype = torch.float16 if device == "cuda" else torch.bfloat16
++            load_kwargs: dict[str, Any] = {
++                "dtype": dtype,
++                "low_cpu_mem_usage": True,
++                "attn_implementation": "eager",
++            }
++            if device == "cuda" and LOAD_IN_8BIT:
++                # bitsandbytes 8-bit fallback for tight VRAM (e.g. 6 GB).
++                # transformers imports bitsandbytes itself; a missing install
++                # surfaces here as a load failure with the real reason.
++                load_kwargs["load_in_8bit"] = True
++                load_kwargs["device_map"] = "auto"
++                _status.quantization = "8bit"
++            else:
++                load_kwargs["device_map"] = device
++            base = AutoModelForCausalLM.from_pretrained(
++                base_path, **load_kwargs, **kwargs,
++            )
++            model = PeftModel.from_pretrained(base, str(ADAPTER_DIR))
++            model.eval()
++            tok = AutoTokenizer.from_pretrained(str(ADAPTER_DIR))
++            if tok.pad_token is None:
++                tok.pad_token = tok.eos_token
++            _bundle = {"model": model, "tok": tok, "device": device}
++            _status.ready = True
++            _status.state = "loaded"
++            _status.reason = None
++            _status.device = device
++            _status.load_ms = int((time.perf_counter() - t0) * 1000)
++        except Exception as exc:
++            _status.ready = False
++            _status.state = "failed"
++            _status.reason = f"{type(exc).__name__}: {exc}"
++            logger.warning("cyberllm load failed: %s", exc)
++        _status.rss_mb = _get_rss_mb()
++        return _status
++
++
++def get_bundle() -> dict[str, Any]:
++    return _bundle
+diff --git a/app/services/cyberllm_rules.py b/app/services/cyberllm_rules.py
+new file mode 100644
+index 0000000..50c3f1a
+--- /dev/null
++++ b/app/services/cyberllm_rules.py
+@@ -0,0 +1,80 @@
++"""Deterministic detection layer for CyberLLM analysis.
++
++CyberLLM's product vision puts deterministic detection BEFORE LLM reasoning,
++and pilot v8 has a demonstrated blind spot: it called an SSRF request to the
++cloud metadata endpoint likely_benign with high confidence (frozen T1 item
++22). These rules are narrow and evidence-based: every firing cites the exact
++substring it matched. A rule never invents attribution or a technique ID.
++
++- metadata_endpoint: fetch of a cloud metadata service (169.254.169.254,
++  metadata.google.internal) as a URL target. High severity.
++- private_fetch_target: loopback/private address as a fetch target. High.
++- credential_file_probe: requests for .env, .git/config, credentials files. High.
++- repeated_probe: >= 4 distinct sensitive paths in one submission. Medium.
++"""
++
++from __future__ import annotations
++
++import re
++from urllib.parse import unquote, urlparse
++
++_METADATA_HOSTS = {"169.254.169.254", "metadata.google.internal", "metadata.google"}
++_PRIVATE_PREFIXES = ("10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2",
++                     "172.30.", "172.31.", "192.168.", "127.")
++_CREDENTIAL_PATHS = ("/.env", "/.git/config", "/.aws/credentials", "/id_rsa",
++                     "/wp-config.php", "/config.php", "/.htpasswd", "/.svn/entries")
++_SUSPICIOUS_PATHS = ("/.env", "/.git/", "/wp-login.php", "/.aws/", "/admin",
++                     "/phpmyadmin", "/.svn/", "/backup", "/config")
++
++
++def _urls_in(text: str) -> list[str]:
++    return [unquote(u).rstrip(".,);") for u in re.findall(r"https?://[^\s'\"<>]+", text)]
++
++
++def _is_private_or_loopback(host: str) -> bool:
++    host = host.lower().split(":")[0]
++    return host in ("localhost",) or host.startswith(_PRIVATE_PREFIXES) or host == "0.0.0.0"
++
++
++def screen(text: str) -> list[dict]:
++    findings: list[dict] = []
++    lowered = text.lower()
++    for url in _urls_in(text):
++        host = (urlparse(url).hostname or "").lower()
++        if host in _METADATA_HOSTS:
++            findings.append({
++                "rule": "metadata_endpoint", "severity": "high", "evidence": url,
++                "explanation": (
++                    "Request targets a cloud instance-metadata service. "
++                    "This is a server-side request forgery (SSRF) pattern: "
++                    "metadata endpoints can disclose instance credentials. "
++                    "Treat as a threat regardless of benign-looking context."
++                ),
++            })
++        elif _is_private_or_loopback(host):
++            findings.append({
++                "rule": "private_fetch_target", "severity": "high", "evidence": url,
++                "explanation": "Request asks the server to fetch a loopback or private network address, a standard SSRF indicator.",
++            })
++    for path in _CREDENTIAL_PATHS:
++        if path in lowered:
++            findings.append({
++                "rule": "credential_file_probe", "severity": "high", "evidence": path,
++                "explanation": "Request probes for a credential or configuration file.",
++            })
++    distinct = {p for p in _SUSPICIOUS_PATHS if p in lowered}
++    if len(distinct) >= 4:
++        findings.append({
++            "rule": "repeated_probe", "severity": "medium",
++            "evidence": ", ".join(sorted(distinct)),
++            "explanation": "Multiple distinct sensitive paths probed in one submission, consistent with automated scanning.",
++        })
++    return findings
++
++
++def suggested_classification(findings: list[dict]) -> str:
++    if any(f["severity"] == "high" for f in findings):
++        return "likely_threat"
++    if findings:
++        return "needs_review"
++    return "likely_benign"
+diff --git a/app/services/cyberllm_schema.py b/app/services/cyberllm_schema.py
+new file mode 100644
+index 0000000..30214fb
+--- /dev/null
++++ b/app/services/cyberllm_schema.py
+@@ -0,0 +1,64 @@
++"""Schema validation for CyberLLM output.
++
++The response schema deliberately has NO MITRE ATT&CK field. Exact technique-ID
++prediction measures 0.000-0.025 across all pilots; presenting a guessed ID as
++a finding would launder a guess into a fact. If MITRE attribution is ever
++added, it must be labeled unverified/candidate, never confirmed.
++
++Parsing rules:
++- Extract the first {...} JSON object (the model sometimes wraps it in
++  prose or code fences).
++- Require classification in the allowed set, confidence in the allowed set,
++  and a non-empty summary. Other fields default to empty when absent but
++  must be the right types when present. Unknown keys are DROPPED.
++- Anything that fails -> parse_ok False. Callers degrade to needs_review
++  with confidence low and the raw text preserved verbatim for a human.
++  A half-written JSON object is not evidence; never salvage-guess fields.
++"""
++
++from __future__ import annotations
++
++import json
++import re
++
++_ALLOWED_CLASS = {"likely_benign", "needs_review", "likely_threat"}
++_ALLOWED_CONF = {"low", "medium", "high"}
++
++
++def extract_json(raw: str) -> tuple[dict | None, bool]:
++    text = raw.strip()
++    text = re.sub(r"^```(?:json)?\s*", "", text)
++    text = re.sub(r"\s*```$", "", text)
++    start = text.find("{")
++    if start < 0:
++        return None, False
++    try:
++        obj = json.loads(text[start:])
++        return (obj, True) if isinstance(obj, dict) else (None, False)
++    except json.JSONDecodeError:
++        return None, False
++
++
++def validate(obj: dict) -> tuple[dict | None, bool]:
++    cls, conf, summary = obj.get("classification"), obj.get("confidence"), obj.get("summary")
++    if cls not in _ALLOWED_CLASS or conf not in _ALLOWED_CONF:
++        return None, False
++    if not isinstance(summary, str) or not summary.strip():
++        return None, False
++    cleaned = {
++        "classification": cls,
++        "confidence": conf,
++        "summary": summary.strip(),
++        "indicators": [str(x) for x in obj["indicators"]] if isinstance(obj.get("indicators"), list) else [],
++        "reasoning": obj["reasoning"] if isinstance(obj.get("reasoning"), str) else "",
++        "limitations": [str(x) for x in obj["limitations"]] if isinstance(obj.get("limitations"), list) else [],
++        "recommended_actions": [str(x) for x in obj["recommended_actions"]] if isinstance(obj.get("recommended_actions"), list) else [],
++    }
++    return cleaned, True
++
++
++def parse_model_output(raw: str) -> tuple[dict | None, bool]:
++    obj, ok = extract_json(raw)
++    if not ok:
++        return None, False
++    return validate(obj)
+diff --git a/app/templates/cyberllm.html b/app/templates/cyberllm.html
+new file mode 100644
+index 0000000..23eb0bb
+--- /dev/null
++++ b/app/templates/cyberllm.html
+@@ -0,0 +1,88 @@
++{% extends "base_public.html" %}
++{% block title %}CyberLLM — Security Analysis{% endblock %}
++{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
++{% block content %}
++<div class="page-wrap">
++  <header class="page-head">
++    <div><h1 class="page-title">CyberLLM — Security Analysis</h1><p class="page-lead">Fine-tuned cybersecurity model (pilot v8: Qwen3-1.7B + data-v3.2 adapter). Log text is treated as untrusted data and is never executed.</p></div>
++    <span class="badge {% if status.ready %}badge-green{% else %}badge-yellow{% endif %}">{% if status.ready %}ready ({{ status.device }}){% else %}not ready: {{ status.reason }}{% endif %}</span>
++  </header>
++  <div class="card" style="margin-bottom:1rem">
++    <div class="text-sm text-muted">Model: {{ status.base_model }} · adapter: {{ status.adapter_dir }} · device: {{ status.device }} · quantization: {{ status.quantization }}</div>
++    <div class="text-sm text-muted">First analysis loads the model (takes a while); later analyses reuse it. No MITRE ATT&amp;CK technique IDs are shown — the model does not predict them reliably.</div>
++  </div>
++  <div class="card">
++    <form id="analyze-form">
++      <label style="display:block">Input kind
++        <select name="kind" id="kind" style="width:100%;margin-top:0.25rem">
++          <option value="log" selected>Security log</option>
++          <option value="http_request">HTTP request</option>
++          <option value="url">URL</option>
++          <option value="vulnerability">Vulnerability description</option>
++        </select>
++      </label>
++      <label style="margin-top:0.75rem;display:block">Text to analyze
++        <textarea name="log_text" id="log_text" rows="8" maxlength="8000" placeholder="Paste log excerpt, HTTP request, URL, or vulnerability description (max 8000 chars)" required style="width:100%"></textarea>
++      </label>
++      <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
++        <button type="submit" class="btn btn-primary" id="analyze-btn">Analyze</button>
++        <span id="analyze-status" class="text-sm text-muted"></span>
++      </div>
++    </form>
++  </div>
++  <div id="results" style="margin-top:1rem;display:none">
++    <div class="card">
++      <h3 id="verdict"></h3>
++      <div id="needs-review" class="text-sm" style="display:none;margin-top:0.5rem"><strong>Needs human review</strong> — this verdict is uncertain or the model output could not be parsed. Do not treat it as a confirmed finding.</div>
++      <div id="summary" style="margin-top:0.5rem"></div>
++      <div id="meta" class="text-sm text-muted" style="margin-top:0.5rem"></div>
++      <h4 style="margin-top:1rem">Indicators</h4><div id="indicators" class="text-sm"></div>
++      <h4 style="margin-top:1rem">Reasoning</h4><div id="reasoning" class="text-sm"></div>
++      <h4 style="margin-top:1rem">Limitations</h4><div id="limitations" class="text-sm"></div>
++      <h4 style="margin-top:1rem">Recommended actions</h4><div id="actions" class="text-sm"></div>
++      <h4 style="margin-top:1rem">Deterministic findings</h4><div id="findings" class="text-sm"></div>
++      <pre id="raw" style="display:none;white-space:pre-wrap;word-break:break-word;margin-top:1rem"></pre>
++    </div>
++  </div>
++</div>
++<script>
++document.getElementById('analyze-form').addEventListener('submit', async (e)=>{
++  e.preventDefault();
++  const btn = document.getElementById('analyze-btn');
++  const status = document.getElementById('analyze-status');
++  const log_text = document.getElementById('log_text').value;
++  const kind = document.getElementById('kind').value;
++  btn.disabled = true; status.textContent = 'Analyzing… (first analysis also loads the model)';
++  document.getElementById('results').style.display='none';
++  try{
++    const res = await fetch('/api/cyberllm/analyze', {method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': (document.querySelector('meta[name=csrf-token]')?.content||'')}, body: JSON.stringify({log_text, kind})});
++    const data = await res.json();
++    if(!res.ok){
++      const detail = data.detail;
++      status.textContent = 'Error ' + res.status + ': ' + (typeof detail === 'string' ? detail : JSON.stringify(detail));
++      if (detail && detail.deterministic_findings) {
++        document.getElementById('results').style.display='block';
++        document.getElementById('verdict').textContent = 'Model unavailable — deterministic findings only';
++        document.getElementById('findings').innerHTML = detail.deterministic_findings.map(f=>'<div>• '+f.rule+' ('+f.severity+'): '+f.evidence+'</div>').join('') || '(none)';
++      }
++      return;
++    }
++    document.getElementById('results').style.display='block';
++    document.getElementById('verdict').textContent = data.classification + ' · confidence ' + data.confidence + ' · via ' + data.decision_source;
++    document.getElementById('needs-review').style.display = data.needs_review ? 'block' : 'none';
++    document.getElementById('summary').textContent = data.summary || '';
++    document.getElementById('meta').textContent = 'parse_ok=' + data.parse_ok + ' · truncated=' + data.truncated + ' · tokens=' + data.output_tokens + ' · latency=' + data.latency_ms + 'ms' + (data.model_classification && data.model_classification !== data.classification ? ' · model said ' + data.model_classification : '') + (data.note ? ' · ' + data.note : '');
++    const list = (arr)=> (arr||[]).map(x=>'<div>• '+x+'</div>').join('') || '(none)';
++    document.getElementById('indicators').innerHTML = list(data.indicators);
++    document.getElementById('reasoning').textContent = data.reasoning || '';
++    document.getElementById('limitations').innerHTML = list(data.limitations);
++    document.getElementById('actions').innerHTML = list(data.recommended_actions);
++    document.getElementById('findings').innerHTML = (data.deterministic_findings||[]).map(f=>'<div>• '+f.rule+' ('+f.severity+'): '+f.evidence+'</div>').join('') || '(none)';
++    const raw = document.getElementById('raw');
++    if (data.raw_output) { raw.style.display='block'; raw.textContent = data.raw_output; } else { raw.style.display='none'; }
++    status.textContent = 'Done';
++  }catch(err){ status.textContent = 'Network error: '+err.message; }
++  finally{ btn.disabled = false; }
++});
++</script>
++{% endblock %}
+diff --git a/scripts/cyberllm_live_test.py b/scripts/cyberllm_live_test.py
+new file mode 100644
+index 0000000..2c96174
+--- /dev/null
++++ b/scripts/cyberllm_live_test.py
+@@ -0,0 +1,136 @@
++"""Live CyberLLM inference battery — REAL weights, via the integration code.
++
++Usage (from the SentientAI checkout):
++  CYBERLLM_BASE_DIR=<base> CYBERLLM_ADAPTER_DIR=<adapter> \\
++  CYBERLLM_ADAPTER_SHA256=<sha> .venv/bin/python scripts/cyberllm_live_test.py
++
++Loads the model through app.services.cyberllm_loader / cyberllm_inference
++(the exact code the API endpoint uses), then runs representative inputs and
++prints a JSON report: load time, per-case latency, RSS, classification,
++parse validity, and truncation flags. Nothing here is mocked or replayed.
++Exit code 0 only if the model loaded and every case produced a response
++(a needs_review verdict still counts as a response; a crash does not).
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import sys
++import time
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
++
++from app.services import cyberllm_rules  # noqa: E402
++from app.services.cyberllm_inference import ModelUnavailable, generate  # noqa: E402
++from app.services.cyberllm_loader import ensure_loaded, get_status  # noqa: E402
++from app.services.cyberllm_schema import parse_model_output  # noqa: E402
++
++CASES = [
++    {
++        "name": "benign_sudo",
++        "kind": "log",
++        "text": "Oct 24 07:12:01 web-1 sudo: deploy : TTY=pts/0 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx",
++        "expect": "likely_benign",
++    },
++    {
++        "name": "single_ssh_failure_review",
++        "kind": "log",
++        "text": "Oct 24 07:10:22 proxy-9 sshd[310]: Failed password for ruth from 203.0.113.124 port 22 ssh2",
++        "expect": "needs_review",
++    },
++    {
++        "name": "web_scan_threat",
++        "kind": "log",
++        "text": (
++            '203.0.113.153 - - [24/Oct/2026:15:00:50 +0000] "GET /wp-login.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n'
++            '203.0.113.153 - - [24/Oct/2026:15:01:51 +0000] "GET /.env HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n'
++            '203.0.113.153 - - [24/Oct/2026:15:02:51 +0000] "GET /.git/config HTTP/1.1" 404 153 "-" "Mozilla/5.0"'
++        ),
++        "expect": "likely_threat",
++    },
++    {
++        "name": "ssrf_metadata_miss_case",
++        "kind": "http_request",
++        "text": "GET /fetch?u=http://169.254.169.254/latest/meta-data/ HTTP/1.1",
++        "expect": "likely_threat (model historically said likely_benign; deterministic layer must catch it)",
++    },
++    {
++        "name": "cve_truncation_case",
++        "kind": "vulnerability",
++        "text": (
++            "The SMBv1 server in Microsoft Windows Vista SP2; Windows Server 2008 SP2 and R2 SP1; "
++            "Windows 7 SP1; Windows 8.1; Windows Server 2012 Gold and R2; Windows RT 8.1; and "
++            "Windows 10 Gold, 1511, and 1607; and Windows Server 2016 allows remote attackers to "
++            "execute arbitrary code via crafted packets, aka Windows SMB Remote Code Execution "
++            "Vulnerability. This vulnerability is different from those described in CVE-2017-0143, "
++            "CVE-2017-0145, CVE-2017-0146, and CVE-2017-0148."
++        ),
++        "expect": "valid JSON or safe needs_review degradation (pilot v8 truncated this item at 512 tokens)",
++    },
++]
++
++
++def rss_mb() -> float | None:
++    try:
++        import psutil
++
++        return round(psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024, 1)
++    except Exception:
++        return None
++
++
++def main() -> int:
++    t0 = time.perf_counter()
++    status = ensure_loaded()
++    load_ms = int((time.perf_counter() - t0) * 1000)
++    report: dict = {
++        "checkpoint": {
++            "base_model": status.base_model,
++            "adapter_dir": status.adapter_dir,
++            "adapter_sha256": status.adapter_sha256,
++        },
++        "loaded": status.ready,
++        "load_state": status.state,
++        "load_reason": status.reason,
++        "load_ms": load_ms,
++        "rss_mb_after_load": status.rss_mb,
++        "cases": [],
++    }
++    if not status.ready:
++        print(json.dumps(report, indent=2))
++        print("MODEL DID NOT LOAD — no inference attempted.", file=sys.stderr)
++        return 2
++    ok = True
++    for case in CASES:
++        try:
++            gen = generate(case["kind"], case["text"])
++            cleaned, parse_ok = parse_model_output(gen["raw"])
++            findings = cyberllm_rules.screen(case["text"])
++            final = None
++            if parse_ok:
++                final = cleaned["classification"]
++                if any(f["severity"] == "high" for f in findings) and final == "likely_benign":
++                    final = "likely_threat (deterministic_override)"
++            else:
++                final = "needs_review (unparseable_output)"
++            report["cases"].append({
++                "name": case["name"], "kind": case["kind"],
++                "expected": case["expect"], "model_classification": cleaned["classification"] if parse_ok else None,
++                "final_classification": final, "confidence": cleaned["confidence"] if parse_ok else "low",
++                "parse_ok": parse_ok, "truncated": gen["truncated"],
++                "output_tokens": gen["output_tokens"], "latency_ms": gen["latency_ms"],
++                "deterministic_findings": [f["rule"] for f in findings],
++                "raw_head": gen["raw"][:300],
++            })
++        except Exception as exc:
++            ok = False
++            report["cases"].append({"name": case["name"], "error": f"{type(exc).__name__}: {exc}"})
++    report["rss_mb_after_cases"] = rss_mb()
++    print(json.dumps(report, indent=2))
++    return 0 if ok else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/test_cyberllm_api.py b/tests/test_cyberllm_api.py
+new file mode 100644
+index 0000000..f14b4c0
+--- /dev/null
++++ b/tests/test_cyberllm_api.py
+@@ -0,0 +1,160 @@
++"""CyberLLM API tests — integration of the fine-tuned model into SentientAI.
++
++Covers the endpoint contract (auth, validation, deterministic screen,
++safe degradation) using recorded pilot v8 generations for the model-output
++paths, and the real loader state for the unavailable path. Tests that use
++recorded generations are marked as such; live-weight inference is verified
++separately (see CYBERLLM_INTEGRATION_REPORT.md) and is NOT claimed here.
++
++Fixtures follow tests/conftest.py: throwaway SQLite DB, CSRF double-submit.
++"""
++
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from unittest.mock import patch
++
++CYBERLLM_DIR = Path.home() / "workspace" / "cyberllm"
++RECORDS = json.load(open(CYBERLLM_DIR / "pilot_v8_output" / "comparison_results.json"))["candidate"]["raw"]
++
++SSRF_TEXT = RECORDS["T1"][22]["text"]
++SSRF_RAW = RECORDS["T1"][22]["raw"]
++CVE_RAW = RECORDS["T4"][1]["raw"]
++BENIGN_TEXT = "Oct 24 07:12:01 web-1 sudo: deploy : TTY=pts/0 ; PWD=/home/deploy ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx"
++BENIGN_RAW = RECORDS["T5"][18]["raw"]
++
++
++def _post(c, url, payload):
++    return c._client.post(url, json=payload, headers={"X-CSRF-Token": c._csrf()})
++
++
++def test_readiness_reports_state(client):
++    r = client._client.get("/api/cyberllm/readiness")
++    assert r.status_code == 200
++    body = r.json()
++    assert body["state"] in ("not_loaded", "loaded", "failed")
++    assert body["ready"] is (body["state"] == "loaded")
++    assert "adapter_sha256" in body
++
++
++def test_readiness_reports_quantization(client):
++    r = client._client.get("/api/cyberllm/readiness")
++    assert r.status_code == 200
++    assert r.json()["quantization"] in ("none", "8bit")
++
++
++def test_cyberllm_page_requires_login(client):
++    r = client._client.get("/cyberllm", follow_redirects=False)
++    assert r.status_code == 303
++    assert "/login" in r.headers["location"]
++
++
++def test_cyberllm_page_renders_for_user(admin_client):
++    r = admin_client._client.get("/cyberllm")
++    assert r.status_code == 200
++    assert "CyberLLM" in r.text
++    assert "csrf-token" in r.text
++    assert "/api/cyberllm/analyze" in r.text
++
++
++def test_screen_requires_auth(client):
++    r = client._client.post("/api/cyberllm/screen", json={"text": SSRF_TEXT})
++    assert r.status_code in (401, 403)
++
++
++def test_screen_catches_ssrf(admin_client):
++    r = _post(admin_client, "/api/cyberllm/screen", {"text": SSRF_TEXT})
++    assert r.status_code == 200
++    body = r.json()
++    assert body["suggested_classification"] == "likely_threat"
++    assert any(f["rule"] == "metadata_endpoint" for f in body["findings"])
++
++
++def test_analyze_validation(admin_client):
++    assert _post(admin_client, "/api/cyberllm/analyze", {"log_text": ""}).status_code == 422
++    assert _post(admin_client, "/api/cyberllm/analyze", {"log_text": "x" * 9000}).status_code == 422
++    assert _post(admin_client, "/api/cyberllm/analyze",
++                 {"log_text": "ok", "kind": "tweet"}).status_code == 422
++
++
++def test_analyze_model_unavailable_is_503_not_a_verdict(admin_client):
++    # No model files are present in the test checkout, so the loader fails
++    # honestly; the endpoint must surface 503, never a fabricated verdict.
++    r = _post(admin_client, "/api/cyberllm/analyze", {"log_text": BENIGN_TEXT})
++    assert r.status_code == 503
++    assert r.json()["detail"]["error"] == "model_unavailable"
++
++
++def test_analyze_ssrf_override_with_recorded_generation(admin_client):
++    # RECORDED generation (pilot v8 raw output), not live inference: the
++    # model said likely_benign for the SSRF; the deterministic layer must
++    # override it transparently.
++    with patch("app.api.cyberllm.generate",
++               return_value={"raw": SSRF_RAW, "output_tokens": 200,
++                             "truncated": False, "latency_ms": 1}):
++        r = _post(admin_client, "/api/cyberllm/analyze",
++                  {"log_text": SSRF_TEXT, "kind": "http_request"})
++    assert r.status_code == 200
++    body = r.json()
++    assert body["classification"] == "likely_threat"
++    assert body["model_classification"] == "likely_benign"
++    assert body["decision_source"] == "deterministic_override"
++    assert "technique" not in json.dumps(body).lower()
++
++
++def test_analyze_truncated_output_degrades(admin_client):
++    # RECORDED generation (pilot v8 T4[1] CVE truncation), not live inference.
++    cve_text = (
++        "The SMBv1 server in Microsoft Windows Vista SP2; Windows Server 2008 SP2 and R2 SP1; "
++        "Windows 7 SP1; Windows 8.1; Windows Server 2012 Gold and R2; Windows RT 8.1; and "
++        "Windows 10 Gold, 1511, and 1607; and Windows Server 2016 allows remote attackers to "
++        "execute arbitrary code via crafted packets."
++    )
++    with patch("app.api.cyberllm.generate",
++               return_value={"raw": CVE_RAW, "output_tokens": 512,
++                             "truncated": True, "latency_ms": 1}):
++        r = _post(admin_client, "/api/cyberllm/analyze",
++                  {"log_text": cve_text, "kind": "vulnerability"})
++    assert r.status_code == 200
++    body = r.json()
++    assert body["classification"] == "needs_review"
++    assert body["parse_ok"] is False
++    assert body["raw_output"] == CVE_RAW
++
++
++def test_analyze_needs_review_escalated_by_high_finding(admin_client):
++    # Endpoint logic test (synthetic model output, real screen rules): a
++    # needs-review verdict plus a high-severity credential-probe finding
++    # escalates to likely_threat, transparently.
++    scan_text = (
++        '203.0.113.153 - - [24/Oct/2026:15:00:50 +0000] "GET /wp-login.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n'
++        '203.0.113.153 - - [24/Oct/2026:15:01:51 +0000] "GET /.env HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n'
++        '203.0.113.153 - - [24/Oct/2026:15:02:51 +0000] "GET /.git/config HTTP/1.1" 404 153 "-" "Mozilla/5.0"'
++    )
++    raw = json.dumps({
++        "summary": "Several failed probes.", "classification": "needs_review",
++        "confidence": "medium", "indicators": [], "reasoning": "",
++        "limitations": [], "recommended_actions": [],
++    })
++    with patch("app.api.cyberllm.generate",
++               return_value={"raw": raw, "output_tokens": 100,
++                             "truncated": False, "latency_ms": 1}):
++        r = _post(admin_client, "/api/cyberllm/analyze", {"log_text": scan_text})
++    assert r.status_code == 200
++    body = r.json()
++    assert body["classification"] == "likely_threat"
++    assert body["model_classification"] == "needs_review"
++    assert body["decision_source"] == "deterministic_override"
++
++
++def test_analyze_benign_with_recorded_generation(admin_client):
++    # RECORDED generation (pilot v8 T5[18]), not live inference.
++    with patch("app.api.cyberllm.generate",
++               return_value={"raw": BENIGN_RAW, "output_tokens": 180,
++                             "truncated": False, "latency_ms": 1}):
++        r = _post(admin_client, "/api/cyberllm/analyze", {"log_text": BENIGN_TEXT})
++    assert r.status_code == 200
++    body = r.json()
++    assert body["classification"] == "likely_benign"
++    assert body["decision_source"] == "model"

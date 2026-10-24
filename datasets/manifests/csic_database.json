@@ -1,0 +1,96 @@
+{
+  "dataset": "csic_database.csv",
+  "canonical_raw_path": "datasets/raw/web/csic_database.csv",
+  "alternate_expected_path": "datasets/csic_database.csv",
+  "alternate_exists": false,
+  "source": {
+    "kaggle_slug": "ispangler/csic-2010-web-application-attacks",
+    "kaggle_dataset_id": 378374,
+    "kaggle_owner": "ispangler",
+    "original_upstream": "http://www.isi.csic.es/dataset/",
+    "provenance": "Kaggle mirror of CSIC 2010 HTTP dataset; original .txt files at ISI CSIC site, converted to CSV by Kaggle uploader (fields kept intact, some irrelevant)"
+  },
+  "verification": {
+    "sha256": "c420f0bc0464376de75b6c419a0ac226fe69fe12c8ac4908843273721e44e637",
+    "sha256_expected": "c420f0bc0464376de75b6c419a0ac226fe69fe12c8ac4908843273721e44e637",
+    "sha256_match": true,
+    "bytes": 29539583,
+    "rows": 61065,
+    "reported_rows": 61065,
+    "row_count_match": true,
+    "encoding": "utf-8 (read succeeds; no decode error)",
+    "columns": [
+      "",
+      "Method",
+      "User-Agent",
+      "Pragma",
+      "Cache-Control",
+      "Accept",
+      "Accept-encoding",
+      "Accept-charset",
+      "language",
+      "host",
+      "cookie",
+      "content-type",
+      "connection",
+      "lenght",
+      "content",
+      "classification",
+      "URL"
+    ],
+    "n_columns": 17,
+    "missing_values": {
+      "": 0,
+      "Method": 0,
+      "User-Agent": 0,
+      "Pragma": 0,
+      "Cache-Control": 0,
+      "Accept": 397,
+      "Accept-encoding": 0,
+      "Accept-charset": 0,
+      "language": 0,
+      "host": 0,
+      "cookie": 0,
+      "content-type": 43088,
+      "connection": 0,
+      "lenght": 43088,
+      "content": 43088,
+      "classification": 0,
+      "URL": 0
+    },
+    "label_distribution": {
+      "0": 36000,
+      "1": 25065
+    },
+    "label_mapping": {
+      "0": "normal (benign)",
+      "1": "anomalous (attack)"
+    },
+    "label_column": "classification"
+  },
+  "license": {
+    "kaggle_licenses_field": [
+      {
+        "name": "copyright-authors"
+      }
+    ],
+    "status": "restricted/unverified - copyright-authors; redistribution NOT permitted without explicit permission",
+    "redistribution_permitted": false,
+    "evidence": "tmp/dataset-metadata.json licenses=[{name: copyright-authors}]; Kaggle expectedUpdateFrequency not specified; no open license (MIT/CC-BY/etc) declared; do not assume permission",
+    "action_required": "Verify upstream ISI CSIC terms before any redistribution; treat as restricted for training use only on this device"
+  },
+  "limitations": [
+    "Web-only HTTP traffic (Method/URL/headers/content); not authentication/network/application/benign ambiguity datasets",
+    "Vintage 2010; not representative of modern WAF payloads",
+    "Column lenght is typo for length; 43088 rows have empty content/content-type/lenght (no body)",
+    "43088 rows lack request body; 397 rows lack Accept header",
+    "First column is unnamed index (empty header) from CSV export",
+    "Single binary label; attack subtypes (sqli/xss/etc) not separated in this CSV",
+    "Synthetic/normal traffic generation; class balance 36000 benign / 25065 attack may not reflect production",
+    "No PII scrub audit performed in this phase; raw not modified"
+  ],
+  "integrity": {
+    "raw_modified": false,
+    "note": "Raw CSV not modified; read-only verification only"
+  }
+}
