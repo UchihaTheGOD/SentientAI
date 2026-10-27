@@ -34,12 +34,14 @@ from pydantic import BaseModel, Field
 
 from app.models.user import User
 from app.services import cyberllm_rules
+from app.services.cyberllm_evidence import check_evidence
 from app.services.auth_service import get_current_user, require_admin
 from app.template_env import templates
 from app.services.cyberllm_inference import ModelUnavailable, generate
 from app.services.cyberllm_loader import ensure_loaded, get_status
 from app.services.cyberllm_schema import parse_model_output
 from app.services.prompt_service import MAX_LOG_CHARS, validate_log_text
+from app.services.ratelimit import limit_cyberllm_analyze
 
 logger = logging.getLogger("sentientai.cyberllm.api")
 router = APIRouter(tags=["cyberllm"])
@@ -53,6 +55,7 @@ def readiness():
         "state": s.state,
         "reason": s.reason,
         "base_model": s.base_model,
+        "model_root": s.model_root,
         "adapter_dir": s.adapter_dir,
         "adapter_sha256": s.adapter_sha256,
         "device": s.device,
@@ -104,7 +107,11 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/api/cyberllm/analyze")
-def analyze(req: AnalyzeRequest, user: User = Depends(get_current_user)):
+def analyze(
+    req: AnalyzeRequest,
+    user: User = Depends(get_current_user),
+    _rate: None = Depends(limit_cyberllm_analyze),
+):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -140,6 +147,51 @@ def analyze(req: AnalyzeRequest, user: User = Depends(get_current_user)):
             "note": "Unparseable output is never upgraded into a confident verdict.",
         }
     model_cls = cleaned["classification"]
+    # Deterministic evidence check: numbers the model reports must agree
+    # with numbers stated in the input. A mismatch (or a truncated
+    # generation) never silently keeps a confident verdict.
+    model_text = " ".join(
+        [cleaned["summary"], cleaned["reasoning"]] + list(cleaned["indicators"])
+    )
+    mismatches = check_evidence(text, model_text)
+    # Severity justification: a confident threat verdict with no cited
+    # indicators and no reasoning is an assertion, not evidence. It is
+    # downgraded to needs_review, with the original verdict preserved.
+    if (
+        model_cls == "likely_threat"
+        and cleaned["confidence"] == "high"
+        and not cleaned["indicators"]
+        and len(cleaned["reasoning"].strip()) < 20
+    ):
+        mismatches.append(
+            "severity justification: high-confidence likely_threat with "
+            "no cited indicators or reasoning"
+        )
+    if mismatches or gen["truncated"]:
+        reasons = list(mismatches)
+        if gen["truncated"]:
+            reasons.append("model output hit its token budget (truncated)")
+        high_for_mismatch = [f for f in findings if f["severity"] == "high"]
+        if not high_for_mismatch:
+            return {
+                "kind": req.kind, "classification": "needs_review",
+                "model_classification": model_cls, "confidence": "low",
+                "needs_review": True,
+                "decision_source": "evidence_mismatch"
+                if mismatches else "truncated_output",
+                **{k: cleaned[k] for k in ("summary", "indicators", "reasoning", "recommended_actions")},
+                "limitations": list(cleaned["limitations"])
+                + [f"Evidence inconsistency: {r}" for r in reasons],
+                "deterministic_findings": findings, "parse_ok": True,
+                "truncated": gen["truncated"], "output_tokens": gen["output_tokens"],
+                "latency_ms": latency_ms, "raw_output": gen["raw"],
+                "note": "Model output contradicts the input evidence or was "
+                        "truncated; no confident verdict is asserted.",
+            }
+        # High-severity deterministic finding still overrides, but the
+        # mismatch/truncation is preserved as a limitation, not hidden.
+        cleaned = {**cleaned, "limitations": list(cleaned["limitations"])
+                   + [f"Evidence inconsistency: {r}" for r in reasons]}
     high = [f for f in findings if f["severity"] == "high"]
     if high and model_cls in ("likely_benign", "needs_review"):
         # High-severity deterministic patterns (metadata SSRF, credential

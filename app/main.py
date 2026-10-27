@@ -39,11 +39,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         # Content-Security-Policy is a second line of defence behind
         # app/services/sanitize.py: even if markup slipped through, inline
-        # <script> would not execute. 'unsafe-inline' is still required for
-        # style attributes used throughout the templates.
+        # <script> would not execute. All page scripts live in
+        # app/static/js/ (no inline <script> or onclick handlers remain);
+        # 'unsafe-inline' is kept only for style-src, where style
+        # attributes are used throughout the templates.
         response.headers.setdefault("Content-Security-Policy", "; ".join([
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: https:",
@@ -99,7 +101,16 @@ def create_app() -> FastAPI:
     from app.middleware.security_events import SecurityEventsMiddleware
     application.add_middleware(SecurityEventsMiddleware)
 
-    application.mount("/static", StaticFiles(directory="app/static"), name="static")
+    # Project-root-relative static dir: launching from another cwd must
+    # not break /static (run.bat already cd's to its own folder, but the
+    # Python entry point alone should not depend on that).
+    from pathlib import Path as _Path
+
+    application.mount(
+        "/static",
+        StaticFiles(directory=str(_Path(__file__).resolve().parent / "static")),
+        name="static",
+    )
 
     from app.api import (
         admin, auth, blog, community, feed, health, messages, moderation,

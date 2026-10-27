@@ -25,6 +25,12 @@ htmlcov/
 logs/
 # Sentinel artifacts, model weights, datasets — never commit (large + private)
 local_models/
+# Project-local CyberLLM artifacts: weights stay local, but the small
+# manifest + README inside cyberLLMv1/ are tracked. Note the pattern:
+# cyberLLMv1/* (not cyberLLMv1/**) so the two exceptions below can work.
+cyberLLMv1/*
+!cyberLLMv1/manifest.json
+!cyberLLMv1/README.md
 *.pt
 *.safetensors
 *.bin
@@ -66,6 +72,7 @@ reports/*
 !reports/security_integration_audit.md
 !reports/security_test_lab_report.md
 !reports/theme_implementation_report.md
+!reports/full_validation_report.md
 # OS junk
 .DS_Store
 Thumbs.db

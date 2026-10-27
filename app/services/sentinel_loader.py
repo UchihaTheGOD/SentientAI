@@ -5,7 +5,7 @@ import json
 import logging
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 logger = logging.getLogger("sentientai.sentinel")
@@ -33,6 +33,21 @@ class SentinelStatus:
     load_ms_a: Optional[int] = None
     load_ms_b: Optional[int] = None
     rss_mb: Optional[float] = None
+    # Exact files a user must supply to make Sentinel ready. Empty when
+    # all are present; never a fabricated verdict, just a checklist.
+    missing_files: list = field(default_factory=list)
+
+
+def sentinel_missing_files() -> list[str]:
+    """Files required for full dual-checkpoint Sentinel inference."""
+    missing: list[str] = []
+    if not TOKENIZER_PATH.exists():
+        missing.append(str(TOKENIZER_PATH))
+    if not CHECKPOINT_A.exists():
+        missing.append(str(CHECKPOINT_A))
+    if _choose_checkpoint_b() is None:
+        missing.append(str(CHECKPOINT_B) + " (or " + str(CHECKPOINT_B_ALT) + ")")
+    return missing
 _status = SentinelStatus(reason="not_initialized")
 _bundle: dict[str, Any] = {}
 _lock = threading.Lock()
@@ -117,7 +132,12 @@ def _load_single_checkpoint(path: Path, config_dict: dict):
     if not _TORCH_AVAILABLE or torch is None:
         raise RuntimeError("torch_not_available")
     t0 = time.perf_counter()
-    ckpt = torch.load(str(path), map_location="cpu", weights_only=False)  # type: ignore
+    # weights_only=True: a checkpoint is data, never code. The real
+    # sentinel_best_model.pt contains only OrderedDict + tensor rebuilds
+    # (verified by pickletools disassembly), so this does not change
+    # loading of a legitimate checkpoint — it only refuses a checkpoint
+    # that tries to execute arbitrary classes on load.
+    ckpt = torch.load(str(path), map_location="cpu", weights_only=True)  # type: ignore
     if not isinstance(ckpt, dict) or "model_state_dict" not in ckpt:
         raise ValueError("unexpected checkpoint")
     state = ckpt["model_state_dict"]
@@ -153,7 +173,7 @@ def _do_load():
             return _status
     if not _TORCH_AVAILABLE:
         with _lock:
-            _status = SentinelStatus(ready=False, a="torch_missing", b="torch_missing", reason="torch_not_installed", config=_load_config(), tokenizer_vocab_size=_load_tokenizer_vocab_size(), rss_mb=_get_rss_mb())
+            _status = SentinelStatus(ready=False, a="torch_missing", b="torch_missing", reason="torch_not_installed", config=_load_config(), tokenizer_vocab_size=_load_tokenizer_vocab_size(), rss_mb=_get_rss_mb(), missing_files=sentinel_missing_files())
         return _status
     cfg = _load_config() or {"vocab_size": 7053, "hidden_size": 768, "num_layers": 12, "num_heads": 12, "intermediate_size": 3072, "max_position_embeddings": 768, "dropout": 0.1, "pad_token_id": 0, "unk_token_id": 1, "bos_token_id": 2, "eos_token_id": 3}
     vocab = _load_tokenizer_vocab_size()
@@ -161,7 +181,7 @@ def _do_load():
     b_path = _choose_checkpoint_b()
     if a_path is None and b_path is None:
         with _lock:
-            _status = SentinelStatus(ready=False, a="not_found", b="not_found", reason="checkpoints_not_found", config=cfg, tokenizer_vocab_size=vocab, rss_mb=_get_rss_mb())
+            _status = SentinelStatus(ready=False, a="not_found", b="not_found", reason="checkpoints_not_found", config=cfg, tokenizer_vocab_size=vocab, rss_mb=_get_rss_mb(), missing_files=sentinel_missing_files())
         return _status
     _build_tokenizer()
     a_state = "not_found"; b_state = "not_found"; load_ms_a = None; load_ms_b = None
@@ -183,13 +203,13 @@ def _do_load():
     with _lock:
         _config = cfg; _models = models
         _bundle = {"tokenizer": _build_tokenizer(), "model_a": models.get("a"), "model_b": models.get("b"), "config": cfg}
-        _status = SentinelStatus(ready=ready, a=a_state, b=b_state, reason=reason, config=cfg, tokenizer_vocab_size=vocab, load_ms_a=load_ms_a, load_ms_b=load_ms_b, rss_mb=_get_rss_mb())
+        _status = SentinelStatus(ready=ready, a=a_state, b=b_state, reason=reason, config=cfg, tokenizer_vocab_size=vocab, load_ms_a=load_ms_a, load_ms_b=load_ms_b, rss_mb=_get_rss_mb(), missing_files=sentinel_missing_files())
         return _status
 
 def get_status() -> SentinelStatus:
     with _lock:
         if _status.ready or _status.reason not in ("not_initialized",):
-            return SentinelStatus(ready=_status.ready, a=_status.a, b=_status.b, reason=_status.reason, config=_status.config, tokenizer_vocab_size=_status.tokenizer_vocab_size, load_ms_a=_status.load_ms_a, load_ms_b=_status.load_ms_b, rss_mb=_get_rss_mb())
+            return SentinelStatus(ready=_status.ready, a=_status.a, b=_status.b, reason=_status.reason, config=_status.config, tokenizer_vocab_size=_status.tokenizer_vocab_size, load_ms_a=_status.load_ms_a, load_ms_b=_status.load_ms_b, rss_mb=_get_rss_mb(), missing_files=_status.missing_files or sentinel_missing_files())
         cfg = _load_config(); vocab = _load_tokenizer_vocab_size()
         a_state = "present_no_inference_phase0" if CHECKPOINT_A.exists() else "not_found"
         b_exists = _choose_checkpoint_b() is not None
@@ -197,7 +217,7 @@ def get_status() -> SentinelStatus:
         reason = "not_initialized"
         if a_state == "not_found" and b_state == "not_found":
             reason = "checkpoints_not_found"
-        return SentinelStatus(ready=False, a=a_state, b=b_state, reason=reason, config=cfg, tokenizer_vocab_size=vocab, load_ms_a=None, load_ms_b=None, rss_mb=_get_rss_mb())
+        return SentinelStatus(ready=False, a=a_state, b=b_state, reason=reason, config=cfg, tokenizer_vocab_size=vocab, load_ms_a=None, load_ms_b=None, rss_mb=_get_rss_mb(), missing_files=sentinel_missing_files())
 
 def is_ready() -> bool:
     with _lock:

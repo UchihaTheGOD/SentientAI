@@ -1,5 +1,14 @@
 # CyberLLM on Windows — download, configure, run, test
 
+> **Portability note (2026-10-27, release candidate):** for a new
+> install, use `CYBERLLM_PORTABLE_SETUP.md` and the project-local
+> `cyberLLMv1/` layout instead of this guide's old layout. The
+> `D:\CyberLLM\models\…` paths below are the old layout, kept here
+> as examples only — they are NOT runtime defaults any more, and
+> `.env.example` no longer sets them. This guide's model, revision,
+> adapter SHA, and test battery are unchanged; only the storage
+> location changed.
+
 Goal: run the already-trained CyberLLM model locally on a Windows PC
 through the existing SentientAI website. No retraining, no new website,
 no Docker/Kubernetes, no paid services, no publishing.

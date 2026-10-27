@@ -12,7 +12,13 @@ from markupsafe import Markup, escape
 
 from app.services.sanitize import clean_text, render_content, safe_url, strip_formatting
 
-templates = Jinja2Templates(directory="app/templates")
+from pathlib import Path as _Path
+
+# Project-root-relative, not cwd-relative: rendering a page must not
+# depend on which directory the server was launched from.
+templates = Jinja2Templates(
+    directory=str(_Path(__file__).resolve().parent.parent / "app" / "templates")
+)
 
 
 # ---------------------------------------------------------------------------

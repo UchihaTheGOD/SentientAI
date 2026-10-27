@@ -94,3 +94,7 @@ limit_post_write = rate_limit("post_write", 15, 600)
 limit_report = rate_limit("report", 10, 3600)
 limit_search = rate_limit("search", 45, 60)
 limit_message = rate_limit("message", 30, 300)
+# Model inference is the most expensive endpoint in the app (seconds to
+# minutes per request on CPU); a generous per-user cap stops scripted
+# abuse without blocking real analysis work.
+limit_cyberllm_analyze = rate_limit("cyberllm_analyze", 20, 600)
