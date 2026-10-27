@@ -104,6 +104,7 @@ def create_app() -> FastAPI:
     from app.api import (
         admin, auth, blog, community, feed, health, messages, moderation,
         sentinel, social, users,
+        cyberllm,
     )
     from app.api.security import router as security_router
     from app.api.admin_security import router as admin_security_router
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     application.include_router(moderation.router)
     application.include_router(admin.router)
     application.include_router(sentinel.router)
+    application.include_router(cyberllm.router)
     application.include_router(security_router)
     application.include_router(lab_router)
     application.include_router(admin_security_router)

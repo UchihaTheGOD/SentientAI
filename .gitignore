@@ -72,3 +72,4 @@ Thumbs.db
 *.swp
 *~
 
+.venv-cyberllm/

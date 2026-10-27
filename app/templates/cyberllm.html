@@ -1,0 +1,88 @@
+{% extends "base_public.html" %}
+{% block title %}CyberLLM — Security Analysis{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
+{% block content %}
+<div class="page-wrap">
+  <header class="page-head">
+    <div><h1 class="page-title">CyberLLM — Security Analysis</h1><p class="page-lead">Fine-tuned cybersecurity model (pilot v8: Qwen3-1.7B + data-v3.2 adapter). Log text is treated as untrusted data and is never executed.</p></div>
+    <span class="badge {% if status.ready %}badge-green{% else %}badge-yellow{% endif %}">{% if status.ready %}ready ({{ status.device }}){% else %}not ready: {{ status.reason }}{% endif %}</span>
+  </header>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="text-sm text-muted">Model: {{ status.base_model }} · adapter: {{ status.adapter_dir }} · device: {{ status.device }} · quantization: {{ status.quantization }}</div>
+    <div class="text-sm text-muted">First analysis loads the model (takes a while); later analyses reuse it. No MITRE ATT&amp;CK technique IDs are shown — the model does not predict them reliably.</div>
+  </div>
+  <div class="card">
+    <form id="analyze-form">
+      <label style="display:block">Input kind
+        <select name="kind" id="kind" style="width:100%;margin-top:0.25rem">
+          <option value="log" selected>Security log</option>
+          <option value="http_request">HTTP request</option>
+          <option value="url">URL</option>
+          <option value="vulnerability">Vulnerability description</option>
+        </select>
+      </label>
+      <label style="margin-top:0.75rem;display:block">Text to analyze
+        <textarea name="log_text" id="log_text" rows="8" maxlength="8000" placeholder="Paste log excerpt, HTTP request, URL, or vulnerability description (max 8000 chars)" required style="width:100%"></textarea>
+      </label>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+        <button type="submit" class="btn btn-primary" id="analyze-btn">Analyze</button>
+        <span id="analyze-status" class="text-sm text-muted"></span>
+      </div>
+    </form>
+  </div>
+  <div id="results" style="margin-top:1rem;display:none">
+    <div class="card">
+      <h3 id="verdict"></h3>
+      <div id="needs-review" class="text-sm" style="display:none;margin-top:0.5rem"><strong>Needs human review</strong> — this verdict is uncertain or the model output could not be parsed. Do not treat it as a confirmed finding.</div>
+      <div id="summary" style="margin-top:0.5rem"></div>
+      <div id="meta" class="text-sm text-muted" style="margin-top:0.5rem"></div>
+      <h4 style="margin-top:1rem">Indicators</h4><div id="indicators" class="text-sm"></div>
+      <h4 style="margin-top:1rem">Reasoning</h4><div id="reasoning" class="text-sm"></div>
+      <h4 style="margin-top:1rem">Limitations</h4><div id="limitations" class="text-sm"></div>
+      <h4 style="margin-top:1rem">Recommended actions</h4><div id="actions" class="text-sm"></div>
+      <h4 style="margin-top:1rem">Deterministic findings</h4><div id="findings" class="text-sm"></div>
+      <pre id="raw" style="display:none;white-space:pre-wrap;word-break:break-word;margin-top:1rem"></pre>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('analyze-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn = document.getElementById('analyze-btn');
+  const status = document.getElementById('analyze-status');
+  const log_text = document.getElementById('log_text').value;
+  const kind = document.getElementById('kind').value;
+  btn.disabled = true; status.textContent = 'Analyzing… (first analysis also loads the model)';
+  document.getElementById('results').style.display='none';
+  try{
+    const res = await fetch('/api/cyberllm/analyze', {method:'POST', headers:{'Content-Type':'application/json', 'X-CSRF-Token': (document.querySelector('meta[name=csrf-token]')?.content||'')}, body: JSON.stringify({log_text, kind})});
+    const data = await res.json();
+    if(!res.ok){
+      const detail = data.detail;
+      status.textContent = 'Error ' + res.status + ': ' + (typeof detail === 'string' ? detail : JSON.stringify(detail));
+      if (detail && detail.deterministic_findings) {
+        document.getElementById('results').style.display='block';
+        document.getElementById('verdict').textContent = 'Model unavailable — deterministic findings only';
+        document.getElementById('findings').innerHTML = detail.deterministic_findings.map(f=>'<div>• '+f.rule+' ('+f.severity+'): '+f.evidence+'</div>').join('') || '(none)';
+      }
+      return;
+    }
+    document.getElementById('results').style.display='block';
+    document.getElementById('verdict').textContent = data.classification + ' · confidence ' + data.confidence + ' · via ' + data.decision_source;
+    document.getElementById('needs-review').style.display = data.needs_review ? 'block' : 'none';
+    document.getElementById('summary').textContent = data.summary || '';
+    document.getElementById('meta').textContent = 'parse_ok=' + data.parse_ok + ' · truncated=' + data.truncated + ' · tokens=' + data.output_tokens + ' · latency=' + data.latency_ms + 'ms' + (data.model_classification && data.model_classification !== data.classification ? ' · model said ' + data.model_classification : '') + (data.note ? ' · ' + data.note : '');
+    const list = (arr)=> (arr||[]).map(x=>'<div>• '+x+'</div>').join('') || '(none)';
+    document.getElementById('indicators').innerHTML = list(data.indicators);
+    document.getElementById('reasoning').textContent = data.reasoning || '';
+    document.getElementById('limitations').innerHTML = list(data.limitations);
+    document.getElementById('actions').innerHTML = list(data.recommended_actions);
+    document.getElementById('findings').innerHTML = (data.deterministic_findings||[]).map(f=>'<div>• '+f.rule+' ('+f.severity+'): '+f.evidence+'</div>').join('') || '(none)';
+    const raw = document.getElementById('raw');
+    if (data.raw_output) { raw.style.display='block'; raw.textContent = data.raw_output; } else { raw.style.display='none'; }
+    status.textContent = 'Done';
+  }catch(err){ status.textContent = 'Network error: '+err.message; }
+  finally{ btn.disabled = false; }
+});
+</script>
+{% endblock %}
