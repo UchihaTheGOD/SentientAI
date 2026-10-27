@@ -73,6 +73,7 @@ reports/*
 !reports/security_test_lab_report.md
 !reports/theme_implementation_report.md
 !reports/full_validation_report.md
+!reports/architecture_audit_sentinel_cyberllm.md
 # OS junk
 .DS_Store
 Thumbs.db
