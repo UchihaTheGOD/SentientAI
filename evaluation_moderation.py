@@ -25,17 +25,22 @@ def _moderation_label_is_positive(parsed_label: str | None) -> bool:
     return parsed_label in ("likely_threat", )
 
 def run_evaluation(output_dir="evaluation"):
-    from app.services import sentinel_moderation as sm
+    """Human-only moderation evaluation.
+
+    The obsolete Sentinel moderation model was removed, and CyberLLMv1
+    is not a content-moderation model, so no model prediction is
+    produced here. Each case honestly reports status
+    "model_removed_human_review_only" with json_valid False — the
+    evaluation still runs, still counts cases, and still reports
+    valid_rate (0.0), rather than inventing predictions.
+    """
     from app.services.scoring import score_candidate, SIGNAL_STRONG, SIGNAL_WEAK
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
     for case in MODERATION_CASES:
         t0 = time.perf_counter()
-        try:
-            res = sm.run_moderation_for_text(case["content"])
-        except Exception as exc:
-            res = {"status": "error", "error": str(exc), "json_valid": False, "parsed": None, "tokens": 0, "latency_ms": 0}
+        res = {"status": "model_removed_human_review_only", "error": "legacy Sentinel moderation model removed; human review is the sole moderation authority", "json_valid": False, "parsed": None, "tokens": 0, "latency_ms": 0}
         latency = int((time.perf_counter() - t0) * 1000)
         parsed = res.get("parsed")
         label = (parsed or {}).get("label") if parsed else None

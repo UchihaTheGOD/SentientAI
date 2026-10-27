@@ -5,25 +5,31 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.sentinel_incident import SentinelIncident, TempBlock, INCIDENT_STATUSES
-from app.services.prompt_service import prompt_snapshot as get_prompt_snapshot, PROMPT_PATH
 
-def _safe_snapshot() -> str:
-    try:
-        return get_prompt_snapshot()[:5000]
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as _exc:
-        return f"[prompt unavailable: {_exc}]"[:5000]
-def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, inference: dict, prompt_path: str | None = None) -> SentinelIncident:
+# NOTE on legacy-named columns: SentinelIncident.model_a_text /
+# model_a_status / model_b_text / model_b_status / agreement are
+# storage columns in an existing database. Renaming them would require
+# a destructive migration for existing databases, so they are kept
+# as storage: the classifier slot (model_a_*) now holds the single
+# CyberLLMv1 classification, model_b_* is always None (no second
+# model exists any more), and agreement is always None. No dual-model
+# inference is performed or implied by these columns.
+def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, classification: dict | None = None, prompt_path: str | None = None) -> SentinelIncident:
     excerpt = (log_text or "")[:2000]
     evidence_json = json.dumps(fused.get("rules", {}).get("evidence", [])[:20])
-    ma = (inference.get("model_a") or {}); mb = (inference.get("model_b") or {})
+    classifier_text = None
+    classifier_status = None
+    if classification:
+        classifier_text = (classification.get("summary") or "")[:4000] or None
+        classifier_status = classification.get("status")
     inc = SentinelIncident(
         log_text=log_text, log_excerpt=excerpt, ip_address=ip_address,
         fused_score=fused.get("fused_score"), fused_verdict=fused.get("fused_verdict"),
-        model_a_text=ma.get("text","")[:4000] if ma.get("text") else None,
-        model_b_text=mb.get("text","")[:4000] if mb.get("text") else None,
-        model_a_status=ma.get("status"), model_b_status=mb.get("status"),
-        agreement=inference.get("agreement"), evidence=evidence_json,
-        prompt_snapshot=_safe_snapshot(), prompt_path=str(prompt_path or PROMPT_PATH),
+        model_a_text=classifier_text,
+        model_b_text=None,
+        model_a_status=classifier_status, model_b_status=None,
+        agreement=None, evidence=evidence_json,
+        prompt_snapshot="", prompt_path=str(prompt_path or ""),
         status="pending_review", severity=fused.get("fused_verdict") or "pending_review",
     )
     db.add(inc); db.commit(); db.refresh(inc)

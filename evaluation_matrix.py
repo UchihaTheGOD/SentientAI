@@ -70,32 +70,33 @@ IS_POSITIVE_GT = {"benign": False, "suspicious": False, "attack": True}
 IS_POSITIVE_PRED = {"likely_benign": False, "needs_review": True, "likely_threat": True}
 
 def evaluate_case(case, with_models=False, max_new_tokens=48, timeout_s=12):
-    from app.services.sentinel_fusion import evaluate_rules, fuse
+    from app.services.security_rules import evaluate_rules
+    from app.services.classifier import fuse_classification
     import time as _t
     log_text = case["log_text"]
     t0 = _t.perf_counter()
     rules = evaluate_rules(log_text)
     rule_ms = int((_t.perf_counter()-t0)*1000)
-    rec = {"id": case["id"],"category": case["category"],"subcategory": case["subcategory"],"ground_truth": case["ground_truth"],"expected_verdict": GROUND_TO_EXPECTED.get(case["ground_truth"]),"is_positive_gt": IS_POSITIVE_GT.get(case["ground_truth"], False),"log_text": log_text,"log_len": len(log_text),"rules": {"verdict": rules.get("verdict"), "score": rules.get("score"), "evidence": rules.get("evidence"), "failed_count": rules.get("failed_count"), "latency_ms": rule_ms, "raw": rules},"fusion": None,"model_a": None,"model_b": None,"agreement": None,"fusion_latency_ms": None}
+    rec = {"id": case["id"],"category": case["category"],"subcategory": case["subcategory"],"ground_truth": case["ground_truth"],"expected_verdict": GROUND_TO_EXPECTED.get(case["ground_truth"]),"is_positive_gt": IS_POSITIVE_GT.get(case["ground_truth"], False),"log_text": log_text,"log_len": len(log_text),"rules": {"verdict": rules.get("verdict"), "score": rules.get("score"), "evidence": rules.get("evidence"), "failed_count": rules.get("failed_count"), "latency_ms": rule_ms, "raw": rules},"fusion": None,"classification": None,"model_a": None,"model_b": None,"agreement": None,"fusion_latency_ms": None}
     if not with_models:
-        fused = fuse(log_text, {"model_a": {"text": "", "status": "skipped"}, "model_b": {"text": "", "status": "skipped"}, "agreement": None})
+        fused = fuse_classification(log_text, {"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []})
         rec["fusion"] = {"verdict": fused.get("fused_verdict"), "score": fused.get("fused_score"), "components": fused.get("components")}
         rec["fusion_latency_ms"] = 0
         return rec
-    from app.services.prompt_service import build_analysis_prompt
-    from app.services.sentinel_inference import run_dual_inference
-    prompt = build_analysis_prompt(log_text)
+    from app.services.classifier import classify_log
     t1 = _t.perf_counter()
-    inf = run_dual_inference(prompt, max_new_tokens=max_new_tokens, timeout_s=timeout_s)
+    inf = classify_log(log_text, kind="log", max_new_tokens=max_new_tokens)
     total_ms = int((_t.perf_counter()-t1)*1000)
-    ma = inf.get("model_a") or {}
-    mb = inf.get("model_b") or {}
-    ja = _try_parse_json(ma.get("text",""))
-    jb = _try_parse_json(mb.get("text",""))
-    rec["model_a"] = {"raw_text": ma.get("text",""), "parsed_verdict": _verdict_from_text(ma.get("text","")), "status": ma.get("status"), "tokens": ma.get("tokens"), "latency_ms": ma.get("latency_ms"), "stopped": ma.get("stopped"), "error": ma.get("error"), "json_valid": ja["valid"], "json_error": ja["error"], "json_parsed": ja["parsed"]}
-    rec["model_b"] = {"raw_text": mb.get("text",""), "parsed_verdict": _verdict_from_text(mb.get("text","")), "status": mb.get("status"), "tokens": mb.get("tokens"), "latency_ms": mb.get("latency_ms"), "stopped": mb.get("stopped"), "error": mb.get("error"), "json_valid": jb["valid"], "json_error": jb["error"], "json_parsed": jb["parsed"]}
-    rec["agreement"] = inf.get("agreement")
-    fused = fuse(log_text, inf)
+    # Single CyberLLMv1 classification (no dual model, no agreement).
+    rec["classification"] = {"classification": inf.get("classification"), "confidence": inf.get("confidence"),
+                             "status": inf.get("status"), "summary": inf.get("summary"),
+                             "output_tokens": inf.get("output_tokens"), "latency_ms": inf.get("latency_ms"),
+                             "raw_output": inf.get("raw_output"), "error": inf.get("error"),
+                             "json_valid": inf.get("parse_ok")}
+    rec["model_a"] = None
+    rec["model_b"] = None
+    rec["agreement"] = None
+    fused = fuse_classification(log_text, inf)
     rec["fusion"] = {"verdict": fused.get("fused_verdict"), "score": fused.get("fused_score"), "components": fused.get("components"), "note": fused.get("note")}
     rec["fusion_latency_ms"] = total_ms
     return rec
@@ -107,7 +108,7 @@ def _prf(tp, fp, fn):
     return precision, recall, f1
 
 def aggregate_metrics(records):
-    sources = ["rules", "model_a", "model_b", "fusion"]
+    sources = ["rules", "classification", "fusion"]
     out = {}
     for src in sources:
         tp=fp=tn=fn=0
@@ -121,7 +122,7 @@ def aggregate_metrics(records):
                 pred_verdict = (r["fusion"] or {}).get("verdict")
             else:
                 m = r.get(src) or {}
-                pred_verdict = m.get("parsed_verdict")
+                pred_verdict = m.get("parsed_verdict") or m.get("classification")
                 if m.get("status") in ("empty", None) or not pred_verdict:
                     empty += 1
                 if not m.get("json_valid"):
@@ -153,7 +154,7 @@ def aggregate_metrics(records):
             elif gt_pos and not pred_pos:
                 per_category[cat]["fn"]+=1
         precision, recall, f1 = _prf(tp,fp,fn)
-        out[src] = {"n": total, "tp": tp, "fp": fp, "tn": tn, "fn": fn, "precision": precision, "recall": recall, "f1": f1, "empty": empty, "invalid_json": invalid_json if src in ("model_a","model_b") else None, "per_category": per_category}
+        out[src] = {"n": total, "tp": tp, "fp": fp, "tn": tn, "fn": fn, "precision": precision, "recall": recall, "f1": f1, "empty": empty, "invalid_json": invalid_json if src == "classification" else None, "per_category": per_category}
     return out
 
 def run_evaluation(with_models=False, max_new_tokens=48, timeout_s=12, output_dir="evaluation"):
@@ -165,7 +166,7 @@ def run_evaluation(with_models=False, max_new_tokens=48, timeout_s=12, output_di
         records.append(rec)
     metrics = aggregate_metrics(records)
     ts = time.strftime("%Y%m%d_%H%M%S")
-    payload = {"meta": {"n_cases": len(records), "with_models": with_models, "timestamp": ts, "model": "sentinel_best_model.pt + best_autolab_checkpoint.pt, vocab 7053, max_pos 768"}, "cases": records, "metrics": metrics}
+    payload = {"meta": {"n_cases": len(records), "with_models": with_models, "timestamp": ts, "model": "CyberLLMv1 (Qwen3-1.7B + LoRA v8, data-v3.2)"}, "cases": records, "metrics": metrics}
     (out_dir / "latest.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     (out_dir / f"results_{ts}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return payload

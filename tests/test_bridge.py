@@ -48,10 +48,10 @@ def test_duplicate_submit_no_dup(admin, admin_client):
 def test_inference_failure_still_preserves_event(admin, admin_client, monkeypatch):
     from app.database import SessionLocal
     from app.services.security_events import log_event
-    import app.services.sentinel_inference as _inf
+    import app.services.classifier as _clf
     s = SessionLocal()
     ev = log_event(s, event_type="suspicious_input.traversal", category="traversal", severity="medium", source="middleware", route="/static/../../../../etc/passwd", method="GET", http_status=403, evidence="../etc/passwd")
-    monkeypatch.setattr(_inf, "run_dual_inference", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("simulated failure")))
+    monkeypatch.setattr(_clf, "classify_log", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("simulated failure")))
     from app.services.sentinel_bridge import submit_security_event_for_analysis
     res = submit_security_event_for_analysis(s, event_id=ev.id, triggered_by=admin.id)
     from app.models.attact_assessment import SecurityEvent
@@ -100,38 +100,34 @@ def test_auth_enforced_on_admin_security_analyze(app, admin, user):
     if r3.status_code == 200:
         assert "status" in r3.json()
 
-def test_checkpoint_load_and_parse_produces_verdict():
-    from app.services.sentinel_loader import ensure_loaded
-    from app.services.prompt_service import build_analysis_prompt
-    from app.services.sentinel_schema import parse_model_text, fuse_structured
-    from app.services.sentinel_fusion import fuse
-    s = ensure_loaded()
+def test_classifier_unavailable_fusion_is_rules_only():
+    """Replaces the old checkpoint test: with no model, fusion must be rules-only and honest."""
+    from app.services.classifier import classify_log, fuse_classification
+    from app.services.security_rules import evaluate_rules
     log_text = "2024-01-01 12:00:00 WARN login failed for user admin from 198.51.100.23 401\n"*6 + "successful login for admin"
-    prompt = build_analysis_prompt(log_text)
-    assert "<output>" in prompt
-    if s.ready:
-        from app.services.sentinel_inference import run_dual_inference
-        inf = run_dual_inference(prompt, max_new_tokens=32, timeout_s=12)
-        assert "model_a" in inf and "model_b" in inf
-        a_st = (inf.get("model_a") or {}).get("status")
-        b_st = (inf.get("model_b") or {}).get("status")
-        assert a_st in ("ok","empty","timeout","error","unavailable")
-        assert b_st in ("ok","empty","timeout","error","unavailable")
-        p_a = parse_model_text((inf.get("model_a") or {}).get("text"), a_st)
-        assert "vulnerability_detected" in p_a
-        fused = fuse_structured(log_text, inf)
-        assert fused["fused_verdict"] in ("likely_threat","needs_review","likely_benign")
-        legacy = fuse(log_text, inf)
-        assert legacy["fused_verdict"] is not None
-    else:
-        inf = {"model_a":{"status":"unavailable","text":""}, "model_b":{"status":"unavailable","text":""}, "agreement":None}
-        fused = fuse_structured(log_text, inf)
-        assert fused["fused_verdict"] in ("likely_threat","needs_review","likely_benign")
+    cls = classify_log(log_text)
+    assert cls["source"] == "cyberllm"
+    assert cls["status"] in ("unavailable", "ok", "unparseable")
+    if cls["status"] == "unavailable":
+        assert cls["classification"] == "needs_review" and cls["confidence"] == "low"
+    fused = fuse_classification(log_text, cls)
+    assert fused["fused_verdict"] in ("likely_threat", "needs_review", "likely_benign")
+    assert fused["rules"]["failed_count"] == 6
+    assert evaluate_rules(log_text)["failed_count"] == 6
 
 def test_fusion_uses_real_results_not_mock():
-    from app.services.sentinel_schema import parse_model_text
-    txt = "likely_threat: sqli confirmed with high confidence. Vulnerability detected, exploitable. Remediation: use parameterized queries."
-    parsed = parse_model_text(txt, "ok")
-    assert parsed["vulnerability_detected"] is True
-    assert parsed["severity"] in ("high","medium","low","info")
+    """A confident CyberLLM classification moves fusion; an unavailable one does not fabricate."""
+    from app.services.classifier import fuse_classification
+    benign = "2024-01-01 10:00:00 INFO user alice fetched /blog 200"
+    ok_threat = {"source": "cyberllm", "status": "ok", "classification": "likely_threat", "confidence": "high",
+                 "summary": "Attack detected", "indicators": ["198.51.100.23"], "reasoning": "Repeated failures",
+                 "deterministic_findings": []}
+    r = fuse_classification(benign, ok_threat)
+    # Rules 0 + model 85 -> 42, i.e. needs_review, not a single-model flip to threat.
+    assert r["fused_verdict"] == "needs_review" and r["fused_score"] == 42
+    assert r["components"][1]["source"] == "cyberllm"
+    unavailable = {"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low",
+                   "deterministic_findings": []}
+    r2 = fuse_classification(benign, unavailable)
+    assert r2["fused_verdict"] == "likely_benign" and r2["fused_score"] == 0
 

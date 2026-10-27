@@ -65,17 +65,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
-    # Sentinel: schedule background warm-load so readiness reflects real state
-    # without blocking startup (2-4s / ~1.9 GB). Kept inside lifespan so both
-    # the initial boot and every reload (run.py reload_dirs=["app"]) trigger it.
+    # No model is loaded at startup by design: CyberLLMv1 loads lazily
+    # on explicit load/analyze, so a missing or heavy model can never
+    # block the application or its non-model features. The obsolete
+    # Sentinel background warm-load was removed with its loader.
     # The endpoint POST /api/sentinel/readiness/load remains the explicit sync path.
-    # Fail-open: missing torch/tokenizers must never crash the app.
-    try:
-        from app.services.sentinel_loader import init_sentinel  # local import: loader pulls config/tokenizer lazily
-        init_sentinel(background=True)
-        logger.info("Sentinel background load scheduled")
-    except Exception as exc:  # pragma: no cover — startup must not crash on model issues
-        logger.warning("sentinel background init failed: %s", exc)
     yield
 
 

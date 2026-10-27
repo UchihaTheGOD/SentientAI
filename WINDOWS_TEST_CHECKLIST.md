@@ -246,10 +246,11 @@ their own test app, not your server):
 run.bat test
 ```
 
-Record the final line exactly (expected on this branch, before
-Windows-specific issues: 651 collected, 644 passed, 6 failed,
-1 skipped — the 6 are the Sentinel artifact tests, which need
-`local_models\sentinel\` checkpoints that are not in the repo).
+Record the final line exactly (expected counts will be updated
+in the migration report once the full suite finishes on this
+branch — the old 651/644/6/1 baseline no longer applies, because
+the Sentinel artifact tests were replaced by CyberLLM classifier
+tests that need no checkpoints).
 If Windows shows different failures, record the failing test
 names and their error messages, not just the count.
 

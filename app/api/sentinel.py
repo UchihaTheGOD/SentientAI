@@ -1,7 +1,12 @@
-"""Sentinel API — readiness, analysis, prompt admin, incidents & containment.
+"""Security analysis API — readiness, analysis, incidents & containment.
 
-Extension for spec sections 8-12: structured parsing + fuse_structured + demo enrichment.
-Now also persists SecurityEvent per analyze and reuses incident deduplication logic.
+Classification is now provided by CyberLLMv1 (see app/services/classifier.py)
+plus deterministic security rules. The obsolete Sentinel dual-model
+inference, tokenizer, prompt file, and model-agreement logic were removed
+in the 2026-10-27 migration; the route paths (/api/sentinel/*, /sentinel)
+and the incident/review/block workflows are preserved, but the response
+no longer contains model_a / model_b / agreement / prompt fields — those
+were outputs of the retired models, not of the application.
 """
 from __future__ import annotations
 import time
@@ -11,8 +16,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.services.prompt_service import PROMPT_PATH, get_base_prompt, reload_prompt as do_reload_prompt, validate_extra_prompt, validate_log_text, build_analysis_prompt, MAX_LOG_CHARS, MAX_EXTRA_CHARS
-from app.services.sentinel_loader import get_status, ensure_loaded
+from app.services.log_validation import validate_log_text, MAX_LOG_CHARS
+from app.services.cyberllm_loader import get_status as cyberllm_status, ensure_loaded as cyberllm_ensure_loaded
 from app.services.auth_service import get_current_user, require_admin
 from app.models.user import User
 from app.template_env import templates
@@ -21,59 +26,34 @@ router = APIRouter(tags=["sentinel"])
 
 @router.get("/api/sentinel/readiness")
 def readiness():
-    s = get_status()
-    try:
-        prompt_chars = len(get_base_prompt())
-        prompt_error = None
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as exc:
-        prompt_chars = None
-        prompt_error = str(exc)
-        logger.warning("readiness prompt unavailable: %s", exc)
-    payload: dict = {
-        "ready": s.ready,
-        "a": s.a,
-        "b": s.b,
+    """Classifier readiness: CyberLLMv1 status + deterministic rules availability.
+
+    Rules are always available (model-independent). ``ready`` here means
+    the CyberLLMv1 model is loaded; when it is not, analysis still works
+    rules-only and honestly reports model_status=unavailable.
+    """
+    s = cyberllm_status()
+    return {
+        "ready": bool(s.ready),
+        "classifier": "cyberllm",
+        "base_model": s.base_model,
+        "model_root": s.model_root,
+        "adapter_dir": s.adapter_dir,
+        "device": s.device,
         "reason": s.reason,
-        "vocab_size": s.tokenizer_vocab_size,
-        "config_vocab": (s.config or {}).get("vocab_size") if s.config else None,
         "rss_mb": s.rss_mb,
-        "prompt_path": PROMPT_PATH.name,
-        "prompt_chars": prompt_chars,
-        "phase": "phase_1" if s.ready else "phase_0_placeholder",
-        "load_ms_a": s.load_ms_a,
-        "load_ms_b": s.load_ms_b,
-        "missing_files": list(getattr(s, "missing_files", []) or []),
+        "rules_available": True,
+        "legacy_models": "removed",
     }
-    if prompt_error is not None:
-        payload["prompt_error"] = prompt_error
-    return payload
 
 @router.post("/api/sentinel/readiness/load")
 def readiness_load(user: User = Depends(require_admin)):
-    s = ensure_loaded()
-    return {"ready": s.ready, "a": s.a, "b": s.b, "reason": s.reason, "load_ms_a": s.load_ms_a, "load_ms_b": s.load_ms_b}
-
-@router.get("/api/sentinel/prompt/status")
-def prompt_status(user: User = Depends(get_current_user)):
-    try:
-        txt = get_base_prompt()
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    return {"path": str(PROMPT_PATH), "chars": len(txt), "preview": txt[:1200]}
-
-
-@router.post("/api/sentinel/prompt/reload")
-def prompt_reload(user: User = Depends(require_admin)):
-    try:
-        info = do_reload_prompt()
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    return info
+    s = cyberllm_ensure_loaded()
+    return {"ready": bool(s.ready), "classifier": "cyberllm", "reason": s.reason, "load_ms": s.load_ms}
 
 class AnalyzeRequest(BaseModel):
     log_text: str = Field(..., min_length=1, max_length=MAX_LOG_CHARS)
-    extra_prompt: str | None = Field(default=None, max_length=MAX_EXTRA_CHARS)
-    max_new_tokens: int = Field(default=96, ge=16, le=256)
+    max_new_tokens: int | None = Field(default=None, ge=16, le=512)
     create_incident: bool = Field(default=True)
 
 def _dedup_incident_key(db: Session, ip: str | None, log_text: str) -> str | None:
@@ -91,23 +71,12 @@ def _dedup_incident_key(db: Session, ip: str | None, log_text: str) -> str | Non
             return r.id  # signal duplicate
     return None
 
-def _structured_or_fallback(req_text: str, inference: dict):
-    try:
-        from app.services.sentinel_schema import fuse_structured
-        return fuse_structured(req_text, inference)
-    except Exception as e:
-        logger.warning("fuse_structured failed: %s", e)
-        from app.services.sentinel_fusion import fuse, evaluate_rules
-        legacy = fuse(req_text, inference)
-        return {"legacy_fusion": legacy, "fused_verdict": legacy.get("fused_verdict"), "fused_score": legacy.get("fused_score"), "rules": legacy.get("rules"), "components": legacy.get("components")}
-
 @router.post("/api/sentinel/analyze")
 def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db), user: User | None = Depends(get_current_user)):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
         log_text = validate_log_text(req.log_text)
-        extra = validate_extra_prompt(req.extra_prompt) if req.extra_prompt else ""
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     import re, ipaddress
@@ -120,37 +89,28 @@ def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db)
             break
         except Exception:
             pass
-    try:
-        prompt = build_analysis_prompt(log_text, extra_prompt=extra or None)
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    from app.services.sentinel_inference import run_dual_inference
-    from app.services.sentinel_fusion import fuse
+    from app.services.classifier import classify_log, fuse_classification
     from app.services import incident_service
     start = time.perf_counter()
-    inference = run_dual_inference(prompt, max_new_tokens=req.max_new_tokens, timeout_s=12)
-    fused = fuse(log_text, inference)
+    classification = classify_log(log_text, kind="log", max_new_tokens=req.max_new_tokens)
+    fused = fuse_classification(log_text, classification)
     latency_ms = int((time.perf_counter() - start)*1000)
     incident = None
     if req.create_incident:
         try:
-            incident = incident_service.create_incident(db, log_text=log_text, ip_address=ip_addr, fused=fused, inference=inference, prompt_path=str(PROMPT_PATH))
+            incident = incident_service.create_incident(db, log_text=log_text, ip_address=ip_addr, fused=fused, classification=classification)
         except Exception as exc:
             logger.exception("incident create failed: %s", exc)
     return {
-        "model_a": inference.get("model_a"),
-        "model_b": inference.get("model_b"),
-        "agreement": inference.get("agreement"),
-        "agreement_detail": inference.get("agreement_detail"),
+        "classification": classification,
         "rules": fused.get("rules"),
         "fusion": {"score": fused.get("fused_score"), "verdict": fused.get("fused_verdict"), "components": fused.get("components"), "note": fused.get("note")},
         "risk_score": fused.get("fused_score"),
         "verdict": fused.get("fused_verdict"),
         "incident_id": getattr(incident, "id", None),
         "evidence": fused.get("rules", {}).get("evidence", []),
-        "prompt_chars": len(prompt),
         "latency_ms": latency_ms,
-        "inference_latency_ms": inference.get("latency_ms"),
+        "inference_latency_ms": classification.get("latency_ms"),
     }
 
 @router.get("/api/sentinel/incidents")
@@ -254,14 +214,10 @@ def rollback_candidate(user: User = Depends(require_admin)):
 def sentinel_page(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user is None:
         return RedirectResponse(url="/login?next=/sentinel", status_code=303)
-    s = get_status()
+    s = cyberllm_status()
     from app.services import incident_service
     recent = incident_service.list_incidents(db, limit=10)
-    try:
-        preview = get_base_prompt()[:1200]
-    except (FileNotFoundError, ValueError, OSError, RuntimeError) as exc:
-        preview = f"[prompt unavailable: {exc}]"
-    return templates.TemplateResponse("sentinel.html", {"request": request, "current_user": user, "user": user, "status": s, "prompt_preview": preview, "recent_incidents": recent})
+    return templates.TemplateResponse("sentinel.html", {"request": request, "current_user": user, "user": user, "status": s, "prompt_preview": "", "recent_incidents": recent})
 
 @router.get("/admin/sentinel/incidents", response_class=HTMLResponse)
 def admin_sentinel_incidents(request: Request, status: str | None = None, db: Session = Depends(get_db), user: User = Depends(require_admin)):

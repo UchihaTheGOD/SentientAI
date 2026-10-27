@@ -14,7 +14,8 @@ from app.models.training_example import TrainingExample
 from app.models.audit import AuditEvent
 from app.services import scoring
 from app.services import training as training_service
-from app.services.sentinel_fusion import evaluate_rules, fuse
+from app.services.security_rules import evaluate_rules
+from app.services.classifier import fuse_classification
 DISPOSABLE = "[E2E-VERIFY"
 CASES = [
     {"id": "case-01", "kind": "Normal harmless blog post", "target_type": "post",
@@ -179,19 +180,14 @@ def test_e2e_rules_vs_models_are_honestly_distinguished(db):
     assert evaluate_rules("2024-01-01 INFO user alice viewed SELECTION committee report 200")["verdict"] == "likely_benign"
     brute = "  ".join([f"2024-01-01 10:00:0{i} WARN login failed for 10.0.0.5" for i in range(6)])
     assert evaluate_rules(brute)["verdict"] in ("needs_review", "likely_threat")
-    try:
-        from app.services.sentinel_loader import get_status, ensure_loaded
-        status = get_status()
-        if not status.ready:
-            try: status = ensure_loaded()
-            except Exception: pass
-        fused = fuse("2024-01-01 INFO user alice viewed SELECTION committee report 200", {"model_a": {"status": "unavailable","text": ""}, "model_b": {"status": "unavailable","text": ""}})
-        assert fused["rules"]["verdict"] == "likely_benign"
-        assert "same family" in fused["note"].lower()
-    except ImportError:
-        pytest.skip("sentinel not importable")
+    # With CyberLLMv1 unavailable, fusion is rules-only and honest about it.
+    fused = fuse_classification("2024-01-01 INFO user alice viewed SELECTION committee report 200",
+        {"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []})
+    assert fused["rules"]["verdict"] == "likely_benign"
+    assert fused["fused_verdict"] == "likely_benign"
+    assert "CyberLLMv1" in fused["note"]
 
-def test_e2e_sentinel_evaluation_matrix_matches_documented_baseline(db):
+def test_e2e_evaluation_matrix_matches_documented_baseline(db):
     from evaluation_matrix import run_evaluation, EVAL_CASES
     assert len(EVAL_CASES) == 26
     res_payload = run_evaluation(with_models=False)
@@ -242,14 +238,15 @@ def test_e2e_regression_scorer_bands_and_gates(db):
     row = TrainingExample(instruction="keep", input_text="[E2E-VERIFY-ISOLATION eval row", output_text="keep", source="moderation", provenance="moderation_flag", status=APPROVED, approved=True, safe_to_train=True, split=SPLIT_EVAL, dedup_hash=h)
     db.add(row); db.commit()
     assert "[E2E-VERIFY-ISOLATION" not in training_service.export_approved_jsonl(db, split=SPLIT_TRAIN)
-def test_e2e_sentinel_fusion_primitives_remain_correct():
-    from app.services.sentinel_fusion import _count_failed_logins
+def test_e2e_classifier_fusion_primitives_remain_correct():
+    from app.services.security_rules import _count_failed_logins
     txt = " ".join([f"10.0.0.5 login failed 401 attempt {i}" for i in range(6)])
     assert _count_failed_logins(txt) >= 6
     assert _count_failed_logins("10.0.0.5 login failed 401 once") == 1
     assert evaluate_rules("2024-01-01 INFO SELECTION committee report 200")["verdict"] == "likely_benign"
     r = evaluate_rules("2024-01-01 INFO normal fetch /blog/hello 200")
-    f = fuse("2024-01-01 INFO normal fetch /blog/hello 200", {"model_a": {"status":"empty","text":""}, "model_b": {"status":"empty","text":""}})
+    f = fuse_classification("2024-01-01 INFO normal fetch /blog/hello 200",
+        {"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []})
     assert f["fused_verdict"] == r["verdict"]
 def test_e2e_admin_authorization_and_csrf_still_enforced(client, auth_client, admin_client, db):
     row = TrainingExample(instruction="x", input_text="[E2E-VERIFY-AUTHZ test", output_text="y", source="moderation", provenance="moderation_flag", status=CANDIDATE, dedup_hash=training_service.dedup_hash("x", "[E2E-VERIFY-AUTHZ test"))

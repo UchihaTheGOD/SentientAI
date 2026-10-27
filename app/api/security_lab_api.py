@@ -116,13 +116,14 @@ def get_run(rid: int, db: Session = Depends(get_db), user: User = Depends(requir
     return {**d, "event_ids": eids, "events": evs, "links": links, "fusion": fusion, "model_a_text": getattr(r,"model_a_text",None), "model_b_text": getattr(r,"model_b_text",None)}
 
 def _persist_run_assessment(db: Session, run, inference: dict, fused: dict, incident, cand_id: int | None, *, analysis_error: str | None = None) -> None:
-    ma=(inference.get("model_a") or {}); mb=(inference.get("model_b") or {})
+    # Legacy-named storage columns (see incident_service note): the
+    # classifier slot holds the single CyberLLMv1 summary/status.
     try:
-        run.model_a_text=(ma.get("text") or "")[:4000] if ma.get("text") else None
-        run.model_a_status=ma.get("status")
-        run.model_b_text=(mb.get("text") or "")[:4000] if mb.get("text") else None
-        run.model_b_status=mb.get("status")
-        run.agreement=inference.get("agreement")
+        run.model_a_text=(inference.get("summary") or "")[:4000] if inference.get("summary") else None
+        run.model_a_status=inference.get("status")
+        run.model_b_text=None
+        run.model_b_status=None
+        run.agreement=None
         run.fused_verdict=fused.get("fused_verdict")
         try: run.fused_score=int(fused.get("fused_score")) if fused.get("fused_score") is not None else None
         except Exception: run.fused_score=None
@@ -174,24 +175,20 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         log_text=" | ".join((r.evidence or r.event_type or "")[:1200] for r in rows)[:7000]
     else:
         raise HTTPException(status_code=422, detail="provide lab_run_id or event_ids or log_text")
-    from app.services.prompt_service import PROMPT_PATH, build_analysis_prompt
-    from app.services.sentinel_inference import run_dual_inference
-    from app.services.sentinel_schema import fuse_structured
+    from app.services.classifier import classify_log, fuse_classification
     from app.services.incident_service import create_incident
-    from app.services.sentinel_loader import get_status
+    from app.services.cyberllm_loader import get_status
     import time, re, ipaddress
-    try: prompt_text=build_analysis_prompt(log_text)
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
     ip_cands=re.findall(r"(?:\d{1,3}\.){3}\d{1,3}", log_text); ip_addr=None
     for c in ip_cands:
         try: ipaddress.ip_address(c); ip_addr=c; break
         except Exception: pass
     status=get_status()
     t0=time.perf_counter()
-    inference=run_dual_inference(prompt_text, max_new_tokens=body.max_new_tokens, timeout_s=18)
-    fused=fuse_structured(log_text, inference)
+    inference=classify_log(log_text, kind="log", max_new_tokens=body.max_new_tokens)
+    fused=fuse_classification(log_text, inference)
     inc=None
-    try: inc=create_incident(db, log_text=log_text, ip_address=ip_addr, fused={"fused_score": fused.get("fused_score", 50), "fused_verdict": fused.get("fused_verdict","needs_review"), "rules": fused.get("rules", {}) if isinstance(fused.get("rules"), dict) else {}}, inference=inference, prompt_path=str(PROMPT_PATH))
+    try: inc=create_incident(db, log_text=log_text, ip_address=ip_addr, fused={"fused_score": fused.get("fused_score", 50), "fused_verdict": fused.get("fused_verdict","needs_review"), "rules": fused.get("rules", {}) if isinstance(fused.get("rules"), dict) else {}}, classification=inference)
     except Exception: pass
     cand_id=None
     if inc is not None:
@@ -202,18 +199,7 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         except Exception: pass
     if target_run is not None:
         _persist_run_assessment(db, target_run, inference, fused, inc, cand_id)
-    try: prompt_chars=len(prompt_text)
-    except Exception: prompt_chars=None
-    truncated=None
-    try:
-        from app.services.sentinel_loader import get_bundle
-        tok=get_bundle().get("tokenizer")
-        if tok and prompt_text:
-            ids=tok.encode(prompt_text).ids
-            budget=768 - body.max_new_tokens - 4
-            truncated=len(ids) > budget
-    except Exception: pass
-    return {"log_text_preview": log_text[:800], "model_a": inference.get("model_a"), "model_b": inference.get("model_b"), "agreement": inference.get("agreement"), "agreement_detail": inference.get("agreement_detail"), "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "prompt_path": str(PROMPT_PATH), "prompt_chars": prompt_chars, "prompt_truncated": truncated, "ready": status.ready if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None)}
+    return {"log_text_preview": log_text[:800], "classification": inference, "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "ready": bool(status.ready) if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None)}
 
 @router.post("/log-analyze")
 def log_analyze(body: LogAnalyzeBody, db: Session = Depends(get_db), user: User = Depends(require_admin)):

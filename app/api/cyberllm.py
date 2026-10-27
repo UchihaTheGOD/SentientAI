@@ -40,7 +40,7 @@ from app.template_env import templates
 from app.services.cyberllm_inference import ModelUnavailable, generate
 from app.services.cyberllm_loader import ensure_loaded, get_status
 from app.services.cyberllm_schema import parse_model_output
-from app.services.prompt_service import MAX_LOG_CHARS, validate_log_text
+from app.services.log_validation import MAX_LOG_CHARS, validate_log_text
 from app.services.ratelimit import limit_cyberllm_analyze
 
 logger = logging.getLogger("sentientai.cyberllm.api")
