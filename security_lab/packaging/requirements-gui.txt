@@ -1,0 +1,7 @@
+# GUI-only dependencies for the CyberLLMv1 Security Lab executable.
+# The SentientAI backend dependencies (fastapi, uvicorn, sqlalchemy, ...)
+# are NOT bundled: the backend runs from the user's own project Python /
+# virtual environment, which already has them (requirements.txt).
+PySide6>=6.6
+requests>=2.31
+reportlab>=4.0
