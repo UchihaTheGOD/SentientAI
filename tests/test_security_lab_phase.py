@@ -70,5 +70,5 @@ def test_lab_analyze_creates_incident_and_candidate(app, admin):
     assert r2.status_code in (200,422)
     if r2.status_code == 200:
         j = r2.json()
-        assert "model_a" in j and "model_b" in j and "fusion" in j
+        assert "classification" in j and "fusion" in j and "model_a" not in j and "model_b" not in j
         # candidate may be None if rules benign, but incident should exist for some cases

@@ -6,15 +6,13 @@ def test_analyze_requires_auth(app, client):
     assert r.status_code in (401,403)
 
 def test_analyze_success_admin(admin, admin_client):
-    # ensure models ready
-    from app.services.sentinel_loader import ensure_loaded
-    s = ensure_loaded()
-    assert s.ready
+    # No model is required: analysis is rules + CyberLLM (unavailable here -> rules-only, honest).
     payload = {"log_text": "2024-01-01 12:00:00 WARN 1.2.3.4Failed login for alice 401\n"*2, "max_new_tokens": 16}
     r = admin_client._client.post("/api/sentinel/analyze", json=payload, headers={"X-CSRF-Token": admin_client._csrf()})
     assert r.status_code == 200, r.text[:800]
     data = r.json()
-    assert "model_a" in data and "model_b" in data
+    assert "model_a" not in data and "model_b" not in data and "agreement" not in data
+    assert "classification" in data and data["classification"]["source"] == "cyberllm"
     assert "fusion" in data and "verdict" in data
     assert "incident_id" in data
 
@@ -24,14 +22,13 @@ def test_analyze_invalid_rejects_empty_and_long(admin_client):
     r2 = admin_client._client.post("/api/sentinel/analyze", json={"log_text":"x"*9000}, headers={"X-CSRF-Token": admin_client._csrf()})
     assert r2.status_code == 422
 
-def test_prompt_reload_requires_admin(admin, user, admin_client, client):
-    # anonymous / normal user cannot reload
+def test_prompt_reload_route_removed(admin, user, admin_client, client):
+    # The Sentinel prompt file was removed with the retired models; the route must be gone, not auth-gated.
     c = client._client
     r = c.post("/api/sentinel/prompt/reload", headers={"X-CSRF-Token": client._csrf()})
-    assert r.status_code in (401,403)
-    # admin can
+    assert r.status_code == 404
     r2 = admin_client._client.post("/api/sentinel/prompt/reload", headers={"X-CSRF-Token": admin_client._csrf()})
-    assert r2.status_code == 200
+    assert r2.status_code == 404
 
 def test_blocks_authz_and_self_block(admin, admin_client):
     # admin cannot block self
@@ -48,9 +45,7 @@ def test_blocks_authz_and_self_block(admin, admin_client):
     assert r2.status_code == 400
 
 def test_incident_review_authz(admin, user, admin_client, client):
-    # first create incident via admin analyze
-    from app.services.sentinel_loader import ensure_loaded
-    ensure_loaded()
+    # first create incident via admin analyze (no model required)
     payload = {"log_text":"test incident for review "+ "x"*20, "max_new_tokens":16}
     r = admin_client._client.post("/api/sentinel/analyze", json=payload, headers={"X-CSRF-Token": admin_client._csrf()})
     assert r.status_code == 200

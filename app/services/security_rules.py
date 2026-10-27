@@ -1,9 +1,15 @@
-"""Fusion + deterministic rules — transparent layer over model outputs."""
+"""Deterministic security rules — model-independent layer.
+
+These rules were previously combined with the obsolete Sentinel model
+outputs in sentinel_fusion.py. They do not depend on any model, tokenizer,
+or prompt, and are preserved unchanged (same thresholds, scores, and
+verdicts) so existing incident and review behaviour does not change.
+"""
 from __future__ import annotations
 import re
 import ipaddress
 import logging
-logger = logging.getLogger("sentientai.sentinel.fusion")
+logger = logging.getLogger("sentientai.security_rules")
 IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 def _extract_ips(text: str) -> list[str]:
     cands = IP_RE.findall(text or "")
@@ -136,82 +142,3 @@ def evaluate_rules(log_text: str) -> dict:
     else:
         verdict = "likely_benign"
     return {"score": score, "verdict": verdict, "evidence": evidence, "risks": risks, "ips": ips, "failed_count": failed, "success_after_fail": success_after, "port_scan": scan}
-def _verdict_from_model_text(text: str) -> str | None:
-    """Legacy keyword heuristic (used only when strict validation unavailable)."""
-    t = (text or "").lower()
-    for v in ["likely_threat","needs_review","likely_benign"]:
-        if v in t:
-            return v
-    if any(k in t for k in ["likely threat","high risk","malicious","attack"]):
-        return "likely_threat"
-    if any(k in t for k in ["benign","normal","no threat","no indicator"]):
-        return "likely_benign"
-    if any(k in t for k in ["review","suspicious","inconclusive","uncertain"]):
-        return "needs_review"
-    return None
-
-def _structured_verdict(text: str | None, status: str | None) -> tuple[str | None, bool, list[str]]:
-    """Return (verdict, is_valid_structured, errors) using strict Sentinel validation.
-
-    Only outputs passing validate_sentinel_output are considered valid model
-    verdicts. Invalid/empty outputs return (None, False, errors) and must not
-    contribute confidence to fusion.
-    """
-    try:
-        from app.services.sentinel_schema import validate_sentinel_output
-        res = validate_sentinel_output(text, status)
-        if res["valid"]:
-            return res["verdict"], True, []
-        return None, False, res["errors"]
-    except Exception as exc:
-        return None, False, [f"validation error: {exc}"]
-
-def fuse(log_text: str, inference: dict) -> dict:
-    rules = evaluate_rules(log_text)
-    ma = (inference.get("model_a") or {})
-    mb = (inference.get("model_b") or {})
-    ta = (ma.get("text") or "")
-    tb = (mb.get("text") or "")
-    # Strict validation: only structured-valid outputs count
-    va, va_valid, va_errors = _structured_verdict(ta, ma.get("status"))
-    vb, vb_valid, vb_errors = _structured_verdict(tb, mb.get("status"))
-    # Fallback for backward compat only if needed for diagnostics, but not fused:
-    # legacy keywords are recorded as legacy_verdict but not weighted unless valid
-    legacy_va = _verdict_from_model_text(ta) if not va_valid else None
-    legacy_vb = _verdict_from_model_text(tb) if not vb_valid else None
-    agreement = inference.get("agreement")
-    model_scores = {"likely_benign": 10, "needs_review": 50, "likely_threat": 85}
-    components = []
-    components.append({"source":"rules","verdict":rules["verdict"],"score":rules["score"],"evidence":rules["evidence"]})
-    total = rules["score"] * 0.5
-    w_sum = 0.5
-    for ver, label, is_valid, errs, legacy in [(va, "model_a", va_valid, va_errors, legacy_va), (vb, "model_b", vb_valid, vb_errors, legacy_vb)]:
-        if ver and is_valid:
-            ms = model_scores.get(ver, 50)
-            status_ok = (ma if label=="model_a" else mb).get("status") == "ok"
-            w = 0.25 if status_ok else 0.12
-            components.append({"source":label,"verdict":ver,"score":ms,"evidence":[f"model output contains '{ver}' (structured valid)"],"status": (ma if label=="model_a" else mb).get("status"), "structured_valid": True})
-            total += ms * w
-            w_sum += w
-        else:
-            # Record why invalid; never assign fabricated confidence
-            detail = "; ".join(errs[:2]) if errs else "no verdict keyword in output"
-            if legacy and not is_valid:
-                detail = f"legacy keyword '{legacy}' ignored (invalid structure: {detail})"
-            components.append({"source":label,"verdict":None,"score":None,"evidence":[detail],"status": (ma if label=="model_a" else mb).get("status"), "structured_valid": False, "validation_errors": errs})
-    num = rules["score"]*0.5
-    den = 0.5
-    for ver, label, is_valid in [(va,"model_a", va_valid),(vb,"model_b", vb_valid)]:
-        if ver and is_valid:
-            w = 0.25 if ((ma if label=="model_a" else mb).get("status")=="ok") else 0.12
-            num += model_scores[ver]*w
-            den += w
-    fused_score = int(round(num/den)) if den else rules["score"]
-    if fused_score >= 65:
-        fused_verdict = "likely_threat"
-    elif fused_score >= 35:
-        fused_verdict = "needs_review"
-    else:
-        fused_verdict = "likely_benign"
-    note = "Models A and B are same family (Sentinel finetune); agreement is not independent confirmation"
-    return {"fused_score": fused_score, "fused_verdict": fused_verdict, "rules": rules, "components": components, "agreement": agreement, "note": note, "model_a_verdict": va, "model_b_verdict": vb, "model_a_valid": va_valid, "model_b_valid": vb_valid}

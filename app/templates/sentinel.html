@@ -3,20 +3,16 @@
 {% block content %}
 <div class="page-wrap">
   <header class="page-head">
-    <div><h1 class="page-title">Sentinel — Security Log Analysis</h1><p class="page-lead">Local dual-model analysis. Log text is treated as untrusted data.</p></div>
+    <div><h1 class="page-title">Sentinel — Security Log Analysis</h1><p class="page-lead">CyberLLMv1 classification plus deterministic rules. Log text is treated as untrusted data.</p></div>
     <span class="badge {% if status.ready %}badge-green{% else %}badge-yellow{% endif %}">{% if status.ready %}ready{% else %}not ready: {{ status.reason }}{% endif %}</span>
   </header>
   <div class="card" style="margin-bottom:1rem">
-    <div class="text-sm text-muted">Prompt: <code>{{ prompt_preview[:200] }}…</code> · <a href="/api/sentinel/prompt/status">status</a></div>
-    <div class="text-sm text-muted">Model A: {{ status.a }} {% if status.load_ms_a %}({{ status.load_ms_a }}ms){% endif %} · Model B: {{ status.b }} {% if status.load_ms_b %}({{ status.load_ms_b }}ms){% endif %}</div>
+    <div class="text-sm text-muted">Classifier: CyberLLMv1 ({{ status.base_model }}) · Device: {{ status.device }} · <a href="/api/sentinel/readiness">readiness</a></div>
   </div>
   <div class="card">
     <form id="analyze-form">
       <label>Security log / event text
         <textarea name="log_text" id="log_text" rows="8" maxlength="8000" placeholder="Paste log excerpt (max 8000 chars)" required style="width:100%"></textarea>
-      </label>
-      <label style="margin-top:0.75rem;display:block">Additional prompt (optional, max 2000)
-        <textarea name="extra_prompt" id="extra_prompt" rows="2" maxlength="2000" placeholder="Extra context for this analysis (trusted)" style="width:100%"></textarea>
       </label>
       <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
         <button type="submit" class="btn btn-primary" id="analyze-btn">Analyze</button>
@@ -29,12 +25,9 @@
       <h3>Fusion verdict</h3>
       <div id="fusion"></div>
       <div id="evidence" class="text-sm" style="margin-top:0.5rem"></div>
-      <div id="disagreement" class="text-sm text-muted"></div>
+      <div id="classification-line" class="text-sm text-muted"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem">
-      <div class="card"><h4>Model A</h4><pre id="model-a" style="white-space:pre-wrap;word-break:break-word"></pre><div id="model-a-meta" class="text-sm text-muted"></div></div>
-      <div class="card"><h4>Model B</h4><pre id="model-b" style="white-space:pre-wrap;word-break:break-word"></pre><div id="model-b-meta" class="text-sm text-muted"></div></div>
-    </div>
+    <div class="card" style="margin-top:1rem"><h4>CyberLLMv1 classification</h4><pre id="classification" style="white-space:pre-wrap;word-break:break-word"></pre><div id="classification-meta" class="text-sm text-muted"></div></div>
     <div id="incident-link" class="card" style="margin-top:1rem"></div>
   </div>
   {% if recent_incidents %}

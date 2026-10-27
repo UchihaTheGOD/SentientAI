@@ -1,6 +1,6 @@
-"""Bridge: security_events / ATTACT findings -> Sentinel inference/fusion -> SentinelIncident -> sanitized TrainingExample.
+"""Bridge: security_events / ATTACT findings -> CyberLLMv1 classification + rules -> SentinelIncident -> sanitized TrainingExample.
 
-Preserves deterministic security_events logging. Inference is failure-isolated:
+Preserves deterministic security_events logging. Classification is failure-isolated:
   - missing model / timeout / empty -> still returns fusion from rules, persists
     incident with accurate model statuses, never treats absent model as success.
   - logging of the original event always succeeds even if this bridge fails.
@@ -97,62 +97,37 @@ def _finding_log_text(finding: AttactFinding, assessment: Optional[AttactAssessm
 
 
 def _run_analysis(log_text: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Run prompt build + dual inference + fusion. Never raises; returns honest statuses."""
-    from app.services.prompt_service import build_analysis_prompt
-    from app.services.sentinel_inference import run_dual_inference
-    from app.services.sentinel_fusion import fuse as legacy_fuse
+    """Run CyberLLMv1 classification + deterministic rules fusion. Never raises; returns honest statuses.
+
+    Returns (classification, fused, structured) where classification is the
+    single CyberLLMv1 result (status ok/unavailable/unparseable) and fused
+    is the rules+model fusion. When the model is unavailable, fused is
+    rules-only — never a fabricated model verdict.
+    """
+    from app.services.classifier import classify_log, fuse_classification
+
     try:
-        prompt = build_analysis_prompt(log_text, extra_prompt=None)
+        classification = classify_log(log_text)
     except Exception as exc:
-        logger.warning("prompt build failed: %s", exc)
-        inference = {
-            "model_a": {"status": "error", "error": f"prompt_build_failed:{exc}", "text": "", "tokens": 0},
-            "model_b": {"status": "error", "error": f"prompt_build_failed:{exc}", "text": "", "tokens": 0},
-            "agreement": None,
-            "latency_ms": 0,
-            "ready": False,
-        }
-        try:
-            from app.services.sentinel_fusion import evaluate_rules
-            rules = evaluate_rules(log_text)
-            fused = legacy_fuse(log_text, inference)
-        except Exception as e2:
-            fused = {"fused_score": 50, "fused_verdict": "needs_review", "rules": {"evidence": [str(e2)[:300]], "score": 50, "verdict": "needs_review"}, "components": []}
-        structured = {"fused_verdict": fused.get("fused_verdict"), "fused_score": fused.get("fused_score"), "rules": fused.get("rules"), "legacy_fusion": fused}
-        return inference, fused, structured
-    try:
-        inference = run_dual_inference(prompt, max_new_tokens=180, timeout_s=12)
-    except Exception as exc:
-        logger.exception("dual inference failed: %s", exc)
-        inference = {
-            "model_a": {"status": "error", "error": f"{type(exc).__name__}:{str(exc)[:300]}", "text": "", "tokens": 0},
-            "model_b": {"status": "error", "error": f"{type(exc).__name__}:{str(exc)[:300]}", "text": "", "tokens": 0},
-            "agreement": None,
-            "latency_ms": 0,
-            "ready": False,
+        logger.exception("classification failed: %s", exc)
+        classification = {
+            "source": "cyberllm", "status": "unavailable", "classification": "needs_review",
+            "model_classification": None, "confidence": "low", "summary": "",
+            "indicators": [], "reasoning": [], "limitations": [str(exc)[:300]],
+            "deterministic_findings": [], "parse_ok": False, "truncated": False,
+            "output_tokens": 0, "latency_ms": 0, "raw_output": "", "error": str(exc),
         }
     try:
-        from app.services.sentinel_schema import fuse_structured
-        structured = fuse_structured(log_text, inference)
-        legacy = structured.get("legacy_fusion") or {}
-        fused = {
-            "fused_score": structured.get("fused_score", legacy.get("fused_score", 50)),
-            "fused_verdict": structured.get("fused_verdict", legacy.get("fused_verdict", "needs_review")),
-            "rules": structured.get("rules", legacy.get("rules", {})),
-            "components": structured.get("components", legacy.get("components", [])),
-            "note": structured.get("note", legacy.get("note")),
-        }
-        return inference, fused, structured
+        fused = fuse_classification(log_text, classification)
     except Exception as exc:
-        logger.warning("fuse_structured failed, fallback to legacy: %s", exc)
-        try:
-            fused = legacy_fuse(log_text, inference)
-            structured = {"fused_verdict": fused.get("fused_verdict"), "fused_score": fused.get("fused_score"), "rules": fused.get("rules"), "legacy_fusion": fused, "components": fused.get("components")}
-            return inference, fused, structured
-        except Exception as e2:
-            fused = {"fused_score": 50, "fused_verdict": "needs_review", "rules": {"evidence": [str(e2)[:500]], "score": 50, "verdict": "needs_review"}, "components": []}
-            structured = {"fused_verdict": "needs_review", "fused_score": 50, "rules": fused["rules"], "legacy_fusion": fused}
-            return inference, fused, structured
+        logger.warning("fusion failed: %s", exc)
+        fused = {"fused_score": 50, "fused_verdict": "needs_review",
+                 "rules": {"evidence": [str(exc)[:300]], "score": 50, "verdict": "needs_review"}, "components": []}
+    structured = {
+        "fused_verdict": fused.get("fused_verdict"), "fused_score": fused.get("fused_score"),
+        "rules": fused.get("rules"), "classification": classification, "components": fused.get("components"),
+    }
+    return classification, fused, structured
 
 
 def _maybe_collect_training(db: Session, incident: SentinelIncident, actor_id: Optional[int] = None):
@@ -219,10 +194,9 @@ def submit_security_event_for_analysis(db, *, event_id, triggered_by=None, reque
             except Exception:
                 pass
     from app.services.incident_service import create_incident
-    from app.services.prompt_service import PROMPT_PATH
     ip = event.ip_address
     try:
-        incident = create_incident(db, log_text=redacted_head[:8000], ip_address=ip, fused=fused, inference=inference, prompt_path=str(PROMPT_PATH))
+        incident = create_incident(db, log_text=redacted_head[:8000], ip_address=ip, fused=fused, classification=inference)
     except Exception as exc:
         logger.exception("create_incident failed for event %s: %s", event_id, exc)
         raise
@@ -313,9 +287,8 @@ def submit_attact_finding_for_analysis(db, *, finding_id, triggered_by=None, req
             except Exception:
                 pass
     from app.services.incident_service import create_incident
-    from app.services.prompt_service import PROMPT_PATH
     try:
-        incident = create_incident(db, log_text=redacted[:8000], ip_address=ip, fused=fused, inference=inference, prompt_path=str(PROMPT_PATH))
+        incident = create_incident(db, log_text=redacted[:8000], ip_address=ip, fused=fused, classification=inference)
     except Exception as exc:
         logger.exception("create_incident failed for finding %s: %s", finding_id, exc)
         raise

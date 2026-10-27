@@ -1,5 +1,5 @@
 """Regression tests for single-line vs multiline failed-login counting."""
-from app.services.sentinel_fusion import evaluate_rules, _count_failed_logins, _success_after_fail
+from app.services.security_rules import evaluate_rules, _count_failed_logins, _success_after_fail
 
 def test_space_joined_six_counts_as_six():
     txt = " ".join(["2024-01-01 10:00:00 WARN 192.168.1.10 login failed 401"]*6)

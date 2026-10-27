@@ -110,24 +110,31 @@ of weights, ~4.5 GB peak estimated; Turing has no BF16, so the loader
 uses float16 on CUDA. GPU fit and latency on that card are still
 BLOCKED — they can only be measured on that machine.
 
-## 4. Sentinel artifacts (separate from CyberLLM)
+## 4. Obsolete Sentinel models — REMOVED (2026-10-27 migration)
 
-Sentinel needs, under `<project>/local_models/sentinel/`:
+The old Sentinel Model A / Model B checkpoints, tokenizer, prompt
+file, loader, dual inference, and model-agreement logic were removed
+from this branch. **Do not download `sentinel_best_model.pt`,
+`best_autolab_checkpoint.pt`, `best_autolab.pt`, or
+`sentinel_tokenizer.json` — nothing in the application requires them
+any more, and the application starts without them.**
 
-- `config.json` (vocab 7053, hidden 768, 12 layers, 12 heads,
-  intermediate 3072, max_position 768) — a hardcoded fallback exists,
-  but the file is the documented source.
-- `sentinel_tokenizer.json`
-- `sentinel_best_model.pt` (checkpoint A, 1.1 GB in the user's archive)
-- `best_autolab_checkpoint.pt` (checkpoint B) or the deduped alias
-  `best_autolab.pt` — the loader dedupes B by size + 4 MB hash prefix
-  and prefers the canonical name.
+What replaced them:
+- Classification: CyberLLMv1 via `app/services/classifier.py`
+  (`classify_log` + `fuse_classification`), used by
+  `POST /api/sentinel/analyze`, the bridge, demo, and security lab.
+- Deterministic rules: `app/services/security_rules.py` (unchanged
+  thresholds, scores, and verdicts from the old fusion rules).
+- Incidents, blocks, review queue, and human-review workflows:
+  unchanged, now fed by CyberLLMv1 + rules.
+- Moderation: human-only. CyberLLMv1 is a security-log classifier,
+  not a content-moderation classifier, so it is not forced into
+  that role; moderation candidates are born from a moderator's
+  decision and are never auto-approved.
 
-`GET /api/sentinel/readiness` now returns `missing_files` explicitly.
-In this release candidate, checkpoint B was not found anywhere in the
-available workspace, so dual-checkpoint Sentinel tests are BLOCKED
-(see the validation report). Neither checkpoint was deleted, renamed,
-or moved by this work.
+`GET /api/sentinel/readiness` now reports the CyberLLMv1 classifier
+status (`classifier: "cyberllm"`, `legacy_models: "removed"`,
+`rules_available: true`) instead of Sentinel checkpoint files.
 
 ## 5. Continuous learning (no training in this release)
 
