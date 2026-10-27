@@ -60,7 +60,7 @@ def test_cyberllm_page_renders_for_user(admin_client):
     assert "/static/js/cyberllm_form.js" in r.text
     from pathlib import Path
 
-    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "cyberllm_form.js").read_text()
+    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "cyberllm_form.js").read_text(encoding="utf-8")
     assert "/api/cyberllm/analyze" in js
 
 

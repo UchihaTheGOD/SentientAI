@@ -259,11 +259,6 @@ def ensure_loaded() -> CyberLLMStatus:
         _status.quantization = "none"
 
         try:
-            if not _TORCH_AVAILABLE:
-                raise RuntimeError(
-                    "PyTorch is not installed; CyberLLM cannot load."
-                )
-
             paths = resolve_cyberllm_paths()
             _status.model_root = str(paths.root)
             _status.adapter_dir = str(paths.adapter_dir)
@@ -297,6 +292,16 @@ def ensure_loaded() -> CyberLLMStatus:
                     "CyberLLM artifacts incomplete ("
                     + "; ".join(_present_missing)
                     + "); run scripts/setup_cyberllm.py --check for the full list."
+                )
+
+            # Diagnostic precedence: file problems are reported before the
+            # torch dependency problem, so an incomplete model directory
+            # fails with its own actionable message even on a machine
+            # without torch installed (this also keeps the portability
+            # tests meaningful in a torch-less venv).
+            if not _TORCH_AVAILABLE:
+                raise RuntimeError(
+                    "PyTorch is not installed; CyberLLM cannot load."
                 )
 
             from peft import PeftModel

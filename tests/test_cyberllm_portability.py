@@ -43,7 +43,11 @@ def test_default_root_is_project_local_not_cwd(tmp_path, monkeypatch):
         project_root / "cyberLLMv1" / "adapter",
         project_root / "local_models" / "cyberllm" / "v8",
     )
-    assert "D:" not in str(paths.root) and "CyberLLM" not in str(paths.root)
+    # The project may legitimately live on D: (or any drive) on Windows, so
+    # a drive-letter/substring check is wrong; the guarantee that matters is
+    # that the default root sits inside the project tree, which the
+    # equality assertion above already pins down.
+    assert project_root in paths.root.parents
 
 
 def test_custom_root_and_manifest(tmp_path, monkeypatch):

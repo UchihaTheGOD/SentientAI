@@ -6,6 +6,7 @@ second system. No training is launched here.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +18,15 @@ from app.services.cyberllm_dataset import find_conflicts, prepare, split_rows
 from app.services.cyberllm_feedback import collect_cyberllm_feedback
 from app.services.training import approve_example, review_example
 from app.models.learning import APPROVED, CANDIDATE
+
+def _child_env(root):
+    """Child-process env: inherit the parent, override only the model root.
+
+    A stripped env (Linux-only PATH, no SystemRoot) breaks the child
+    Python on Windows (Winsock/DLL initialisation, WinError 10106 family).
+    """
+    return {**os.environ, "CYBERLLM_MODEL_ROOT": str(root)}
+
 
 
 def test_feedback_is_candidate_not_ground_truth(db):
@@ -114,7 +124,7 @@ def test_promotion_apply_and_rollback_roundtrip(tmp_path, monkeypatch):
     r = subprocess.run([sys.executable, str(script), "--candidate-dir", str(candidate),
                         "--approval", str(approval), "--apply",
                         "--backup-dir", str(backup), "--confirm", "I APPROVE"],
-                       capture_output=True, text=True, env={"CYBERLLM_MODEL_ROOT": str(root), "PATH": "/usr/bin:/bin"})
+                       capture_output=True, text=True, env=_child_env(root))
     assert r.returncode == 0, r.stdout + r.stderr
     assert (adapter / "adapter_model.safetensors").read_bytes() == b"new-adapter"
     r2 = subprocess.run([sys.executable, str(script), "--rollback", "--backup-dir", str(backup)],

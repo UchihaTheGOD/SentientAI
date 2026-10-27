@@ -19,6 +19,7 @@ the tmp model root used by the promotion tests.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,15 @@ from app.models.training_example import TrainingExample
 from app.services.cyberllm_dataset import prepare
 from app.services.cyberllm_feedback import collect_cyberllm_feedback
 from app.services.training import approve_example, reject_example, review_example
+
+def _child_env(root):
+    """Child-process env: inherit the parent, override only the model root.
+
+    A stripped env (Linux-only PATH, no SystemRoot) breaks the child
+    Python on Windows (Winsock/DLL initialisation, WinError 10106 family).
+    """
+    return {**os.environ, "CYBERLLM_MODEL_ROOT": str(root)}
+
 from app.services.cyberllm_dataset import find_conflicts
 
 
@@ -136,7 +146,7 @@ def test_promotion_rejection_leaves_model_intact(tmp_path):
     r = subprocess.run(
         [sys.executable, str(_promotion_script()), "--candidate-dir", str(candidate)],
         capture_output=True, text=True,
-        env={"CYBERLLM_MODEL_ROOT": str(root), "PATH": "/usr/bin:/bin"},
+        env=_child_env(root),
     )
     assert r.returncode != 0
     assert (adapter / "adapter_model.safetensors").read_bytes() == b"production-adapter"
@@ -148,7 +158,7 @@ def test_promotion_rejection_leaves_model_intact(tmp_path):
         [sys.executable, str(_promotion_script()), "--candidate-dir", str(candidate),
          "--approval", str(bad)],
         capture_output=True, text=True,
-        env={"CYBERLLM_MODEL_ROOT": str(root), "PATH": "/usr/bin:/bin"},
+        env=_child_env(root),
     )
     assert r2.returncode != 0
     assert (adapter / "adapter_model.safetensors").read_bytes() == b"production-adapter"
@@ -160,7 +170,7 @@ def test_promotion_rejection_leaves_model_intact(tmp_path):
          "--approval", str(good), "--apply", "--backup-dir", str(tmp_path / "backup"),
          "--confirm", "yes"],
         capture_output=True, text=True,
-        env={"CYBERLLM_MODEL_ROOT": str(root), "PATH": "/usr/bin:/bin"},
+        env=_child_env(root),
     )
     assert r3.returncode != 0
     assert (adapter / "adapter_model.safetensors").read_bytes() == b"production-adapter"
@@ -181,7 +191,7 @@ def test_promotion_apply_backup_rollback_intact(tmp_path):
     approval = tmp_path / "good.json"
     approval.write_text(json.dumps({"decision": "approved", "approver": "admin", "evaluation_report": str(eval_report)}))
     backup = tmp_path / "backup"
-    env = {"CYBERLLM_MODEL_ROOT": str(root), "PATH": "/usr/bin:/bin"}
+    env = _child_env(root)
     r = subprocess.run(
         [sys.executable, str(_promotion_script()), "--candidate-dir", str(candidate),
          "--approval", str(approval), "--apply", "--backup-dir", str(backup),

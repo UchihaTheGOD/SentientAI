@@ -19,7 +19,7 @@ import pytest
 def test_moderation_is_human_only():
     """collection.py must record model_removed, not a fabricated model verdict."""
     import re
-    src = pathlib.Path("app/services/collection.py").read_text()
+    src = (pathlib.Path(__file__).resolve().parent.parent / "app" / "services" / "collection.py").read_text(encoding="utf-8")
     assert "model_removed_human_review_only" in src
     assert "sentinel_moderation" not in src
 

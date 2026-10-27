@@ -21,7 +21,7 @@ import pytest
 def test_cyberllm_loader_uses_safetensors_not_torch_checkpoint():
     """CyberLLMv1 must not load weights via torch.load of a checkpoint."""
     from pathlib import Path
-    src = (Path(__file__).resolve().parent.parent / "app" / "services" / "cyberllm_loader.py").read_text()
+    src = (Path(__file__).resolve().parent.parent / "app" / "services" / "cyberllm_loader.py").read_text(encoding="utf-8")
     assert "torch.load" not in src
     assert "safetensors" in src.lower() or "from_pretrained" in src
 
