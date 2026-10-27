@@ -48,17 +48,16 @@
 
     {% if is_mine %}
     <button type="button" class="comment-action-btn" data-reply-toggle="edit-form-{{ comment.id }}">Edit</button>
-    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete">
+    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete" data-confirm="Delete this comment?">
       {{ csrf_input() }}
-      <button type="submit" class="comment-action-btn"
-              onclick="return confirm('Delete this comment?')">Delete</button>
+      <button type="submit" class="comment-action-btn">Delete</button>
     </form>
     {% else %}
     <a class="comment-action-btn" href="/report?type=comment&amp;id={{ comment.id }}">Report</a>
     {% if current_user.is_admin %}
     {# Admins remove rather than edit — moderation never rewrites what
        someone said. The route checks the role again server-side. #}
-    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete">
+    <form method="POST" action="/blog/{{ post.slug }}/comment/{{ comment.id }}/delete" data-confirm="Delete this comment?">
       {{ csrf_input() }}
       <button type="submit" class="comment-action-btn text-danger">Remove</button>
     </form>

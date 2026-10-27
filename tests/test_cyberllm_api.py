@@ -55,7 +55,13 @@ def test_cyberllm_page_renders_for_user(admin_client):
     assert r.status_code == 200
     assert "CyberLLM" in r.text
     assert "csrf-token" in r.text
-    assert "/api/cyberllm/analyze" in r.text
+    # Form JS is external now (CSP script-src 'self'): the page must
+    # reference it, and that file must call the analyze endpoint.
+    assert "/static/js/cyberllm_form.js" in r.text
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "cyberllm_form.js").read_text()
+    assert "/api/cyberllm/analyze" in js
 
 
 def test_screen_requires_auth(client):

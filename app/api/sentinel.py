@@ -42,6 +42,7 @@ def readiness():
         "phase": "phase_1" if s.ready else "phase_0_placeholder",
         "load_ms_a": s.load_ms_a,
         "load_ms_b": s.load_ms_b,
+        "missing_files": list(getattr(s, "missing_files", []) or []),
     }
     if prompt_error is not None:
         payload["prompt_error"] = prompt_error

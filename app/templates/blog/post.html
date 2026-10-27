@@ -150,10 +150,9 @@
         <button type="submit" class="btn btn-ghost btn-sm">Archive</button>
       </form>
       {% endif %}
-      <form method="POST" action="/blog/{{ post.slug }}/delete" style="margin-left:auto;">
+      <form method="POST" action="/blog/{{ post.slug }}/delete" style="margin-left:auto;" data-confirm="Delete this post for good? Comments and likes on it go too.">
         {{ csrf_input() }}
-        <button type="submit" class="btn btn-danger btn-sm"
-                onclick="return confirm('Delete this post for good? Comments and likes on it go too.')">
+        <button type="submit" class="btn btn-danger btn-sm">
           Delete
         </button>
       </form>
