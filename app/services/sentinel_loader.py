@@ -101,15 +101,6 @@ def _choose_checkpoint_b() -> Optional[Path]:
     if has_alt:
         return CHECKPOINT_B_ALT
     return None
-def _check_ram(required_mb: int = 4096) -> tuple[bool, str]:
-    try:
-        import psutil  # type: ignore
-        avail = psutil.virtual_memory().available / 1024 / 1024  # type: ignore
-        if avail < required_mb:
-            return False, f"low_{int(avail)}mb"
-        return True, f"avail_{int(avail)}mb"
-    except Exception:
-        return True, "ram_unknown"
 def _build_tokenizer():
     global _tokenizer
     if _tokenizer is not None:
@@ -218,14 +209,6 @@ def get_status() -> SentinelStatus:
         if a_state == "not_found" and b_state == "not_found":
             reason = "checkpoints_not_found"
         return SentinelStatus(ready=False, a=a_state, b=b_state, reason=reason, config=cfg, tokenizer_vocab_size=vocab, load_ms_a=None, load_ms_b=None, rss_mb=_get_rss_mb(), missing_files=sentinel_missing_files())
-
-def is_ready() -> bool:
-    with _lock:
-        return bool(_status.ready)
-
-def has_any_model() -> bool:
-    with _lock:
-        return "a" in _models or "b" in _models
 
 def get_bundle() -> dict[str, Any]:
     with _lock:
