@@ -188,3 +188,24 @@ are pre-existing working-tree churn and must NEVER be committed.
   release candidate: promotion to stable `v1.0.0` requires the
   Windows battery. `v1.0.0-rc.1` tag preserved, never moved.
 - Push outcome is recorded in the follow-up entry below.
+
+## 2026-10-28 — Follow-up: release-candidate 1.0.0-rc.2 push outcome
+
+- Push of `feature/cyberllm-desktop-portable` to origin attempted
+  after all checks passed (diff reviewed, `git diff --check`
+  clean, secrets/weights/DB scan clean, suites green, eval files
+  unstaged, tag `v1.0.0-rc.2` on the milestone commit).
+  Result: FAILED — `fatal: could not read Username for
+  'https://github.com': No such device or address`. No git
+  credentials exist in this VM, so the remote is untouched and
+  both tags (`v1.0.0-rc.1`, `v1.0.0-rc.2`) remain local-only. The
+  tag push was not attempted separately (it would fail
+  identically).
+- Delivery path remains patch files, in order after the
+  desktop-portable replay: audit-fixes patch (`1fad93b`),
+  milestone-2 patch (`bd19855`), rc.1 release patch, rc.1
+  push-record patch, then the rc.2 hardening patch (this
+  milestone commit) and this push-record patch. If the user pushes
+  their replay first, these local commits (different hashes, same
+  content) reach that branch via patch application, not via
+  fast-forward pull.
