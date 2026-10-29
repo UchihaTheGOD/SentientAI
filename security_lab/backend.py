@@ -57,17 +57,25 @@ def find_backend_python(settings: Settings, project_root: Path) -> Path | None:
     Order: explicit setting, project venv, then (source runs only) the
     current interpreter. A frozen GUI exe is never used as the backend
     interpreter: it is not a Python environment.
+
+    The project venv is tried as .venv first, then venv, matching
+    run.bat/run.sh: a project that only has .venv must not fall
+    through to sys.executable, or to None when frozen.
     """
     if settings.backend_python:
         p = Path(settings.backend_python)
         if p.is_file():
             return p
     if os.name == "nt":
-        venv_py = project_root / "venv" / "Scripts" / "python.exe"
+        # Forward slashes: pathlib normalizes them on Windows, and this
+        # keeps the layout testable on any host.
+        exe_rel = "Scripts/python.exe"
     else:
-        venv_py = project_root / "venv" / "bin" / "python"
-    if venv_py.is_file():
-        return venv_py
+        exe_rel = "bin/python"
+    for venv_dir in (".venv", "venv"):
+        venv_py = project_root / venv_dir / exe_rel
+        if venv_py.is_file():
+            return venv_py
     if not getattr(sys, "frozen", False):
         return Path(sys.executable)
     return None

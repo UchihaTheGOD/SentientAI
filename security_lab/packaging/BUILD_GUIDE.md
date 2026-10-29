@@ -24,6 +24,9 @@ else runs from there.
    ```
    python -m venv venv
    .\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
+   # torch is deliberately not in requirements.txt (large, platform-specific
+   # install); the CUDA 12.1 wheel supports Turing (compute 7.5).
+   .\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
    ```
 3. Model files (pilot v8, the leading development candidate):
    ```
