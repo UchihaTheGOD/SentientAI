@@ -9,6 +9,9 @@ Definitions (stated so results cannot be misread):
 - Accuracy = correct / decided. Threat recall = threats caught /
   all expected threats. False-positive rate = benign cases called
   threat / all expected benign.
+- Cases whose expected label is not one of the three classes are
+  excluded from metrics (they still appear in the case list), so one
+  mistyped label cannot crash a batch.
 - With no ground-truth labels, metrics are None and the result is
   reported as "not evaluated" — never as a fabricated score.
 """
@@ -105,7 +108,7 @@ def load_cases(path: Path) -> list[dict]:
 
 
 def compute_metrics(cases: list[CaseResult]) -> dict[str, Any] | None:
-    labelled = [c for c in cases if c.expected is not None]
+    labelled = [c for c in cases if c.expected in CLASSES]
     if not labelled:
         return None
     decided = [c for c in labelled if c.decided]
@@ -162,15 +165,22 @@ def run_evaluation(analyze_fn: Callable[[str, str], dict],
         try:
             api = analyze_fn(case["text"], case.get("kind", "log"))
             shaped_class = api.get("classification", "unknown")
+            if shaped_class in CLASSES:
+                predicted, error = shaped_class, ""
+            else:
+                # A malformed API answer is an error, not an analyst
+                # abstention: labelling it "abstained" would hide it.
+                predicted = "error"
+                error = f"unexpected classification: {shaped_class}"
             results.append(CaseResult(
                 name=case.get("name", f"case-{idx + 1}"),
                 kind=case.get("kind", "log"), text=case["text"],
                 expected=case.get("expected"),
-                predicted=shaped_class
-                if shaped_class in CLASSES else "abstained",
+                predicted=predicted,
                 latency_ms=api.get("latency_ms"),
                 parse_ok=bool(api.get("parse_ok", True)),
                 truncated=bool(api.get("truncated", False)),
+                error=error,
             ))
         except Exception as exc:
             results.append(CaseResult(

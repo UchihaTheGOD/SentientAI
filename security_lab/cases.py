@@ -69,9 +69,18 @@ class CaseStore:
     def _load(self) -> list[Case]:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
-            return [Case.from_dict(row) for row in data]
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError):
             return []
+        if not isinstance(data, list):
+            return []
+        cases = []
+        for row in data:
+            try:
+                cases.append(Case.from_dict(row))
+            except (KeyError, TypeError, ValueError):
+                # One malformed row must not drop every other case.
+                continue
+        return cases
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)

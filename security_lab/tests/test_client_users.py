@@ -36,6 +36,11 @@ def test_admin_response_403_maps_to_admin_required():
         _client()._handle_admin_response(_response(403, {"detail": "no"}))
 
 
+def test_admin_response_401_maps_to_auth_error():
+    with pytest.raises(AuthError):
+        _client()._handle_admin_response(_response(401, {"detail": "expired"}))
+
+
 def test_admin_response_error_carries_backend_detail():
     with pytest.raises(BackendError, match="already taken"):
         _client()._handle_admin_response(

@@ -19,7 +19,7 @@ from ..scanner.engine import ScanConfig, Scanner
 from .context import AppContext
 from .dialogs import ask_text, confirm
 from .theme import STATUS_COLORS
-from .workers import DiagnosticsWorker, ScanWorker
+from .workers import DiagnosticsWorker, InferenceWorker, ScanWorker
 
 # ---------------------------------------------------------------- reports
 class ReportsPage(QWidget):
@@ -286,10 +286,22 @@ class DemoPage(QWidget):
     def _start_lab(self) -> None:
         if self._lab is not None:
             return
-        server, _thread, url = start_lab_server()
+        try:
+            server, _thread, url = start_lab_server()
+        except OSError as exc:
+            self.lbl_lab.setText(f"Local lab failed to start: {exc}")
+            return
         self._lab = (server, url)
         self.lbl_lab.setText(f"Local lab running at {url}")
         self.ctx.log_event("lab", f"demo lab started at {url}", source="demo")
+
+    def stop_all(self) -> None:
+        """Stop any running scripted scan (used when the window closes)."""
+        if self._worker is not None and hasattr(self._worker, "stop_scan"):
+            try:
+                self._worker.stop_scan()
+            except Exception:
+                pass
 
     def _scripted_scan(self) -> None:
         if self._lab is None:
@@ -309,7 +321,13 @@ class DemoPage(QWidget):
         self._worker = worker
         worker.start()
 
-    def _run_simulation(self) -> None:
+    def _simulation_results(self) -> dict[str, str]:
+        """Run the scenario's rule screening + model call.
+
+        Each call degrades to an explicit "not measured" string on
+        failure; this method never raises for an API problem, so the
+        demo never fabricates a measured result.
+        """
         scenario = SIM_SCENARIOS[self.cb_scenario.currentText()]
         measured_rule = "not measured (sign in to run rule screening)"
         measured_model = "not measured (model unavailable or not signed in)"
@@ -329,17 +347,38 @@ class DemoPage(QWidget):
                 f"(source: {api.get('decision_source')})")
         except Exception:
             pass
+        return {
+            "scenario": self.cb_scenario.currentText(),
+            "log": scenario["log"],
+            "expected": scenario["expected"],
+            "rule": measured_rule,
+            "model": measured_model,
+        }
+
+    def _run_simulation(self) -> None:
+        # Network calls must not run on the GUI thread: a CPU inference
+        # here used to freeze the whole window for minutes.
+        self.status_label.setText("Running simulation…")
+        worker = InferenceWorker(self._simulation_results, self)
+        worker.finished.connect(self._simulation_done)
+        worker.error.connect(
+            lambda m: self.status_label.setText(f"Simulation failed: {m}"))
+        self._worker = worker
+        worker.start()
+
+    def _simulation_done(self, res: dict) -> None:
         self.out.setPlainText(
-            f"SIMULATED scenario: {self.cb_scenario.currentText()}\n\n"
-            f"Simulated event: {scenario['log']}\n\n"
-            f"Expected detection (scenario design): {scenario['expected']}\n\n"
-            f"Measured deterministic result: {measured_rule}\n\n"
-            f"Measured model result: {measured_model}\n\n"
+            f"SIMULATED scenario: {res['scenario']}\n\n"
+            f"Simulated event: {res['log']}\n\n"
+            f"Expected detection (scenario design): {res['expected']}\n\n"
+            f"Measured deterministic result: {res['rule']}\n\n"
+            f"Measured model result: {res['model']}\n\n"
             "Defender next steps: confirm the finding in the real "
             "environment, block or rate-limit the source if the pattern "
             "repeats, review the affected service's logs, and record the "
             "outcome as a case. This simulation proves nothing about any "
             "real website.")
+        self.status_label.setText("Simulation done (SIMULATED).")
 
 
 # ------------------------------------------------------------ diagnostics
@@ -413,19 +452,18 @@ class SettingsPage(QWidget):
         heading.setObjectName("heading")
         layout.addWidget(heading)
         form = QFormLayout()
-        s = ctx.settings
-        self.ed_api_host = QLineEdit(s.api_host)
-        self.ed_api_port = QLineEdit(str(s.api_port))
-        self.ed_allow = QLineEdit(", ".join(s.allowlist))
+        self.ed_api_host = QLineEdit()
+        self.ed_api_port = QLineEdit()
+        self.ed_allow = QLineEdit()
         self.ck_lab = QCheckBox()
-        self.ck_lab.setChecked(s.local_lab_enabled)
-        self.ed_rate = QLineEdit(str(s.rate_limit_seconds))
-        self.ed_timeout = QLineEdit(str(s.request_timeout_seconds))
-        self.ed_max_req = QLineEdit(str(s.max_requests_per_scan))
-        self.ed_workers = QLineEdit(str(s.max_workers))
-        self.ed_lab_user = QLineEdit(s.lab_username)
-        self.ed_lab_pass = QLineEdit(s.lab_password)
+        self.ed_rate = QLineEdit()
+        self.ed_timeout = QLineEdit()
+        self.ed_max_req = QLineEdit()
+        self.ed_workers = QLineEdit()
+        self.ed_lab_user = QLineEdit()
+        self.ed_lab_pass = QLineEdit()
         self.ed_lab_pass.setEchoMode(QLineEdit.Password)
+        self._load_fields()
         form.addRow("API host:", self.ed_api_host)
         form.addRow("API port:", self.ed_api_port)
         form.addRow("Allowlist (comma separated):", self.ed_allow)
@@ -458,18 +496,54 @@ class SettingsPage(QWidget):
         self.btn_save.clicked.connect(self._save)
         self.btn_reset.clicked.connect(self._reset)
 
+    def _load_fields(self) -> None:
+        """Reload the form widgets from current settings."""
+        s = self.ctx.settings
+        self.ed_api_host.setText(s.api_host)
+        self.ed_api_port.setText(str(s.api_port))
+        self.ed_allow.setText(", ".join(s.allowlist))
+        self.ck_lab.setChecked(s.local_lab_enabled)
+        self.ed_rate.setText(str(s.rate_limit_seconds))
+        self.ed_timeout.setText(str(s.request_timeout_seconds))
+        self.ed_max_req.setText(str(s.max_requests_per_scan))
+        self.ed_workers.setText(str(s.max_workers))
+        self.ed_lab_user.setText(s.lab_username)
+        self.ed_lab_pass.setText(s.lab_password)
+
     def _save(self) -> None:
         s = self.ctx.settings
-        s.api_host = self.ed_api_host.text().strip() or "127.0.0.1"
         try:
-            s.api_port = int(self.ed_api_port.text().strip())
-            s.rate_limit_seconds = float(self.ed_rate.text().strip())
-            s.request_timeout_seconds = float(self.ed_timeout.text().strip())
-            s.max_requests_per_scan = int(self.ed_max_req.text().strip())
-            s.max_workers = int(self.ed_workers.text().strip())
+            port = int(self.ed_api_port.text().strip())
+            rate = float(self.ed_rate.text().strip())
+            timeout = float(self.ed_timeout.text().strip())
+            max_req = int(self.ed_max_req.text().strip())
+            workers = int(self.ed_workers.text().strip())
         except ValueError:
             self.status_label.setText("Numeric fields must be numbers.")
             return
+        if not 1 <= port <= 65535:
+            self.status_label.setText("API port must be between 1 and 65535.")
+            return
+        if rate < 0:
+            self.status_label.setText(
+                "Min seconds between scan requests must be >= 0.")
+            return
+        if timeout <= 0:
+            self.status_label.setText(
+                "Scan request timeout must be > 0 seconds.")
+            return
+        if max_req < 1:
+            self.status_label.setText("Max requests per scan must be >= 1.")
+            return
+        if workers < 1:
+            self.status_label.setText("Max scan workers must be >= 1.")
+            return
+        s.api_host = self.ed_api_host.text().strip() or "127.0.0.1"
+        s.api_port = port
+        s.rate_limit_seconds = rate
+        s.request_timeout_seconds = timeout
+        s.max_requests_per_scan = max_req
+        s.max_workers = workers
         s.api_base = f"http://{s.api_host}:{s.api_port}"
         s.allowlist = [h.strip() for h in self.ed_allow.text().split(",")
                        if h.strip()]
@@ -491,5 +565,5 @@ class SettingsPage(QWidget):
         self.ctx.settings.__dict__.update(fresh.__dict__)
         save_settings(self.ctx.settings, self.ctx.data_dir)
         self.ctx.apply_settings()
-        self.status_label.setText(
-            "Settings reset. Reopen this page to see defaults.")
+        self._load_fields()
+        self.status_label.setText("Settings reset to defaults.")

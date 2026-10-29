@@ -77,14 +77,26 @@ class MainWindow(QMainWindow):
                 return
 
     def closeEvent(self, event):  # noqa: N802 - Qt naming
-        # Stop the local lab if the scanner page started one.
+        # Stop any running scan first, so a scan thread cannot outlive
+        # the window and overwrite state after close.
         scanner = self._pages.get("scanner")
+        if scanner is not None and hasattr(scanner, "stop_all"):
+            try:
+                scanner.stop_all()
+            except Exception:
+                pass
+        demo = self._pages.get("demo")
+        if demo is not None and hasattr(demo, "stop_all"):
+            try:
+                demo.stop_all()
+            except Exception:
+                pass
+        # Stop the local lab if the scanner page started one.
         if scanner is not None and hasattr(scanner, "stop_lab"):
             try:
                 scanner.stop_lab()
             except Exception:
                 pass
-        demo = self._pages.get("demo")
         if demo is not None and getattr(demo, "_lab", None) is not None:
             try:
                 stop_lab_server(demo._lab[0])

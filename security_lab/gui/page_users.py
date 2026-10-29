@@ -9,13 +9,14 @@ request shows the backend's error.
 
 from __future__ import annotations
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
                                QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPushButton, QTableWidget,
                                QTableWidgetItem, QTextEdit, QVBoxLayout,
                                QWidget)
 
-from ..client import AdminRequiredError
+from ..client import AdminRequiredError, AuthError
 from .context import AppContext
 from .dialogs import ask_text, confirm
 
@@ -114,7 +115,13 @@ class UserManagementPage(QWidget):
         filt.addWidget(self.btn_refresh)
         layout.addLayout(filt)
         self.btn_refresh.clicked.connect(self.refresh)
-        self.ed_search.textChanged.connect(self.refresh)
+        # Debounce typing: each keystroke used to fire a synchronous
+        # HTTP request on the GUI thread, freezing the UI while typing.
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(400)
+        self._search_timer.timeout.connect(self.refresh)
+        self.ed_search.textChanged.connect(lambda: self._search_timer.start())
         self.cb_role.currentTextChanged.connect(self.refresh)
         self.cb_status.currentTextChanged.connect(self.refresh)
         self.cb_sort.currentTextChanged.connect(self.refresh)
@@ -235,6 +242,13 @@ class UserManagementPage(QWidget):
             self.status_label.setText(
                 "Administrative access denied (403). Sign in as an "
                 "administrator.")
+            return None
+        except AuthError:
+            # A dead session must not leave the actions enabled but
+            # failing: force an explicit re-sign-in.
+            self._set_actions_enabled(False)
+            self.status_label.setText(
+                "Session expired. Sign in as an administrator again.")
             return None
         except Exception as exc:
             self.status_label.setText(f"Request failed: {exc}")

@@ -331,6 +331,9 @@ class BackendClient:
         if resp.status_code == 403:
             raise AdminRequiredError(
                 "administrative access denied: sign in as an administrator")
+        if resp.status_code == 401:
+            raise AuthError(
+                "backend session expired; sign in again", status=401)
         try:
             detail = resp.json()
         except ValueError:

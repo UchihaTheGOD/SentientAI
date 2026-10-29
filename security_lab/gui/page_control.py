@@ -157,7 +157,25 @@ class ControlCenterPage(QWidget):
     def showEvent(self, event):  # noqa: N802 - Qt naming
         super().showEvent(event)
         self._log_timer.start()
+        # Settings are the source of truth: another page (or a reset)
+        # may have changed them since this page last showed, and a
+        # stale field saved again would silently overwrite that change.
+        self._refresh_fields()
         self.refresh_status()
+
+    def _refresh_fields(self) -> None:
+        """Reload the configuration widgets from current settings."""
+        s = self.ctx.settings
+        self.ed_project.setText(s.project_root)
+        self.ed_python.setText(s.backend_python)
+        self.ed_host.setText(s.api_host)
+        self.ed_port.setText(str(s.api_port))
+        self.ed_model_root.setText(s.model_root)
+        self.ed_base.setText(s.base_dir)
+        self.ed_adapter.setText(s.adapter_dir)
+        self.ed_sha.setText(s.adapter_sha256)
+        self.cb_device.setCurrentText(s.device)
+        self.ck_8bit.setChecked(s.load_in_8bit)
 
     def hideEvent(self, event):  # noqa: N802 - Qt naming
         super().hideEvent(event)
@@ -199,6 +217,7 @@ class ControlCenterPage(QWidget):
 
     def _backend_error(self, msg: str) -> None:
         self.status_label.setText(f"Backend status: error: {msg}")
+        self._set_busy(False)
 
     def refresh_status(self) -> None:
         def collect() -> dict:
@@ -265,10 +284,15 @@ class ControlCenterPage(QWidget):
         s.backend_python = self.ed_python.text().strip()
         s.api_host = self.ed_host.text().strip() or "127.0.0.1"
         try:
-            s.api_port = int(self.ed_port.text().strip())
+            port = int(self.ed_port.text().strip())
         except ValueError:
             self.lbl_cfg_status.setText("API port must be a number.")
             return
+        if not 1 <= port <= 65535:
+            self.lbl_cfg_status.setText(
+                "API port must be between 1 and 65535.")
+            return
+        s.api_port = port
         s.api_base = f"http://{s.api_host}:{s.api_port}"
         s.model_root = self.ed_model_root.text().strip()
         s.base_dir = self.ed_base.text().strip()

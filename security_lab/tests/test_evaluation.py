@@ -72,3 +72,26 @@ def test_case_result_properties():
     assert c.abstained is True
     assert c.decided is False
     assert c.correct is None
+
+
+def test_invalid_expected_label_does_not_crash_metrics():
+    cases = [
+        {"name": "t1", "kind": "log", "text": "a", "expected": "likely_threat"},
+        {"name": "bad", "kind": "log", "text": "b", "expected": "suspicious"},
+    ]
+    result = run_evaluation(
+        _fake_analyze({"a": "likely_threat", "b": "likely_threat"}), cases)
+    assert result.metrics["total"] == 1
+    assert result.metrics["threat_recall"] == 1.0
+    assert len(result.cases) == 2  # bad-label case still listed
+
+
+def test_unknown_classification_is_an_error_not_an_abstention():
+    result = run_evaluation(
+        lambda text, kind: {"classification": "???"},
+        [{"name": "x", "kind": "log", "text": "a",
+          "expected": "likely_threat"}])
+    case = result.cases[0]
+    assert case.predicted == "error"
+    assert "unexpected classification" in case.error
+    assert case.abstained is False

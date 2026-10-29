@@ -2,9 +2,9 @@
 
 Local cybersecurity-oriented web application with CyberLLMv1 model integration, deterministic security rules, and a human-reviewed moderation pipeline. A public blogging and community site backed by a private administration panel, plus a native desktop Security Lab.
 
-Current version: `1.0.0-rc.1` (release candidate — see `VERSION`, `CHANGELOG.md`). The obsolete Sentinel model pipeline was removed on 2026-10-27 and replaced by CyberLLMv1 (see §2, §11). Deterministic rules and model-based analysis are separate components; human review remains the gate.
+Current version: `1.0.0-rc.2` (release candidate — see `VERSION`, `CHANGELOG.md`). The obsolete Sentinel model pipeline was removed on 2026-10-27 and replaced by CyberLLMv1 (see §2, §11). Deterministic rules and model-based analysis are separate components; human review remains the gate.
 
-Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skipped, Security Lab suite 47 passed + 1 skipped. NOT yet verified: Windows test run, Windows exe build/double-click, GPU fit/latency, real 1.7B inference on the reference PC. Linux results are not proof of Windows compatibility.
+Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skipped, Security Lab suite 86 passed + 1 skipped. NOT yet verified: Windows test run, Windows exe build/double-click, GPU fit/latency, real 1.7B inference on the reference PC. Linux results are not proof of Windows compatibility.
 
 ## 1. Project Overview
 
@@ -26,9 +26,9 @@ Honest summary (see `reports/migration_obsolete_models_removed.md` for the 2026-
 - Deterministic rules: brute-force (8 variants) and port-scan working. Evaluation 26-case: rules precision 0.90 recall 0.56 F1 0.69 (historical, rules unchanged by the migration).
 - Moderation: human-only. The old Sentinel moderation model was removed; CyberLLMv1 is not a content-moderation model.
 - Human review required for all consequential decisions.
-- Branch and version: `feature/cyberllm-desktop-portable`, version `1.0.0-rc.1` (`VERSION`, `CHANGELOG.md`, tag `v1.0.0-rc.1`). Stable `v1.0.0` requires the Windows battery: exe build + double-click, GPU fit/latency, real 1.7B inference, Windows test run.
+- Branch and version: `feature/cyberllm-desktop-portable`, version `1.0.0-rc.2` (`VERSION`, `CHANGELOG.md`, tag `v1.0.0-rc.2`). Stable `v1.0.0` requires the Windows battery: exe build + double-click, GPU fit/latency, real 1.7B inference, Windows test run.
 - Desktop app: native PySide6 Security Lab (`security_lab/`, 9 pages); the exe bundles the GUI only — backend deps, torch, and model files stay on the machine (see `security_lab/packaging/BUILD_GUIDE.md`).
-- Rollback: check out tag `v1.0.0-rc.1` (procedure in `CHANGELOG.md`).
+- Rollback: check out tag `v1.0.0-rc.2` (previous candidate: `v1.0.0-rc.1`; procedure in `CHANGELOG.md`).
 
 Do NOT treat any single model output as a reliable detector; do NOT claim automatic blocking.
 
@@ -199,7 +199,7 @@ Future retrain prerequisites (gated): properly labeled moderation dataset 80/20 
 .\venv\Scripts\python.exe -m pytest tests/test_e2e_review_queue_verification.py -v
 ```
 
-Baseline on this branch (2026-10-28, Linux): website 635 passed + 1 skipped (pre-existing template skip); Security Lab 47 passed + 1 skipped (real-model smoke, needs weights + `CYBERLLM_REAL_MODEL=1`).
+Baseline on this branch (2026-10-28, Linux): website 635 passed + 1 skipped (pre-existing template skip); Security Lab 86 passed + 1 skipped (real-model smoke, needs weights + `CYBERLLM_REAL_MODEL=1`).
 
 Covers: auth, blog lifecycle, admin, moderation, csrf, sanitization, scoring, ATTACT scope/checks, classifier adapter and fusion, log validation, bruteforce regression, evaluation isolation, moderation contract, E2E review queue, Security Lab GUI smoke, scanner safety, client/admin API, model/evaluation, reports redaction. Passing unit tests does not establish detection accuracy.
 
@@ -238,7 +238,7 @@ Experimental. Not a guaranteed defense. Human review and independent validation 
 
 Current limitations: CyberLLMv1 exact MITRE technique-ID prediction measured 0.000–0.025 across pilots (no MITRE field by design); no per-category precision/recall beyond auth_abuse/port_scan; narrow rules; small-n categories (n=1 each for xss/sqli/traversal/cmdi/ssrf/ssti/upload); in-process rate limit (single process only); prompt injection handled as DATA ONLY only in moderation path; Windows exe build, GPU fit/latency, and real 1.7B inference unverified (Linux CPU results only).
 
-Roadmap (future work): Windows battery (exe build + double-click, GPU fit/latency, real 1.7B inference, Windows test run) to promote `1.0.0-rc.1` to stable `v1.0.0`; properly labeled moderation dataset 80/20 stratified per category with benign/suspicious pairs and encoding variants; eval isolated; per-category precision/recall + ECE; injection robustness; preserve baselines; improve structured generation reliability.
+Roadmap (future work): Windows battery (exe build + double-click, GPU fit/latency, real 1.7B inference, Windows test run) to promote `1.0.0-rc.2` to stable `v1.0.0`; properly labeled moderation dataset 80/20 stratified per category with benign/suspicious pairs and encoding variants; eval isolated; per-category precision/recall + ECE; injection robustness; preserve baselines; improve structured generation reliability.
 
 ## 20. Contributing and Development
 

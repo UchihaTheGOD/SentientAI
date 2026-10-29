@@ -115,3 +115,76 @@ are pre-existing working-tree churn and must NEVER be committed.
   pushes their replay first, these local commits (different
   hashes, same content) reach that branch via patch application,
   not via fast-forward pull.
+
+## 2026-10-28 — Milestone 4: hardening review + run.sh boot test (rc.2)
+
+- Boundary re-verified first: repo `UchihaTheGOD/SentientAI`, branch
+  `feature/cyberllm-desktop-portable`, HEAD `93185f5`, tag
+  `v1.0.0-rc.1` still on `cda3462` (never moved), working tree only
+  the 2 protected evaluation files modified-unstaged. Environment:
+  Linux VM copy, NOT the Windows PC copy.
+- Deep review read every Security Lab GUI page (control, scanner,
+  model, users, reports, cases, demo, diagnostics, settings), the
+  scanner engine + all 14 checks, backend integration, client auth
+  boundary, and error paths. Real bugs fixed (each with a regression
+  test); no unrelated rewrites; no app/ code touched.
+- Fixes: backend failed-start process leak + log-handle leak;
+  gpu_info multi-GPU/comma crash; scanner worker-thread widget
+  update; stale scan-worker results; window-close scan stop;
+  diagnostics scanner-safety always-fail; TRACE probe bypassing
+  engine gates (+ corrected "GET only" claim); SSRF redirect
+  substring false positive; TLS socket leak on handshake failure;
+  case-store whole-file drop on one bad row; evaluation crash on
+  mistyped expected label; unknown classification mislabelled as
+  abstention; Control Center buttons stuck disabled on action
+  error; demo simulation blocking the GUI thread; batch button not
+  disabled; evaluation export open-dialog; baseline-save and
+  own-login uncaught exceptions; users search per-keystroke HTTP;
+  admin 401 leaving enabled-but-broken actions; settings-reset
+  stale fields (Settings + Control Center showEvent refresh);
+  local-lab start failures uncaught; settings bounds validation.
+- Added: `run.sh` export/export-eval/backfill parity with `run.bat`;
+  frozen-exe project-root discovery via exe parent's parent (the
+  standard `<project>/dist/` layout); `build_windows.bat`
+  `--upgrade` for GUI deps (Windows-untested batch change).
+- Tests: Security Lab suite 86 passed + 1 skipped (87 total), up
+  from 47 + 1 — 39 new regression tests, 0 failed. Website suite
+  635 passed + 1 skipped (636 total), identical to rc.1.
+- Boot test (clean Linux venv, created in repo `.venv` and removed
+  after, with an empty `venv/` also present to prove `.venv`
+  preference): deps installed (fastapi 0.115.6; torch absent by
+  design); help lists 7 commands; missing-venv path exits 1 with
+  instructions; `run.sh test tests/test_csrf.py` 5 passed via
+  `.venv`; backend started as `.venv/bin/python run.py`; health
+  ok; readiness honest `not_loaded`/`not_initialized`, device
+  `cpu`, expected adapter SHA; second start failed honestly
+  `[Errno 98]` (exit 1); SIGINT shutdown clean (reloader stopped,
+  port closed, no `run.py` left); restart served health again;
+  `run.sh status` printed counts (all 0); `run.sh backfill` dry-run
+  `Would band 0 candidate(s)`. Export commands not executed (they
+  write repo `data/` files); their `app.cli` signatures match
+  `run.bat`. Qt system libs had been wiped by a VM replacement and
+  were reinstalled (`apt-get update` + libegl1/libgl1/libxkbcommon0/
+  libdbus-1-3/libfontconfig1) before the lab suite ran.
+- Windows-blocker investigation (static, NOT verified): spec
+  `datas=[]` is correct (no GUI resource files; `__main__.py` uses
+  an absolute import, safe as a PyInstaller entry); the exe's
+  project-root auto-detection gap is fixed above but the double-
+  click itself is still untested; `build_windows.bat` checks for
+  *a* python but not 3.11/3.12 specifically (wrong-version failure
+  would surface honestly at pip install, not silently); the
+  one-folder `COLLECT` fallback in BUILD_GUIDE remains the
+  antivirus fallback. Still NOT verified on Windows: exe build +
+  double-click, GPU fit/latency, real 1.7B inference, Windows test
+  run, and the user's `unparseable` case (still awaiting raw output
+  + truncated flag + token count).
+- Known limitation (documented, not hidden): batch evaluation and
+  single inference have no cancel; closing the window mid-batch or
+  mid-inference does not stop the in-flight request (bounded by
+  API timeouts; process exit ends them). Only scanner workers are
+  stopped on close.
+- Version: `1.0.0-rc.2` (VERSION, CHANGELOG, README updated; tag
+  `v1.0.0-rc.2` to be created on the milestone commit). Still a
+  release candidate: promotion to stable `v1.0.0` requires the
+  Windows battery. `v1.0.0-rc.1` tag preserved, never moved.
+- Push outcome is recorded in the follow-up entry below.

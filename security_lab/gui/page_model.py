@@ -170,7 +170,11 @@ class ModelTestingPage(QWidget):
         if password is None:
             return
         client = self._ensure_client()
-        ok, msg = client.login(username.strip(), password)
+        try:
+            ok, msg = client.login(username.strip(), password)
+        except Exception as exc:
+            self.lbl_auth.setText(f"Sign-in failed: {exc}")
+            return
         self.lbl_auth.setText(
             f"Signed in as {username.strip()}." if ok else f"Sign-in failed: {msg}")
 
@@ -281,6 +285,7 @@ class ModelTestingPage(QWidget):
             return
         client = self._ensure_client()
         self.progress.setValue(0)
+        self.btn_batch.setEnabled(False)
 
         def do_batch(progress):
             return run_evaluation(
@@ -292,12 +297,16 @@ class ModelTestingPage(QWidget):
         worker.progress.connect(
             lambda d, t: self.progress.setValue(int(d / max(t, 1) * 100)))
         worker.finished.connect(self._batch_done)
-        worker.error.connect(
-            lambda m: self.lbl_batch_file.setText(f"Batch failed: {m}"))
+        worker.error.connect(self._batch_error)
         self._worker = worker
         worker.start()
 
+    def _batch_error(self, msg: str) -> None:
+        self.btn_batch.setEnabled(True)
+        self.lbl_batch_file.setText(f"Batch failed: {msg}")
+
     def _batch_done(self, result) -> None:
+        self.btn_batch.setEnabled(True)
         self._eval_result = result
         self.progress.setValue(100)
         m = result.metrics
@@ -331,7 +340,7 @@ class ModelTestingPage(QWidget):
             return
         default = str(self.ctx.dirs["reports"] /
                       f"evaluation.{kind}")
-        path, _ = QFileDialog.getOpenFileName(self, "Export evaluation", default)
+        path, _ = QFileDialog.getSaveFileName(self, "Export evaluation", default)
         if not path:
             return
         try:
@@ -348,7 +357,11 @@ class ModelTestingPage(QWidget):
             self.lbl_batch_file.setText("Run a batch evaluation first.")
             return
         path = self.ctx.dirs["reports"] / "evaluation-baseline.json"
-        save_baseline(self._eval_result, path)
+        try:
+            save_baseline(self._eval_result, path)
+        except OSError as exc:
+            self.lbl_batch_file.setText(f"Baseline save failed: {exc}")
+            return
         self.lbl_batch_file.setText(f"Baseline saved to {path}")
 
     def _compare_baseline(self) -> None:

@@ -39,7 +39,12 @@ def find_project_root(settings: Settings) -> Path | None:
         candidates.append(Path(settings.project_root))
     # When frozen, the distribution folder holds the project next to the exe.
     if getattr(sys, "frozen", False):
-        candidates.append(Path(sys.executable).resolve().parent)
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.append(exe_dir)
+        # A one-file build lands in <project>/dist/, so the project root
+        # is the exe directory's parent. Without this, a double-clicked
+        # exe (cwd = dist/) cannot auto-detect its own project.
+        candidates.append(exe_dir.parent)
     candidates.append(Path(__file__).resolve().parent.parent)
     candidates.append(Path.cwd())
     for cand in candidates:
@@ -203,13 +208,19 @@ def gpu_info(backend_python: Path | None) -> dict[str, Any]:
             capture_output=True, text=True, timeout=15,
         )
         if out.returncode == 0 and out.stdout.strip():
-            name, total, used = [p.strip() for p in out.stdout.strip().split(",")]
-            info.update({
-                "available": True, "source": "nvidia-smi", "name": name,
-                "vram_total": total, "vram_used": used,
-            })
-            return info
-    except (OSError, subprocess.SubprocessError):
+            # One line per GPU; a name containing a comma (or several
+            # GPUs) used to crash the unpack below. Take the first GPU
+            # and only accept a clean three-field line.
+            lines = out.stdout.strip().splitlines()
+            parts = [p.strip() for p in lines[0].split(",")]
+            if len(parts) == 3:
+                name, total, used = parts
+                info.update({
+                    "available": True, "source": "nvidia-smi", "name": name,
+                    "vram_total": total, "vram_used": used,
+                })
+                return info
+    except (OSError, subprocess.SubprocessError, ValueError):
         pass
     # Fall back to torch in the backend interpreter.
     if backend_python is not None:
@@ -310,12 +321,22 @@ class BackendManager:
                 stdout=self._log_handle, stderr=subprocess.STDOUT,
             )
         except OSError as exc:
+            if self._log_handle is not None:
+                try:
+                    self._log_handle.close()
+                except OSError:
+                    pass
+                self._log_handle = None
             return False, f"failed to launch backend: {exc}"
         self._reader_thread = threading.Thread(
             target=self._tail_log, args=(log_path,), daemon=True)
         self._reader_thread.start()
         ok, msg = self.wait_ready(timeout=90)
         if not ok:
+            # Never leave a running backend behind a reported failure:
+            # it would hold the port, and the next start would report
+            # "already running" for a backend the GUI never owned.
+            self.stop()
             return False, msg
         self.started_by_gui = True
         return True, f"backend running (pid {self.proc.pid})"

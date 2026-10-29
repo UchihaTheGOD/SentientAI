@@ -19,7 +19,9 @@ call "%VENV%\Scripts\activate.bat"
 
 echo Installing GUI dependencies ...
 python -m pip install --upgrade pip
-pip install -r security_lab\packaging\requirements-gui.txt
+REM --upgrade: a reused build venv must not silently keep older GUI
+REM packages than a fresh build would install.
+pip install --upgrade -r security_lab\packaging\requirements-gui.txt
 pip install pyinstaller
 
 echo Building exe (this takes a few minutes) ...

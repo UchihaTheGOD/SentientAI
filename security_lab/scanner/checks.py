@@ -149,9 +149,17 @@ def _tls_info(ctx: ScanContext) -> dict:
 
         conn = _socket.create_connection((host, port), timeout=ctx.config.timeout_seconds)
         context = ssl.create_default_context()
-        with context.wrap_socket(conn, server_hostname=host) as sock:
-            version = sock.version() or ""
-            cert = sock.getpeercert() or {}
+        try:
+            with context.wrap_socket(conn, server_hostname=host) as sock:
+                version = sock.version() or ""
+                cert = sock.getpeercert() or {}
+        except Exception:
+            # A failed handshake must not leak the connected socket.
+            try:
+                conn.close()
+            except OSError:
+                pass
+            raise
         days_left = None
         raw_after = cert.get("notAfter", "")
         if raw_after:
@@ -535,7 +543,10 @@ def check_ssrf(ctx: ScanContext) -> list[Finding]:
         except (ScanRefused, requests.RequestException):
             continue
         location = resp.headers.get("Location", "")
-        if resp.is_redirect and "example.com" in location:
+        # Hostname equality, not a substring: "example.com" must not
+        # match "example.com.evil.com".
+        loc_host = (urlparse(urljoin(probe, location)).hostname or "").lower()
+        if resp.is_redirect and loc_host == "example.com":
             out.append(_mk(ctx, f"Open redirect via parameter: {key}",
                            "SSRF indicators", "Medium", "high", "suspected",
                            "The server redirected to a neutral external "
@@ -618,10 +629,10 @@ def check_misconfig(ctx: ScanContext) -> list[Finding]:
                        "Restrict allowed origins to the ones the API "
                        "actually serves."))
     # TRACE method: a read-only echo check, never used to modify anything.
+    # It goes through the engine's gated request path (cap, deadline,
+    # stop, rate limit, allowlist + DNS), like every other probe.
     try:
-        resp = ctx.session.request(
-            "TRACE", ctx.check_target(url),
-            timeout=ctx.config.timeout_seconds, allow_redirects=False)
+        resp = ctx.request_raw("TRACE", url)
         if resp.status_code == 200:
             out.append(_mk(ctx, "HTTP TRACE method enabled",
                            "Misconfigurations", "Low", "medium", "verified",

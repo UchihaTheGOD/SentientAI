@@ -32,7 +32,8 @@ SCAN_LIMITATIONS = [
     "Detection only: findings are observations and suspected indicators, "
     "not confirmed exploitations. A missing header, an error string, or a "
     "version banner alone never confirms a vulnerability.",
-    "Only GET requests were sent. No login attempts, data extraction, "
+    "Only GET requests were sent, plus one read-only TRACE echo probe "
+    "(misconfigurations check). No login attempts, data extraction, "
     "brute force, denial-of-service, or destructive tests were performed.",
     "DNS was resolved once per host per scan and cached; a hostile DNS "
     "change between the check and the connect (rebinding) is not fully "
@@ -191,6 +192,32 @@ class ScanContext:
             self._next_allowed = time.time() + self.config.rate_limit_seconds
         return self.session.get(url, timeout=timeout or self.config.timeout_seconds,
                                 allow_redirects=False)
+
+    def request_raw(self, method: str, url: str,
+                    timeout: float | None = None) -> requests.Response:
+        """One non-GET probe through every safety gate.
+
+        The scanner is GET-only except for the single documented
+        read-only TRACE echo probe. That probe still passes the
+        allowlist + DNS gates, the request cap, the deadline, the stop
+        event, and the rate limiter, and redirects are never followed.
+        Checks must use this (or fetch/fetch_no_follow), never the
+        session directly, so no request can bypass the gates.
+        """
+        if self.stop_event.is_set():
+            raise ScanRefused("scan stopped by user")
+        if time.time() > self._deadline:
+            raise ScanRefused("scan deadline reached")
+        self._take_request_slot()
+        url = self.check_target(url)
+        with self._rate_lock:
+            wait = self._next_allowed - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            self._next_allowed = time.time() + self.config.rate_limit_seconds
+        return self.session.request(
+            method, url, timeout=timeout or self.config.timeout_seconds,
+            allow_redirects=False)
 
     # -- safety ---------------------------------------------------------
     def validate_url(self, url: str) -> str:

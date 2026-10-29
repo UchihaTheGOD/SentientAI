@@ -160,23 +160,28 @@ def check_scanner_safety() -> CheckResult:
         return _fail("Scanner safety", "unauthorized scan was not refused")
     except ScanRefused:
         pass
-    # Non-allowlisted host must be refused.
-    try:
-        Scanner(ScanConfig(target="http://example.com/", authorized=True,
-                           allowlist=["other.example"])).run()
+    # Non-allowlisted host must be refused. Note run() reports refusals
+    # as errors in the returned result; it does not raise for them
+    # (only the unauthorized constructor raises). An earlier version
+    # of this check expected ScanRefused from run() and therefore
+    # reported failure on every run, even when refusals worked.
+    result = Scanner(ScanConfig(target="http://example.com/", authorized=True,
+                                allowlist=["other.example"])).run()
+    if result.requests_made != 0 or not any(
+            "not on the allowlist" in e for e in result.errors):
         return _fail("Scanner safety", "non-allowlisted host was not refused")
-    except ScanRefused:
-        pass
     # Private/metadata IP must be refused even when allowlisted by name.
-    try:
-        Scanner(ScanConfig(target="http://169.254.169.254/latest/meta-data/",
-                           authorized=True,
-                           allowlist=["169.254.169.254"])).run()
+    result = Scanner(ScanConfig(target="http://169.254.169.254/latest/meta-data/",
+                                authorized=True,
+                                allowlist=["169.254.169.254"])).run()
+    if result.requests_made != 0 or not any(
+            "blocked address" in e for e in result.errors):
         return _fail("Scanner safety", "metadata address was not refused")
-    except ScanRefused:
-        pass
     # A real local-lab scan must succeed end to end.
-    server, _thread, url = start_lab_server()
+    try:
+        server, _thread, url = start_lab_server()
+    except OSError as exc:
+        return _fail("Scanner safety", f"local lab could not start: {exc}")
     try:
         result = Scanner(ScanConfig(
             target=url, allowlist=["127.0.0.1"], local_lab_enabled=True,
@@ -261,5 +266,10 @@ def run_diagnostics(
     emit("Scanner safety")
     results.append(check_scanner_safety())
     emit("Report generation")
-    results.append(check_reports(data_dir))
+    # The report check writes scratch files: keep them in a real temp
+    # dir, not in the user's data directory.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        results.append(check_reports(Path(td)))
     return results

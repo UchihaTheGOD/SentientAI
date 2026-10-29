@@ -43,8 +43,9 @@ class ScannerPage(QWidget):
         heading.setObjectName("heading")
         layout.addWidget(heading)
         layout.addWidget(QLabel(
-            "Detection only: GET requests, inert markers, no logins, no "
-            "extraction, no destructive tests. A finding marked "
+            "Detection only: GET requests plus one read-only TRACE echo "
+            "probe, inert markers, no logins, no extraction, no "
+            "destructive tests. A finding marked "
             "'suspected' is an indicator, not a confirmed vulnerability."))
 
         # -- target ---------------------------------------------------------
@@ -179,7 +180,11 @@ class ScannerPage(QWidget):
     def start_lab(self) -> None:
         if self._lab_server is not None:
             return
-        server, thread, url = start_lab_server()
+        try:
+            server, thread, url = start_lab_server()
+        except OSError as exc:
+            self.lbl_lab.setText(f"Local lab failed to start: {exc}")
+            return
         self._lab_server, self._lab_thread, self._lab_url = server, thread, url
         self.ed_target.setText(url)
         self.ck_lab.setChecked(True)
@@ -231,24 +236,43 @@ class ScannerPage(QWidget):
         self.btn_stop.setEnabled(True)
         self.progress.setValue(0)
 
+        # Progress must cross from the worker thread to the GUI thread
+        # via a Qt signal: calling setValue() directly from the scan
+        # thread (the old code) is not thread-safe.
+        holder: dict = {}
+
         def make_scanner():
             scanner = Scanner(config,
-                              progress=lambda d, t, m: self.progress.setValue(
-                                  int(d / max(t, 1) * 100)))
+                              progress=lambda d, t, m: holder["worker"].progress.emit(d, t, m))
             return scanner
 
         worker = ScanWorker(make_scanner, self)
-        worker.finished.connect(self._scan_done)
-        worker.error.connect(self._scan_error)
+        holder["worker"] = worker
+        worker.progress.connect(self._on_scan_progress)
+        worker.finished.connect(lambda r, w=worker: self._scan_done(r, w))
+        worker.error.connect(lambda m, w=worker: self._scan_error(m, w))
         self._worker = worker
         worker.start()
+
+    def _on_scan_progress(self, done: int, total: int, _msg: str) -> None:
+        self.progress.setValue(int(done / max(total, 1) * 100))
 
     def stop_scan(self) -> None:
         if self._worker is not None:
             self._worker.stop_scan()
             self.status_label.setText("Stopping scan…")
 
-    def _scan_done(self, result) -> None:
+    def stop_all(self) -> None:
+        """Stop any running scan (used when the window closes)."""
+        if self._worker is not None:
+            self._worker.stop_scan()
+
+    def _scan_done(self, result, worker) -> None:
+        # Ignore a late result from a worker that is no longer current
+        # (e.g. an earlier scan stopped after a new one started).
+        if worker is not self._worker:
+            return
+        self._worker = None
         self._result = result
         self.btn_scan.setEnabled(True)
         self.btn_stop.setEnabled(False)
@@ -265,7 +289,10 @@ class ScannerPage(QWidget):
                            source="scanner")
         self._render_table()
 
-    def _scan_error(self, msg: str) -> None:
+    def _scan_error(self, msg: str, worker) -> None:
+        if worker is not self._worker:
+            return
+        self._worker = None
         self.btn_scan.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.status_label.setText(f"Scan refused or failed: {msg}")

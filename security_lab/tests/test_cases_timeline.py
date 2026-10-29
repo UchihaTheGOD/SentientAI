@@ -1,5 +1,7 @@
 """Case store + timeline behaviour (including note/status guards)."""
 
+import json
+
 import pytest
 
 from ..cases import CaseStore
@@ -57,3 +59,16 @@ def test_timeline_redacts_and_reads(tmp_path):
     assert "abcdef123456" not in entries[0]["detail"]
     assert entries[0]["source"] == "scanner"
     assert entries[0]["event"] == "scan"
+
+
+def test_malformed_case_row_does_not_drop_valid_cases(tmp_path):
+    path = tmp_path / "cases.json"
+    good = {"id": 1, "title": "good", "severity": "Low", "url": "http://x/",
+            "finding_name": "f", "evidence": "e", "status": "New",
+            "notes": [], "created_at": "", "updated_at": ""}
+    bad = {"id": 2, "title": "broken"}  # missing required fields
+    path.write_text(json.dumps([good, bad]), encoding="utf-8")
+    store = CaseStore(path)
+    assert store.get(1) is not None
+    assert store.get(2) is None
+    assert len(store.cases) == 1
