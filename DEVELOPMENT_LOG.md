@@ -71,3 +71,28 @@ are pre-existing working-tree churn and must NEVER be committed.
 - NOT verified (Windows-only): exe build / double-click, `.venv`
   resolution on real Windows, GPU fit / latency, real 1.7B
   inference, Windows test run.
+
+## 2026-10-28 — Milestone 3: release candidate 1.0.0-rc.1
+
+- Baseline tests (Linux VM, this session): website 635 passed +
+  1 skipped in 67.43s; Security Lab 47 passed + 1 skipped in 9.12s;
+  0 failed in either suite. Skips are the known ones (template skip;
+  real-model smoke).
+- No prior versioning existed (no tags, no VERSION/CHANGELOG, no
+  `__version__`): established `1.0.0-rc.1` as the first version.
+  Deliberately NOT called stable: Windows/GPU/exe/real-inference
+  verification is pending; promotion criteria are recorded in
+  `CHANGELOG.md`.
+- `VERSION`, `CHANGELOG.md` (with rollback procedure), README
+  refresh: removed stale Sentinel claims and a duplicated §12
+  (dual-model fusion text), corrected routers, stack, install,
+  environment variables (added the real `CYBERLLM_*` rows),
+  evaluation status, and the bootstrap-admin password literal
+  (removed from docs; default remains in `manage.py` code).
+- Correction during the README work: `Documentation/SENTIENTAI_AUDIT.md`
+  exists (unusual name, not a typo for Sentinel) — its §23 link was
+  briefly removed in error and immediately restored; the final
+  README keeps it. Lesson: verify a file's existence before
+  calling its link broken.
+- Tag `v1.0.0-rc.1` (annotated) created on the release commit.
+  Push outcome is recorded in the follow-up entry below.
