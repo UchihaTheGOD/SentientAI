@@ -96,3 +96,22 @@ are pre-existing working-tree churn and must NEVER be committed.
   calling its link broken.
 - Tag `v1.0.0-rc.1` (annotated) created on the release commit.
   Push outcome is recorded in the follow-up entry below.
+
+## 2026-10-28 — Follow-up: release-candidate push outcome
+
+- Push of `feature/cyberllm-desktop-portable` to origin attempted
+  after all checks passed (diff reviewed, `git diff --check`
+  clean, secrets scan clean, suites green, eval files unstaged).
+  Result: FAILED, exit 128 — `fatal: could not read Username
+  for 'https://github.com': No such device or address`. No git
+  credentials exist in this VM, so the remote is untouched and the
+  tag `v1.0.0-rc.1` remains local-only. The tag push was not
+  attempted separately (it would fail identically).
+- Delivery path remains patch files, in order after the
+  desktop-portable replay: audit-fixes patch (`1fad93b`),
+  milestone-2 patch (`bd19855`), release patch (this release
+  commit), then this follow-up patch. The failed push attempt does
+  not affect the user's planned Windows replay-push; if the user
+  pushes their replay first, these local commits (different
+  hashes, same content) reach that branch via patch application,
+  not via fast-forward pull.
