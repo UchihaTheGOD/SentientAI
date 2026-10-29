@@ -209,3 +209,90 @@ are pre-existing working-tree churn and must NEVER be committed.
   their replay first, these local commits (different hashes, same
   content) reach that branch via patch application, not via
   fast-forward pull.
+
+## 2026-10-28 — Follow-up: rc.2 delivery completion attempt (user-directed)
+
+- Verification first, before any action. Repository
+  `https://github.com/UchihaTheGOD/SentientAI`, branch
+  `feature/cyberllm-desktop-portable`, tip `c5691e6` (rc.2
+  push-record). Tag `v1.0.0-rc.2` verified to point at
+  `f086a64` (`f086a64df93ac0405e3c17a9c43f2aa239be72cf`);
+  tag `v1.0.0-rc.1` still on `cda3462`. Neither tag was moved,
+  and no history was rewritten. Working tree: only
+  `evaluation/latest.json` and `evaluation/moderation_latest.json`
+  modified-unstaged, as before; neither was staged, committed,
+  or restored.
+- Evaluation-file hash note (no action taken): the current
+  working-tree hashes (`2b6ee3d0…` /
+  `5fe51b9a…`) differ from the 2026-10-27 record
+  (`7fb612b5…` / `61a10731…`). Cause confirmed in code, not
+  assumed: `tests/test_evaluation_matrix.py` and
+  `tests/test_sentinel_moderation_contract.py` call
+  `run_evaluation(..., output_dir="evaluation")`, which rewrites
+  both files on every root-suite run; mtimes
+  (2026-10-28 14:36 UTC) match the last suite run. This is
+  test-regenerated churn, not user data loss, and the files
+  stay uncommitted by rule.
+- Remote check (unauthenticated read of the public repo):
+  remote branch `feature/cyberllm-desktop-portable` EXISTS at
+  `dd22172` ("Add desktop-portable release reports", committed
+  on the PC 2026-10-28 11:34 IST). Its tree hash
+  (`34e79dc8…`) is IDENTICAL to local `0a5d052`: the user has
+  pushed the desktop-portable base replay. Remote `main` is
+  still `c542cc7`, untouched. Remote tag `v1.0.0-rc.2` does NOT
+  exist.
+- Consequence: the milestone chain (`1fad93b`, `bd19855`,
+  `cda3462`, `93185f5`, `f086a64`, `c5691e6`) is NOT on the
+  remote, and the remote tip is neither an ancestor nor a
+  descendant of the local tip (replay divergence: same content
+  at the base, different commit objects). Nothing was
+  force-pushed or rebased to reconcile this; the user's remote
+  replay is the remote truth for that branch.
+- Push re-attempted from this VM and blocked again, same as
+  every prior attempt: `git push --dry-run` for both the branch
+  and the tag fails with `fatal: could not read Username for
+  'https://github.com': No such device or address`. Cause
+  re-verified, not assumed: no git credential helper is
+  configured, `gh` is installed but not logged into any host,
+  and SSH from this VM is blocked at the egress proxy
+  (connection reset by the proxy) — so adding an SSH key alone
+  would not unblock pushes from here. The remote was not
+  modified by these checks.
+- GitHub connector assessed and deliberately NOT used for
+  this delivery: it is connected and authenticated, but its
+  toolset (`create_branch`, `push_files`,
+  `create_or_update_file`) can only create new snapshot
+  commits from file contents. It cannot push the existing
+  local commit objects, and it has no tag-creation tool, so it
+  cannot publish `v1.0.0-rc.2` pointing at `f086a64`. A
+  snapshot delivery would produce a third divergent history
+  and would conflict with the user's patch-chain replay, so it
+  was left alone. Supported auth options that do NOT involve
+  pasting a token into chat: (1) `gh auth login` device flow
+  completed by the user in their own browser/terminal;
+  (2) pushing from the Windows PC, which is already proven
+  (the base replay is on the remote); the milestone patches
+  already delivered with the rc.2 report apply on top of the
+  remote tip in order. Note on the tag: a tag published from
+  a PC replay would point at the replayed rc.2-equivalent
+  commit (content-identical tree, different hash), not at
+  `f086a64`, because `f086a64` does not exist on the remote;
+  publishing the local tag object itself requires a real git
+  push of the local objects.
+- Windows environment: none accessible from this VM.
+  Tailscale reports "Not connected", and no remote access to
+  the user's PC was ever authorized. No Windows file was
+  modified by this session; everything below stays pending
+  for the PC: Windows test run, exe build + double-click,
+  GPU fit/latency on the GTX 1660 SUPER, real 1.7B inference,
+  and the user's unparseable-case details (raw output +
+  truncated flag + output_tokens). Nothing in this entry
+  claims any Windows result.
+- Remaining delivery step (PC side, patches already in the
+  user's hands): apply audit-fixes, milestone-2, rc.1
+  release, rc.1 push-record, rc.2 hardening, rc.2
+  push-record patches in order on top of remote `dd22172`,
+  push the branch, then tag the replayed rc.2-equivalent
+  commit and push the tag. Until that happens, `v1.0.0-rc.2`
+  is a local-only tag and the milestone commits are
+  local-only.
