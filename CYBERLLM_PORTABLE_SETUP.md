@@ -73,6 +73,11 @@ cd SentientAI
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
 
+# torch is deliberately not in requirements.txt: it is a large,
+# platform-specific install. The CUDA 12.1 wheel supports Turing
+# (compute 7.5), e.g. the GTX 1660 SUPER.
+.\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+
 # 3. Check what is missing (no download, no credentials needed)
 .\venv\Scripts\python.exe scripts\setup_cyberllm.py --check
 
