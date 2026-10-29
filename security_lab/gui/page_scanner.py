@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGroupBox,
 
 from ..lab_server import start_lab_server, stop_lab_server
 from ..reports import (export_scan_csv, export_scan_html, export_scan_json,
-                       export_scan_pdf)
+                       export_scan_pdf, save_scan_report)
 from ..scanner.checks import ALL_CHECKS
 from ..scanner.engine import ScanConfig, Scanner
 from .context import AppContext
@@ -287,12 +287,31 @@ class ScannerPage(QWidget):
         self.ctx.log_event("scan",
                            f"{result.target}: {len(result.findings)} findings",
                            source="scanner")
+        # A scan result previously lived only in this page's memory, so
+        # Reports & History showed nothing and an app restart lost every
+        # finding. Persist it now; a save failure must never hide the
+        # table, so it is reported in the status line instead of raised.
+        try:
+            json_path, _html_path = save_scan_report(
+                result, self.ctx.dirs["reports"])
+            self.status_label.setText(
+                self.status_label.text()
+                + f" Report auto-saved to {json_path}.")
+        except Exception as exc:
+            self.status_label.setText(
+                self.status_label.text()
+                + f" (Report auto-save failed: {exc})")
         self._render_table()
 
     def _scan_error(self, msg: str, worker) -> None:
         if worker is not self._worker:
             return
         self._worker = None
+        # A failed scan has no result: leaving the previous scan in
+        # place would let Export publish stale findings under a new
+        # scan's context (wrong scan association). Clear and re-render.
+        self._result = None
+        self._render_table()
         self.btn_scan.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.status_label.setText(f"Scan refused or failed: {msg}")

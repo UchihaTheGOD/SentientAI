@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
 
 from ..config import save_settings
 from ..diagnostics import run_diagnostics
+from ..reports import save_scan_report
 from ..lab_server import start_lab_server, stop_lab_server
 from ..scanner.engine import ScanConfig, Scanner
 from .context import AppContext
@@ -311,15 +312,27 @@ class DemoPage(QWidget):
             target=url, allowlist=["127.0.0.1"], local_lab_enabled=True,
             authorized=True, rate_limit_seconds=0.05, timeout_seconds=10)
         worker = ScanWorker(lambda: Scanner(config), self)
-        worker.finished.connect(
-            lambda r: self.status_label.setText(
-                f"Scripted lab scan: {len(r.findings)} finding(s), "
-                f"{r.requests_made} request(s). See the Scanner page for "
-                "detail; this was a SIMULATED lab target."))
+        worker.finished.connect(self._scripted_done)
         worker.error.connect(
             lambda m: self.status_label.setText(f"Scripted scan failed: {m}"))
         self._worker = worker
         worker.start()
+
+    def _scripted_done(self, result) -> None:
+        # The old finished handler only wrote counts into a label and
+        # claimed the Scanner page had the detail — it did not, so the
+        # scripted scan's findings existed nowhere. Persist them like
+        # any finished scan, under a distinct prefix.
+        try:
+            json_path, _html_path = save_scan_report(
+                result, self.ctx.dirs["reports"], prefix="scan-demo")
+            saved_note = f" Report auto-saved to {json_path}."
+        except Exception as exc:
+            saved_note = f" (Report auto-save failed: {exc})"
+        self.status_label.setText(
+            f"Scripted lab scan: {len(result.findings)} finding(s), "
+            f"{result.requests_made} request(s).{saved_note} "
+            "This was a SIMULATED lab target.")
 
     def _simulation_results(self) -> dict[str, str]:
         """Run the scenario's rule screening + model call.

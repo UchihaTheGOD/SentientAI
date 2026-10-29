@@ -365,3 +365,26 @@ are pre-existing working-tree churn and must NEVER be committed.
   before new work, or it will diverge again. Working
   tree still only the 2 evaluation files
   modified-unstaged, never committed.
+
+## 2026-10-29 — Fix: detection-to-report persistence (audit follow-up)
+
+- Audit finding: finished scans lived only in ScannerPage memory and
+  Reports & History generates nothing, so findings vanished on
+  navigation/restart. Demo scripted scans discarded findings behind
+  a false "See the Scanner page" claim; failed scans left stale
+  results exportable.
+- Fix: `reports.save_scan_report` (JSON+HTML auto-save, Windows-safe
+  names, no-overwrite suffix); `ScannerPage._scan_done` auto-saves
+  every finished scan; `_scan_error` clears stale results;
+  `DemoPage._scripted_done` auto-saves under the `scan-demo`
+  prefix. No AI interpretation of scan findings was added: scan
+  reports are deterministic by design, and no code path feeds scan
+  findings to the model.
+- Tests: new `security_lab/tests/test_scan_report_persistence.py`
+  (7 tests, failed 7/7 before the fix). Suites at this commit:
+  root 635 passed + 1 skipped, lab 93 passed + 1 skipped,
+  0 failed. Real lab E2E: 14 findings reloaded with correct
+  target. Full audit: `reports/SECURITY_LAB_DETECTION_AUDIT.md`.
+- Evaluation files not committed (test-regenerated churn, preserved
+  uncommitted per standing rule; pre-audit copy backed up outside
+  the repo).

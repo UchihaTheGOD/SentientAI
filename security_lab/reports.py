@@ -12,7 +12,9 @@ from __future__ import annotations
 import csv
 import html
 import json
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .scanner.engine import ScanResult
 
@@ -26,6 +28,41 @@ def export_scan_json(result: ScanResult, path: Path) -> Path:
     Path(path).write_text(json.dumps(result.to_dict(), indent=2),
                           encoding="utf-8")
     return Path(path)
+
+
+def save_scan_report(result: ScanResult, reports_dir: Path,
+                     prefix: str = "scan") -> tuple[Path, Path]:
+    """Persist one finished scan as JSON + HTML under ``reports_dir``.
+
+    This is the durable record behind the Reports & History page: a
+    scan result previously lived only in ScannerPage memory, so
+    navigating away, restarting the app, or never pressing Export
+    silently lost every finding. The filename carries the target host
+    and the scan start time (sanitized for Windows filenames), and a
+    numeric suffix keeps two scans from overwriting each other. The
+    JSON is the complete record (findings, summary, errors, timeline,
+    limitations); the HTML alongside it is the human-readable report.
+    No model call is involved: scan reports are deterministic by
+    design, so saving works even when the backend/model is down.
+    """
+    reports_dir = Path(reports_dir)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    host = urlparse(result.target).hostname or "unknown"
+    host = re.sub(r"[^A-Za-z0-9_.-]", "_", host)
+    # Drop a trailing timezone first so the stamp stays readable
+    # (2026-10-29T17_06_01, not 2026-10-29T17_06_01_00_00).
+    stamp = re.sub(r"(Z|[+-]\d{2}:?\d{2})$", "", result.started_at)
+    stamp = re.sub(r"[^A-Za-z0-9_.-]", "_", stamp)
+    stem = f"{prefix}-{host}-{stamp}"
+    json_path = reports_dir / f"{stem}.json"
+    n = 2
+    while json_path.exists():
+        json_path = reports_dir / f"{stem}-{n}.json"
+        n += 1
+    html_path = json_path.with_suffix(".html")
+    export_scan_json(result, json_path)
+    export_scan_html(result, html_path)
+    return json_path, html_path
 
 
 def export_scan_csv(result: ScanResult, path: Path) -> Path:
