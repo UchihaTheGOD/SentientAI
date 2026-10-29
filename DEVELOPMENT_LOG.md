@@ -296,3 +296,72 @@ are pre-existing working-tree churn and must NEVER be committed.
   commit and push the tag. Until that happens, `v1.0.0-rc.2`
   is a local-only tag and the milestone commits are
   local-only.
+
+## 2026-10-29 — Follow-up: milestone chain published as real Git commits (no patches)
+
+- The user asked to stop using patch files as the delivery method
+  and to put actual Git commits on GitHub. Delivered via the
+  authorized GitHub connector (MCP `push_files`), because git
+  push from this VM is still auth-blocked (no credential
+  helper, `gh` not logged in, SSH blocked at the egress
+  proxy) and the connector doc forbids starting a separate
+  `gh auth login` / device / PAT flow. No token was pasted,
+  requested, or committed.
+- Base verified live before publishing: remote branch
+  `feature/cyberllm-desktop-portable` at `dd22172` (the user's
+  Windows replay, clean tree), remote `main` untouched, no
+  remote tags. Local chain verified first: 7 linear commits
+  `1fad93b` → `bd19855` → `cda3462` → `93185f5` →
+  `f086a64` → `c5691e6` → `28c1b18` on top of `0a5d052`,
+  no deletions, no binaries, all UTF-8, secret-pattern scan
+  clean, messages preserved verbatim.
+- Published chain, in order, each on the previous head
+  (head re-checked live before every push; no force-push,
+  no rewrite of remote history):
+  - `1fad93b` (audit fixes) → `ef2eb12`
+  - `bd19855` (milestone 2) → `419daab`
+  - `cda3462` (rc.1) → `edf983c`
+  - `93185f5` (rc.1 push record) → `26eced2`
+  - `f086a64` (rc.2 hardening) → `de2214c`
+  - `c5691e6` (rc.2 push record) → `23dc057`
+  - `28c1b18` (rc.2 delivery record) → `248af16`
+  Full remote SHAs are in the delivery report; short SHAs
+  above are unambiguous here.
+- Verification after each push (fetch + inspect, not the
+  push receipt alone): parent chain is linear from
+  `dd22172` to `248af16`, subjects match, and every file's
+  content is byte-identical to the local commit. Trees
+  1–4 are exactly equal to local trees. Trees 5–7 differ
+  from local trees by ONE item only: `run.sh` mode.
+- KNOWN DEVIATION — `run.sh` executable bit (disclosed, not
+  hidden): local `run.sh` is mode 100755 with blob
+  `411e15c3…`; the connector's file API writes updated
+  files at mode 100644, so published `run.sh` has the
+  identical blob but mode 100644. Cause: the API exposes
+  no mode control, and a pre-push check that piped the
+  range summary through `head` missed that `run.sh` is the
+  one executable file in the range. Impact: NONE on
+  Windows (checkouts ignore exec bits); on Linux/macOS
+  run `bash run.sh` or `chmod +x run.sh` after cloning
+  until a later commit restores the bit through a
+  mode-aware push. Content is unaffected.
+- Tags: local tags UNTOUCHED (`v1.0.0-rc.1` → `cda3462`,
+  `v1.0.0-rc.2` → `f086a64`, never moved). The connector
+  has no tag-creation tool (only tag reads), so
+  `v1.0.0-rc.2` was NOT published from here. The correct
+  published target is the rc.2-equivalent commit
+  `de2214c` (content-verified above). The Windows
+  commands to create and push the tag are in the delivery
+  report; a release object was NOT created to mint the
+  tag, because the user authorized a tag, not a release.
+- Windows fast-forward (clean tree, from the user's
+  `dd22172`): `git fetch origin` then
+  `git merge --ff-only origin/feature/cyberllm-desktop-portable`.
+  No patches, no rebase, no force-push on either side.
+- Local branch note: this VM's branch keeps the local
+  SHAs (content-identical modulo the `run.sh` mode bit);
+  the published chain is canonical on GitHub. The next
+  development session must start from the published tip
+  before new work, or it will diverge again. Working
+  tree still only the 2 evaluation files
+  modified-unstaged, never committed.
