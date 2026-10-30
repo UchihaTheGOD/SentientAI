@@ -16,6 +16,8 @@ from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
 
+from app.services.security_events import trusted_client_ip
+
 _LOCK = threading.Lock()
 _HITS: dict[str, deque[float]] = defaultdict(deque)
 _last_prune = 0.0
@@ -24,10 +26,13 @@ _MAX_KEYS = 20_000
 
 
 def _client_key(request: Request, bucket: str) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else (
-        request.client.host if request.client else "unknown"
-    )
+    # Never trust X-Forwarded-For blindly: the app binds localhost
+    # with no trusted proxy, so any client could rotate buckets at
+    # will by sending a fresh header value and defeat the per-bucket
+    # caps. Use the codebase's trusted-proxy policy instead: XFF is
+    # honoured only when the peer is in TRUSTED_PROXY_IPS/CIDRS,
+    # otherwise the peer address is the identifier.
+    ip = trusted_client_ip(request) or "unknown"
     # Include a short digest of the session cookie so several users behind one
     # NAT address are not throttled as a single client.
     token = request.cookies.get("access_token", "")

@@ -277,6 +277,14 @@ class ControlCenterPage(QWidget):
         lines = list(self.ctx.backend.log_lines)
         if lines:
             self.log_view.setPlainText("\n".join(lines[-200:]))
+        else:
+            # An empty view previously gave no hint that logs are only
+            # tailed for backends this GUI started; a backend started
+            # elsewhere logs to its own console, not here.
+            self.log_view.setPlainText(
+                "(No backend log lines captured — logs are tailed only "
+                "while this GUI runs the backend. A backend started "
+                "elsewhere logs to its own console.)")
 
     def save_settings(self) -> None:
         s = self.ctx.settings

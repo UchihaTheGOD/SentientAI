@@ -102,6 +102,29 @@ def test_analyze_model_unavailable_is_503_not_a_verdict(admin_client):
     assert r.status_code == 503
 
 
+def test_analyze_generation_failure_is_503_with_findings(admin_client):
+    """A non-ModelUnavailable generate() failure (OOM, tokenizer,
+    runtime) must also be a 503 carrying the deterministic findings,
+    not a generic 500 that discards them."""
+    from unittest.mock import patch
+
+    with patch(
+        "app.api.cyberllm.generate",
+        side_effect=RuntimeError("CUDA out of memory"),
+    ):
+        r = _post(
+            admin_client,
+            "/api/cyberllm/analyze",
+            {"log_text": BENIGN_TEXT},
+        )
+
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert detail["error"] == "model_error"
+    assert "CUDA out of memory" in detail["reason"]
+    assert isinstance(detail["deterministic_findings"], list)
+
+
 def test_analyze_ssrf_override_with_recorded_generation(admin_client):
     # RECORDED generation (pilot v8 raw output), not live inference: the
     # model said likely_benign for the SSRF; the deterministic layer must

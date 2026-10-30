@@ -129,6 +129,46 @@ def test_frozen_exe_in_dist_finds_project_root(monkeypatch, tmp_path):
     assert find_project_root(Settings()) == proj
 
 
+def test_readiness_uses_no_proxy_session(tmp_path):
+    """Readiness polling must match BackendClient: no env proxies."""
+    manager = BackendManager(Settings(), tmp_path)
+    assert manager._session is not None
+    assert manager._session.trust_env is False
+
+
+class _FakeResp:
+    def __init__(self, status=200, payload=None):
+        self.status_code = status
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+
+class _FakeSession:
+    def __init__(self, resp):
+        self.resp = resp
+        self.calls = []
+
+    def get(self, url, timeout=None):
+        self.calls.append(url)
+        return self.resp
+
+
+def test_wait_ready_uses_manager_session(tmp_path):
+    manager = BackendManager(Settings(), tmp_path)
+    manager._session = _FakeSession(_FakeResp(200))
+    ok, _msg = manager.wait_ready(timeout=5)
+    assert ok
+    assert "readiness" in manager._session.calls[0]
+
+
+def test_readiness_maps_non_200_to_error(tmp_path):
+    manager = BackendManager(Settings(), tmp_path)
+    manager._session = _FakeSession(_FakeResp(503))
+    assert "503" in manager.readiness()["error"]
+
+
 def test_explicit_project_root_wins(monkeypatch, tmp_path):
     proj = tmp_path / "proj"
     (proj / "app").mkdir(parents=True)

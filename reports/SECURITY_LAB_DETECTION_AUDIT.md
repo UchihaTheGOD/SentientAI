@@ -309,6 +309,335 @@ restored, or deleted.
   API limitation, documented in the previous delivery). No
   Windows impact; on Linux run `bash run.sh` or `chmod +x run.sh`.
 
+## 7. Reliability audit, continued (2026-10-29, after the first fix)
+
+State at the start of this pass: local branch
+`feature/cyberllm-desktop-portable` at `9f66f24` (the
+detection-to-report fix), remote branch at `6981be2` (the published
+equivalent), working tree clean except the two test-regenerated
+evaluation files. The user published tag `v1.0.0-rc.2` from Windows
+during this pass: it now exists on the remote pointing at
+`de2214ca92ceb91a2b93b1edb0a4d3ed2f0ad76b`, the verified
+rc.2-equivalent commit. That item is closed; no tag action remains
+for the agent.
+
+Scope of this pass: every `security_lab` module was read (GUI pages,
+scanner engine + all 14 checks, findings, reports, cases, timeline,
+context, client, backend manager, config, diagnostics, evaluation,
+lab server, workers, dialogs, theme, entry point), plus the website
+CyberLLM integration surface (loader, inference, API routes, schema,
+classifier essentials, auth login flow, security-lab API routes,
+router registration). Unrelated website features (blog, community,
+social, feed) do not touch the detection pipeline and were not
+audited line by line; that boundary is stated, not hidden.
+
+### 7.1 New confirmed defects and fixes (all uncommitted)
+
+No fix below was published automatically; all await the user's
+approval, per the mission instructions.
+
+1. **Settings coercion left garbage values in place**
+   (`security_lab/config.py::Settings.from_dict`). Numeric
+   conversions were grouped in one try block, so one bad
+   hand-edited value left the remaining fields as unconverted
+   strings, which would fail later at scan time; a string
+   allowlist would have been iterated character by character by
+   the host check. Fix: each numeric field falls back to its safe
+   default independently; a string allowlist is split on commas;
+   a non-list allowlist resets to empty. Tests:
+   `test_hand_edited_settings_coerced_to_safe_values`,
+   `test_non_list_allowlist_resets_to_empty` in
+   `test_config.py`.
+2. **Backend readiness polling ignored the no-proxy lesson**
+   (`security_lab/backend.py::BackendManager`). `wait_ready` and
+   `readiness` used plain `requests.get`, honouring environment
+   proxies, while `BackendClient` deliberately disables them
+   because proxy env vars have broken localhost requests before.
+   The same local backend was therefore reached two different
+   ways. Fix: the manager now holds a `trust_env=False` session
+   used by both methods. Tests: no-proxy session flag,
+   `wait_ready` via a fake session, non-200 readiness mapping in
+   `test_backend_hardening.py`.
+3. **Self-test did not cover the new persistence path**
+   (`security_lab/diagnostics.py::check_reports`). It exercised
+   only the manual exporters, so the auto-save path the Scanner
+   page now relies on was untested by diagnostics. Fix:
+   `check_reports` additionally round-trips a report through
+   `save_scan_report` and verifies the finding survives. Test:
+   `test_check_reports_includes_autosave` in
+   `test_diagnostics.py`.
+4. **Empty backend-log view gave no explanation**
+   (`security_lab/gui/page_control.py::refresh_logs`). For a
+   backend started outside the GUI, the log view stayed blank
+   with no hint (logs are only tailed for GUI-started backends;
+   an external backend logs to its own console). Fix: a
+   placeholder explains this when no lines were captured. Test:
+   `test_control_logs_placeholder_when_empty` in
+   `test_gui_smoke.py`.
+5. **Scan HTTP sessions were never closed**
+   (`security_lab/scanner/engine.py::Scanner.run`). Every scan
+   created a `requests` Session whose pooled connections lingered
+   after the run. Fix: `run()` now delegates to `_run_impl` and
+   closes the session in a `finally` block. Safe because every
+   caller creates a fresh Scanner per run (verified by grep:
+   scanner page, demo page, diagnostics). Test:
+   `test_scan_closes_session_after_run` in
+   `test_engine_hardening.py`.
+
+### 7.2 Verified correct (no change made)
+
+- Model identity pinning: base `Qwen/Qwen3-1.7B` @
+  `70d244cc…`, adapter SHA
+  `d624ed79…5a5b1` — identical in `security_lab/config.py`,
+  `app/services/cyberllm_loader.py` defaults, and the live
+  readiness payload (see §7.3).
+- Loader: project-root-derived paths (never cwd or a personal
+  Windows path), MODEL_ROOT precedence, manifest fallback, SHA
+  check before the torch check, explicit-root incompleteness as a
+  hard error, device auto/cpu/cuda with a clear error for
+  cuda-without-GPU, fp16 on CUDA / fp32 on CPU, 8-bit only on
+  CUDA, `model.eval()`, load failure recorded as
+  `state=failed` + reason with an emptied bundle (no fabricated
+  verdict downstream). Readiness staying unlocked during load is
+  a deliberate tradeoff (a locked readiness would block for the
+  whole load), not a defect: only the ready flag gates verdicts,
+  and it is set under the load lock.
+- Inference: frozen prompt templates verbatim, budgets 320/512,
+  truncation flagged (never hidden), semaphore of 2,
+  `torch.no_grad()`, greedy decoding, `enable_thinking=False`
+  with fallback, input tensors moved to the model device.
+- API: readiness unauthenticated; model load admin-only; screen
+  and analyze authenticated; analyze rate-limited, input
+  validated (422), `max_new_tokens` bounded 16–512 by schema,
+  model-unavailable → 503 with reason + deterministic findings,
+  unparseable output → `needs_review` with raw preserved,
+  evidence-mismatch / truncation / unjustified high-confidence
+  threat → downgraded, never silently confident.
+- Schema: fence stripping, first-`{` strict JSON parse (trailing
+  prose fails honestly), class/confidence/summary required,
+  unknown keys dropped.
+- Classifier: unavailable/unparseable/truncated/mismatch →
+  `needs_review`; SSRF/metadata findings never lost to a benign
+  model verdict.
+- Auth: login/register return HTTP 303, matching the desktop
+  client's success check; website security-lab routes are all
+  admin-only; all CyberLLM routers are registered in `app/main.py`.
+- Scanner checks (all 14): probe-response indicators only, never
+  confirmed vulnerabilities from a header/error/version alone;
+  SSRF sink labelled suspected without a fetch test;
+  open-redirect uses exact hostname comparison and never follows
+  the redirect; sensitive-file bodies never stored (status/length
+  only); cookie values never stored (names only); error-page
+  probes store signatures, not error text; TRACE goes through the
+  gated request path.
+- Lab server: loopback-only, GET-only (other methods 405),
+  escaped search reflection, clearly fake `.env`.
+- Windows packaging: `build_windows.bat` (build venv in `%TEMP%`,
+  GUI deps `--upgrade`, spec with `console=False`, `datas=[]` so
+  no weights are bundled), `run.bat` (`.venv` first, quoted paths,
+  `cd /d %~dp0`), spec name correct. Paths with spaces are
+  handled (quoted batch paths, `Path` objects, list-form Popen).
+  The exe build itself remains Windows-only and untested here.
+- Deliberately not changed (re-examined, still correct to leave):
+  `BackendManager.stop()` kill-wait edge (state is cleaned in
+  `finally`; a timeout surfaces as an error, never as success);
+  `ScanContext` rate limiting is best-effort under the
+  sensitive-files parallel probes (the cap itself is atomic);
+  users-page KeyError exposure if the backend ever broke its
+  admin payload contract (same-repo API; client validates dict
+  shape); diagnostics' artifact-mismatch branch is unreachable
+  because a mismatch is already in the missing list (harmless).
+
+### 7.3 Backend live check (this VM, no model)
+
+Started with the backend venv's uvicorn (as `BackendManager`
+does), then stopped it cleanly:
+
+- `GET /api/health` → `{"status":"ok","service":"sentientai"}`.
+- `GET /api/cyberllm/readiness` → `ready=false`,
+  `state=not_loaded`, `reason=not_initialized`,
+  `base_model=Qwen/Qwen3-1.7B`,
+  `adapter_sha256=d624ed79…5a5b1` (expected value),
+  `device=cpu`, `quantization=none`. Honest: no weights or torch
+  in this VM, so no load was attempted and no verdict fabricated.
+- Shutdown completed cleanly; `app.db` SHA-256 unchanged by the
+  check (backup taken beforehand at
+  `~/workspace/appdb-backup-20261029.db` and not needed).
+- Real Qwen3-1.7B inference, GPU detection on the GTX 1660 SUPER,
+  and CUDA device selection remain NOT TESTED here (no GPU,
+  weights, or torch in this VM) and need the user's PC.
+
+### 7.4 Updated test results
+
+- Lab suite: **101 passed, 1 skipped** (was 93+1; +8 new tests),
+  0 failed. The 1 skip is the real-model smoke test (needs
+  weights + `CYBERLLM_REAL_MODEL=1`).
+- Website suite: **635 passed, 1 skipped**, 0 failed (unchanged;
+  the pre-existing template skip).
+- Targeted runs for the new fixes: 44 passed across the five
+  touched test files.
+- Real lab end-to-end after the session-close change: 14
+  findings, 32 requests, 0 errors; all 14 reloaded with the
+  correct target.
+- Dependency checks: `pip check` clean in both venvs. Lint/type:
+  no configuration exists in the repo, so none was run.
+- Evaluation files: regenerated by the suite runs as usual;
+  pre-pass bytes are preserved at
+  `~/workspace/eval-backup-20261029b/` (plus the earlier
+  `~/workspace/eval-backup-20261029/`); never committed.
+
+### 7.5 Updated matrix deltas
+
+- Diagnostics: PASS (now covers the auto-save path too).
+- Control Center: PARTIAL (log placeholder added; Windows start,
+  frozen-exe discovery, and real GPU reporting still untested
+  here).
+- Scanner / Reports / Cases / Demo / Settings: PASS (unchanged,
+  re-verified by the full suites).
+- Model Testing / User Management / backend readiness / GPU:
+  PARTIAL or NOT TESTED as before — display, parsing, and client
+  mapping are tested, but live inference and live admin flows
+  need the user's backend + GPU.
+- No FAIL rows remain in the matrix. The reliability pass found
+  no defect in the detection pipeline itself (scanner → findings
+  → persistence → report → display); the five fixes above are
+  robustness, coverage, and resource-hygiene issues around it.
+
+### 7.6 Changed files in this pass (UNCOMMITTED)
+
+`security_lab/config.py`, `security_lab/backend.py`,
+`security_lab/diagnostics.py`, `security_lab/gui/page_control.py`,
+`security_lab/scanner/engine.py`,
+`security_lab/tests/test_config.py`,
+`security_lab/tests/test_backend_hardening.py`,
+`security_lab/tests/test_diagnostics.py`,
+`security_lab/tests/test_engine_hardening.py`,
+`security_lab/tests/test_gui_smoke.py`, and this report file.
+Evaluation files remain modified-unstaged by test regeneration
+and are excluded from any commit.
+
+### 7.7 Remaining blockers (updated)
+
+- Publishing this pass's fixes needs the user's approval (not
+  done automatically). The previous fix is already published at
+  remote `6981be2`; the new fixes sit uncommitted on local
+  `9f66f24`.
+- Tag `v1.0.0-rc.2`: DONE — now on the remote at `de2214c`,
+  published by the user from Windows. No tag action remains.
+- Still Windows-only and unverified: Windows test run, exe build
+  + double-click, backend start from the Control Center on
+  Windows, GPU reporting + fit/latency on the GTX 1660 SUPER,
+  real 1.7B inference, a scan against a real authorized target,
+  and the user's unparseable case (still awaiting raw output +
+  truncated flag + token count).
+- Single-analysis persistence on the Model Testing page remains
+  a documented limitation (on-screen only; batch evaluations can
+  be exported). Changing it would add UI and was not smuggled
+  into this pass.
+
+### 7.8 Website-backend defects (second pass, same night)
+
+A deeper read of the website backend (lab runner, ATTACT runner,
+bridge, lab API, rate limiter, analyze error paths) found six
+defects OUTSIDE the detection pipeline. Each was re-verified in
+source before fixing; none was taken on trust. All fixes are
+uncommitted, like the §7.1 set.
+
+1. **Lab detection attributed by recency, not causality**
+   (`app/services/security_lab_runner.py::run_lab_test`). After a
+   test's requests, detection scanned the 500 most recent
+   `SecurityEvent` rows, kept those from the last 900 seconds,
+   and tested only the first 30. Any other user's failed login
+   or suspicious request within 15 minutes made an unrelated
+   test report `detected` (false positive); more than 30 events
+   in the window could hide the test's own events (false
+   negative). The per-request correlation ids were generated but
+   never sent, and the middleware assigns its own per-request id
+   and reads no client header, so id-based attribution is not
+   available without a middleware change. Fix: detection now
+   uses the test's own window (events created at or after the
+   run started) and tests ALL window events; stored event ids
+   are the window's events; `meta.events_attribution` records
+   the method. Residual limitation, documented in code: other
+   traffic landing inside the same seconds-long window could
+   still be attributed; the 15-minute cross-talk is gone.
+   Test: a benign custom test with a suspicious event seeded 10
+   minutes earlier now reports `not_detected`
+   (`test_lab_detection_ignores_events_before_the_run`).
+2. **Non-`ModelUnavailable` inference failures lost their
+   findings** (`app/api/cyberllm.py::analyze`). Only
+   `ModelUnavailable` was mapped to 503 with deterministic
+   findings; any other `generate()` failure (OOM, tokenizer,
+   runtime) fell through to the generic 500 handler, which
+   hides exception text by design — and discarded the
+   deterministic findings computed before the call. Fix: a
+   generic handler after the `ModelUnavailable` branch returns
+   the same 503 shape with error code `model_error`, the reason,
+   and the deterministic findings. Test:
+   `test_analyze_generation_failure_is_503_with_findings`.
+3. **ATTACT report blob stored unredacted**
+   (`app/services/attact_runner.py::run_and_persist`). Finding
+   rows were stored with `redact()` applied, but
+   `assessment.report_json` serialized the raw report dict, so
+   the same error bodies, sensitive-file bodies, and cookie
+   excerpts persisted raw in the assessment row. Fix: each
+   finding's evidence is redacted in the report dict before
+   serialization. Test:
+   `tests/test_attact_report_redaction.py` (secret-shaped
+   evidence is absent from the blob and present only as
+   `[REDACTED]`).
+4. **Bridge incident creation committed before linking**
+   (`app/services/sentinel_bridge.py`, both submit functions).
+   `create_incident()` commits internally; the dedup key was
+   set only in the later link block, so a link failure left a
+   committed incident with no key, and a retry could not dedup
+   against it and duplicated it. Fix: `create_incident()` takes
+   an optional `containment_meta` persisted atomically with
+   creation; both bridge paths pass the dedup JSON at creation.
+   The dedup check (`key in containment_meta`) then finds the
+   incident on retry. Test: a commit that fails exactly on the
+   link commit, followed by a retry that dedups to the same
+   incident
+   (`test_link_failure_keeps_dedup_key_and_retry_dedups`).
+5. **`list_runs` negative limit bypassed the 50-row cap**
+   (`app/api/security_lab_api.py::list_runs`). `min(limit, 50)`
+   with `limit=-5` is `-5`, and SQLAlchemy renders `LIMIT -1`
+   on SQLite as no limit, returning the whole table. Fix:
+   clamp at entry to [1, 50] and use the clamped value
+   throughout. Test: with 55 rows, `limit=-5` returns 1 row
+   (floor) and `limit=500` returns 50 (cap). Note: an early
+   version of this test wrongly expected 50 rows for `-5`;
+   the clamp semantics (floor 1, cap 50) are the correct
+   expectation and the test was corrected, not the code.
+6. **Rate-limit key trusted `X-Forwarded-For` blindly**
+   (`app/services/ratelimit.py::_client_key`). Any client could
+   rotate buckets with a fresh header value and defeat the
+   20-per-600s analyze cap (and the login cap). Fix: use the
+   codebase's own trusted-proxy policy
+   (`security_events.trusted_client_ip`): XFF is honoured only
+   when the peer is in `TRUSTED_PROXY_IPS`/`CIDRS`; otherwise
+   the peer address is the identifier. The app binds localhost
+   with no proxy-headers flag, so the default is the peer.
+   Tests: spoofed XFF ignored without a trusted proxy; honoured
+   when the peer is trusted
+   (`tests/test_ratelimit_client_key.py`).
+
+Updated test results for this pass: website suite **642 passed,
+1 skipped** (635 + 7 new), lab suite **101 passed, 1 skipped**
+(unchanged), 0 failed. Targeted runs for the six fixes: 49
+passed across the touched website test files. Changed files in
+this pass (uncommitted, in addition to the §7.6 list):
+`app/api/cyberllm.py`, `app/api/security_lab_api.py`,
+`app/services/attact_runner.py`,
+`app/services/incident_service.py`, `app/services/ratelimit.py`,
+`app/services/security_lab_runner.py`,
+`app/services/sentinel_bridge.py`, `tests/test_bridge.py`,
+`tests/test_cyberllm_api.py`, `tests/test_security_lab_phase.py`,
+plus new `tests/test_attact_report_redaction.py` and
+`tests/test_ratelimit_client_key.py`. The combined uncommitted
+set (reliability pass + website pass) awaits the user's
+approval; remote branch is still `6981be2`.
+
 ## 6. Windows verification instructions
 
 Do these AFTER the fix is published (on approval) and the Windows

@@ -95,21 +95,37 @@ class Settings:
         clean = {k: v for k, v in data.items() if k in known}
         obj = cls(**clean)
         # Coerce numeric fields that may arrive as strings from hand edits.
+        # Each field falls back to its safe default independently: the old
+        # code grouped conversions in one try, so one bad value left the
+        # remaining fields as unconverted strings, which failed later at
+        # scan time, far from the cause.
         try:
             obj.api_port = int(obj.api_port)
         except (TypeError, ValueError):
             obj.api_port = 8000
-        try:
-            obj.rate_limit_seconds = float(obj.rate_limit_seconds)
-            obj.request_timeout_seconds = float(obj.request_timeout_seconds)
-            obj.scan_deadline_seconds = float(obj.scan_deadline_seconds)
-        except (TypeError, ValueError):
-            pass
-        try:
-            obj.max_requests_per_scan = int(obj.max_requests_per_scan)
-            obj.max_workers = int(obj.max_workers)
-        except (TypeError, ValueError):
-            pass
+        for fname, default in (
+                ("rate_limit_seconds", 0.25),
+                ("request_timeout_seconds", 10.0),
+                ("scan_deadline_seconds", 300.0)):
+            try:
+                setattr(obj, fname, float(getattr(obj, fname)))
+            except (TypeError, ValueError):
+                setattr(obj, fname, default)
+        for fname, default in (
+                ("max_requests_per_scan", 200),
+                ("max_workers", 2)):
+            try:
+                setattr(obj, fname, int(getattr(obj, fname)))
+            except (TypeError, ValueError):
+                setattr(obj, fname, default)
+        # A hand-edited allowlist may be a comma-separated string (or a
+        # non-list entirely); a bare string would otherwise be iterated
+        # character by character when the scanner checks hosts.
+        if isinstance(obj.allowlist, str):
+            obj.allowlist = [a.strip() for a in obj.allowlist.split(",")
+                             if a.strip()]
+        elif not isinstance(obj.allowlist, list):
+            obj.allowlist = []
         if obj.device not in ("auto", "cpu", "cuda"):
             obj.device = "auto"
         return obj

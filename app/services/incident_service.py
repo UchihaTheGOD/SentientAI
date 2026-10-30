@@ -14,7 +14,7 @@ from app.models.sentinel_incident import SentinelIncident, TempBlock, INCIDENT_S
 # CyberLLMv1 classification, model_b_* is always None (no second
 # model exists any more), and agreement is always None. No dual-model
 # inference is performed or implied by these columns.
-def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, classification: dict | None = None, prompt_path: str | None = None) -> SentinelIncident:
+def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, classification: dict | None = None, prompt_path: str | None = None, containment_meta: str | None = None) -> SentinelIncident:
     excerpt = (log_text or "")[:2000]
     evidence_json = json.dumps(fused.get("rules", {}).get("evidence", [])[:20])
     classifier_text = None
@@ -31,6 +31,7 @@ def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused
         agreement=None, evidence=evidence_json,
         prompt_snapshot="", prompt_path=str(prompt_path or ""),
         status="pending_review", severity=fused.get("fused_verdict") or "pending_review",
+        containment_meta=containment_meta or "",
     )
     db.add(inc); db.commit(); db.refresh(inc)
     return inc

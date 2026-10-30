@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ..scanner.engine import ScanConfig, ScanContext, ScanRefused
+from ..scanner.engine import ScanConfig, ScanContext, Scanner, ScanRefused
 
 
 class _Resp:
@@ -73,3 +73,24 @@ def test_request_raw_sends_the_given_method():
     resp = ctx.request_raw("TRACE", "http://127.0.0.1:9/")
     assert resp.status_code == 200
     assert ctx.session.calls == [("TRACE", "http://127.0.0.1:9/")]
+
+
+class _ClosingSession(_Session):
+    def __init__(self):
+        super().__init__()
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+def test_scan_closes_session_after_run():
+    """A scan must not leak its HTTP session (pooled connections)."""
+    scanner = Scanner(ScanConfig(target="http://example.com/",
+                                 authorized=True, allowlist=[],
+                                 rate_limit_seconds=0, timeout_seconds=5))
+    session = _ClosingSession()
+    scanner.ctx.session = session
+    result = scanner.run()
+    assert session.closed
+    assert result.errors  # refused before any request: empty allowlist

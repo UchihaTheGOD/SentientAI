@@ -199,8 +199,10 @@ def check_scanner_safety() -> CheckResult:
 
 
 def check_reports(tmp_dir: Path) -> CheckResult:
+    import json
+
     from .reports import (export_scan_csv, export_scan_html,
-                          export_scan_json)
+                          export_scan_json, save_scan_report)
     from .scanner.engine import ScanResult
     from .scanner.findings import Finding
 
@@ -216,7 +218,18 @@ def check_reports(tmp_dir: Path) -> CheckResult:
         export_scan_html(result, tmp_dir / "selftest.html")
         export_scan_json(result, tmp_dir / "selftest.json")
         export_scan_csv(result, tmp_dir / "selftest.csv")
-        return _pass("Report generation", "HTML, JSON, and CSV exports OK")
+        # Also exercise the auto-save path the Scanner page now relies
+        # on: a saved report must round-trip its finding, or the
+        # persistence fix itself is untested by the self-test.
+        json_path, html_path = save_scan_report(
+            result, tmp_dir, prefix="selftest")
+        saved = json.loads(json_path.read_text(encoding="utf-8"))
+        if ([f["name"] for f in saved["findings"]]
+                != ["Self-test finding"] or not html_path.is_file()):
+            return _fail("Report generation",
+                         "auto-saved report did not round-trip its finding")
+        return _pass("Report generation",
+                     "HTML, JSON, and CSV exports + auto-save OK")
     except Exception as exc:
         return _fail("Report generation", str(exc))
 

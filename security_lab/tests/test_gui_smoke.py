@@ -104,6 +104,13 @@ def test_users_page_renders_stub_data(qapp, ctx):
     assert "alice" in page.detail.toPlainText()
 
 
+def test_control_logs_placeholder_when_empty(qapp, ctx):
+    """An empty log view must explain itself instead of looking broken."""
+    page = ControlCenterPage(ctx)
+    page.refresh_logs()
+    assert "tailed only" in page.log_view.toPlainText()
+
+
 def test_scanner_page_validation_blocks_unsafe_starts(qapp, ctx):
     page = ScannerPage(ctx)
     page.start_scan()

@@ -131,3 +131,41 @@ def test_fusion_uses_real_results_not_mock():
     r2 = fuse_classification(benign, unavailable)
     assert r2["fused_verdict"] == "likely_benign" and r2["fused_score"] == 0
 
+
+
+def test_link_failure_keeps_dedup_key_and_retry_dedups(admin, admin_client):
+    """If the link commit fails after incident creation, the dedup
+    key must already be persisted, so a retry dedups instead of
+    creating a second incident for the same event."""
+    from app.database import SessionLocal
+    from app.services.security_events import log_event
+    from app.services.sentinel_bridge import submit_security_event_for_analysis
+
+    s = SessionLocal()
+    ev = log_event(s, event_type="suspicious_input.sqli", category="sqli",
+                   severity="medium", source="middleware", route="/search",
+                   method="GET", http_status=200, evidence="' OR 1=1 -- sqli probe")
+    real_commit = s.commit
+    calls = {"n": 0}
+
+    def flaky_commit():
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("simulated link failure")
+        return real_commit()
+
+    s.commit = flaky_commit
+    try:
+        res = submit_security_event_for_analysis(s, event_id=ev.id, triggered_by=admin.id)
+    finally:
+        s.commit = real_commit
+    assert res["incident"] is not None
+    inc = res["incident"]
+    s.refresh(inc)
+    assert res["dedup_key"] in (inc.containment_meta or "")
+    s.refresh(ev)
+    assert ev.incident_id is None  # the link was rolled back
+    res2 = submit_security_event_for_analysis(s, event_id=ev.id, triggered_by=admin.id)
+    assert res2["is_duplicate"] is True
+    assert res2["incident"].id == inc.id
+    s.close()

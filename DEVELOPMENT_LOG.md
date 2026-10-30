@@ -388,3 +388,24 @@ are pre-existing working-tree churn and must NEVER be committed.
 - Evaluation files not committed (test-regenerated churn, preserved
   uncommitted per standing rule; pre-audit copy backed up outside
   the repo).
+
+## 2026-10-30 — Publish reliability + website-backend fixes (11 fixes)
+
+- Reliability pass (5): Settings from_dict per-field defaults +
+  allowlist coercion; BackendManager readiness via trust_env=False
+  session; diagnostics check_reports round-trips save_scan_report;
+  Control Center log-view placeholder for externally-started
+  backends; Scanner.run() closes its HTTP session in finally.
+- Website-backend pass (6): lab-run detection attributed to the
+  test's own time window (not 900s recency + first-30 cap);
+  non-ModelUnavailable inference failures now 503 model_error
+  with deterministic findings; ATTACT report_json redacted before
+  serializing; bridge dedup key persisted atomically at incident
+  creation; list_runs clamped to [1, 50]; rate-limit key uses
+  trusted_client_ip (XFF only from TRUSTED_PROXY_IPS/CIDRS).
+- Tests: +15 (8 lab-side, 7 website-side). Suites at this commit:
+  root 642 passed + 1 skipped, lab 101 passed + 1 skipped,
+  0 failed. Evaluation files not committed (test-regenerated
+  churn, preserved uncommitted).
+- Tag v1.0.0-rc.2 already on the remote at de2214c (published
+  by the user from Windows); no tag action in this delivery.

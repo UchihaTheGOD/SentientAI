@@ -71,6 +71,10 @@ def _report_links(db, run) -> dict:
 
 @router.get("/runs")
 def list_runs(limit: int = 20, test_type: str | None = None, status: str | None = None, severity: str | None = None, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    # Clamp at entry: a negative limit made min(limit, 50) negative,
+    # and SQLAlchemy renders LIMIT -1 on SQLite as "no limit", so the
+    # intended 50-row cap was defeated by a one-character input.
+    limit = min(max(limit, 1), 50)
     from app.models.security_lab import SecurityLabRun
     q=db.query(SecurityLabRun).order_by(SecurityLabRun.created_at.desc())
     if test_type: q=q.filter(SecurityLabRun.test_type==test_type)
@@ -87,10 +91,10 @@ def list_runs(limit: int = 20, test_type: str | None = None, status: str | None 
                 elif not sev and severity.lower()=="unavailable": filtered.append(_r)
             except Exception: 
                 if severity.lower()=="unavailable": filtered.append(_r)
-            if len(filtered)>=min(limit,50): break
-        rows=filtered[:min(limit,50)]
+            if len(filtered)>=limit: break
+        rows=filtered[:limit]
     else:
-        rows=q.limit(min(limit,50)).all()
+        rows=q.limit(limit).all()
     out=[]
     for r in rows:
         d=_lab_row_dict(r); d.update(_report_links(db,r)); out.append(d)

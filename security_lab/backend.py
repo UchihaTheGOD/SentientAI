@@ -287,6 +287,14 @@ class BackendManager:
         self.log_lines: deque[str] = deque(maxlen=500)
         self._reader_thread: threading.Thread | None = None
         self._log_handle = None
+        # Local-backend requests must not go through environment proxies:
+        # BackendClient already disables them for exactly this reason
+        # (proxy env vars have broken localhost requests before), and
+        # readiness polling must behave the same way.
+        self._session = None
+        if requests is not None:
+            self._session = requests.Session()
+            self._session.trust_env = False
 
     # -- lifecycle ------------------------------------------------------
     def start(self) -> tuple[bool, str]:
@@ -388,7 +396,7 @@ class BackendManager:
     # -- status ---------------------------------------------------------
     def wait_ready(self, timeout: float = 90) -> tuple[bool, str]:
         """Poll the unauthenticated readiness endpoint until it answers."""
-        if requests is None:
+        if self._session is None:
             return False, "requests library is not installed"
         deadline = time.time() + timeout
         last_error = "no response"
@@ -399,7 +407,7 @@ class BackendManager:
                     "see the log view for the traceback."
                 )
             try:
-                resp = requests.get(
+                resp = self._session.get(
                     f"{self.settings.api_base}/api/cyberllm/readiness",
                     timeout=3,
                 )
@@ -412,10 +420,10 @@ class BackendManager:
         return False, f"backend did not answer readiness within {timeout}s: {last_error}"
 
     def readiness(self) -> dict[str, Any]:
-        if requests is None:
+        if self._session is None:
             return {"error": "requests library is not installed"}
         try:
-            resp = requests.get(
+            resp = self._session.get(
                 f"{self.settings.api_base}/api/cyberllm/readiness", timeout=5)
             if resp.status_code == 200:
                 data = resp.json()

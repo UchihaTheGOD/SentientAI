@@ -55,6 +55,15 @@ def run_lab_test(db, *, test_type, target_url, custom_string, created_by, reques
         target=n
     if not _LK.acquire(blocking=False): raise ValueError('another test is already running')
     t0=_time.perf_counter(); start=_dt.now(_tz.utc).isoformat()
+    # Attribution window: only events created during THIS test run may
+    # count toward its detection. The old code used "last 900 seconds",
+    # so any other user's failed login or suspicious request within
+    # 15 minutes made an unrelated test report "detected", and the
+    # first-30 cap could hide the test's own events. Correlation ids
+    # cannot fix this: the middleware assigns its own per-request id
+    # and never reads a client-sent header, so the runner's ids are
+    # never attached to the events its requests generate.
+    started_dt=_dt.now(_tz.utc)
     cids=[]; eids=[]; sts=[]; req=0; resp=0; det='not_detected'; err=None
     meta={'test_type':test_type,'start':start,'is_synthetic':is_synth}
     try:
@@ -101,21 +110,20 @@ def run_lab_test(db, *, test_type, target_url, custom_string, created_by, reques
                 from app.database import SessionLocal as _SL
                 _sdb=_SL()
                 rows=_sdb.query(SecurityEvent).order_by(SecurityEvent.created_at.desc()).limit(500).all()
-                cutoff=_dt.now(_tz.utc).timestamp()-900
-                seen=[r for r in rows if True]
-                # handle naive datetimes: convert via .replace(tzinfo=_tz.utc) if needed
-                _tmp=[]
-                for _r in seen:
+                # Only events from this test's own window count, and
+                # detection looks at ALL of them: capping first and
+                # then testing could hide the test's own events.
+                seen=[]
+                for _r in rows:
                     _ca=getattr(_r,'created_at',None)
                     if _ca is None: continue
                     try:
                         if _ca.tzinfo is None: _ca=_ca.replace(tzinfo=_tz.utc)
-                        if _ca.timestamp() >= cutoff: _tmp.append(_r)
-                    except Exception: _tmp.append(_r)
-                seen=_tmp
-                for r in seen[:30]: eids.append(r.id)
-                has=any((r.event_type or '').startswith('suspicious_input') or (r.event_type or '')=='auth.login_failed' or (r.event_type or '').startswith('http.') for r in seen[:30])
-                det='detected' if has else 'not_detected'; meta['events_window']=len(seen)
+                        if _ca >= started_dt: seen.append(_r)
+                    except Exception: continue
+                for r in seen: eids.append(r.id)
+                has=any((r.event_type or '').startswith('suspicious_input') or (r.event_type or '')=='auth.login_failed' or (r.event_type or '').startswith('http.') for r in seen)
+                det='detected' if has else 'not_detected'; meta['events_window']=len(seen); meta['events_attribution']='time_window'
                 _sdb.close()
             except Exception as e: meta['event_scan_error']=str(e)[:300]
     except ValueError: raise

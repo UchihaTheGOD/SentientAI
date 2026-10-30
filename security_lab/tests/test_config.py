@@ -37,3 +37,28 @@ def test_defaults_are_safe():
     assert s.max_workers >= 1
     assert s.local_lab_enabled is False
     assert s.allowlist == []
+
+
+def test_hand_edited_settings_coerced_to_safe_values():
+    """One bad hand-edited value must not poison the other fields."""
+    s = Settings.from_dict({
+        "rate_limit_seconds": "not-a-number",
+        "request_timeout_seconds": "12",
+        "scan_deadline_seconds": None,
+        "max_requests_per_scan": "bad",
+        "max_workers": "3",
+        "allowlist": "example.com, 127.0.0.1",
+        "device": "bogus",
+    })
+    assert s.rate_limit_seconds == 0.25
+    assert s.request_timeout_seconds == 12.0
+    assert s.scan_deadline_seconds == 300.0
+    assert s.max_requests_per_scan == 200
+    assert s.max_workers == 3
+    assert s.allowlist == ["example.com", "127.0.0.1"]
+    assert s.device == "auto"
+
+
+def test_non_list_allowlist_resets_to_empty():
+    s = Settings.from_dict({"allowlist": 42})
+    assert s.allowlist == []

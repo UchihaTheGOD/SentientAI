@@ -130,6 +130,19 @@ def analyze(
             "hint": "Load the model via POST /api/cyberllm/readiness/load (admin), "
                     "or run on a machine with enough free RAM for the checkpoint.",
         }) from exc
+    except Exception as exc:
+        # Any other generation failure (OOM, tokenizer, runtime) is
+        # also a model-unavailable condition: it must not fall
+        # through to the generic 500 handler, which would discard
+        # the deterministic findings computed above.
+        logger.exception("CyberLLM inference failed")
+        raise HTTPException(status_code=503, detail={
+            "error": "model_error",
+            "reason": f"{type(exc).__name__}: {exc}",
+            "deterministic_findings": findings,
+            "hint": "The model failed during generation; deterministic "
+                    "rules still apply. Check the server log.",
+        }) from exc
     latency_ms = int((time.perf_counter() - start) * 1000)
     cleaned, parse_ok = parse_model_output(gen["raw"])
     if not parse_ok:

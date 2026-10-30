@@ -337,6 +337,22 @@ class Scanner:
         self.ctx = ScanContext(config, progress=progress)
 
     def run(self) -> ScanResult:
+        """Run the scan; the HTTP session is always closed afterwards.
+
+        Every scan previously created a requests Session that was never
+        closed, so pooled connections lingered after each run. Scanner
+        instances are created fresh per run everywhere, so closing
+        here cannot break a subsequent run.
+        """
+        try:
+            return self._run_impl()
+        finally:
+            try:
+                self.ctx.session.close()
+            except Exception:
+                pass
+
+    def _run_impl(self) -> ScanResult:
         from .checks import ALL_CHECKS
 
         started = datetime.now(timezone.utc).isoformat(timespec="seconds")

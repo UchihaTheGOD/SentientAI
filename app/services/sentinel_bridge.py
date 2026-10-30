@@ -195,13 +195,17 @@ def submit_security_event_for_analysis(db, *, event_id, triggered_by=None, reque
                 pass
     from app.services.incident_service import create_incident
     ip = event.ip_address
+    # The dedup key must be persisted atomically with creation: the
+    # old code set containment_meta only in the link block below, so
+    # a link failure left a committed incident with no key, and the
+    # next submission could not dedup against it and duplicated it.
+    _meta = json.dumps({"dedup_key": key, "source_event_id": event.id, "triggered_by": triggered_by}, ensure_ascii=False)
     try:
-        incident = create_incident(db, log_text=redacted_head[:8000], ip_address=ip, fused=fused, classification=inference)
+        incident = create_incident(db, log_text=redacted_head[:8000], ip_address=ip, fused=fused, classification=inference, containment_meta=_meta)
     except Exception as exc:
         logger.exception("create_incident failed for event %s: %s", event_id, exc)
         raise
     try:
-        incident.containment_meta = json.dumps({"dedup_key": key, "source_event_id": event.id, "triggered_by": triggered_by}, ensure_ascii=False)
         event.incident_id = incident.id
         if event.assessment_id is not None:
             try:
@@ -287,13 +291,16 @@ def submit_attact_finding_for_analysis(db, *, finding_id, triggered_by=None, req
             except Exception:
                 pass
     from app.services.incident_service import create_incident
+    # Dedup key persisted atomically with creation (see the event
+    # path above): a link failure must not leave a keyless incident
+    # that a retry cannot dedup against.
+    _meta = json.dumps({"dedup_key": key, "source_finding_id": finding.id, "source_assessment_id": getattr(assessment, "id", None), "triggered_by": triggered_by}, ensure_ascii=False)
     try:
-        incident = create_incident(db, log_text=redacted[:8000], ip_address=ip, fused=fused, classification=inference)
+        incident = create_incident(db, log_text=redacted[:8000], ip_address=ip, fused=fused, classification=inference, containment_meta=_meta)
     except Exception as exc:
         logger.exception("create_incident failed for finding %s: %s", finding_id, exc)
         raise
     try:
-        incident.containment_meta = json.dumps({"dedup_key": key, "source_finding_id": finding.id, "source_assessment_id": getattr(assessment, "id", None), "triggered_by": triggered_by}, ensure_ascii=False)
         finding.incident_id = incident.id
         if assessment is not None and assessment.incident_id is None:
             assessment.incident_id = incident.id
