@@ -1,5 +1,6 @@
 """Case store + timeline behaviour (including note/status guards)."""
 
+import csv
 import json
 
 import pytest
@@ -44,11 +45,18 @@ def test_case_status_validation(tmp_path):
 
 def test_case_exports(tmp_path):
     store = CaseStore(tmp_path / "cases.json")
-    store.create("title", "Low", "http://x/", "finding", "evidence")
+    case = store.create("title", "Low", "http://x/", "finding", "evidence")
+    store.add_note(case.id, "checked the log")
     store.export_json(tmp_path / "cases.json.out")
     store.export_csv(tmp_path / "cases.csv")
     assert (tmp_path / "cases.json.out").exists()
     assert (tmp_path / "cases.csv").exists()
+    # CSV must not silently drop evidence or notes (the JSON export
+    # is complete; the CSV previously omitted both columns).
+    rows = list(csv.reader(open(tmp_path / "cases.csv", encoding="utf-8")))
+    assert "evidence" in rows[0] and "notes" in rows[0]
+    assert "evidence" in rows[1]
+    assert "checked the log" in rows[1][-1]
 
 
 def test_timeline_redacts_and_reads(tmp_path):

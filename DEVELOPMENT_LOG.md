@@ -409,3 +409,27 @@ are pre-existing working-tree churn and must NEVER be committed.
   churn, preserved uncommitted).
 - Tag v1.0.0-rc.2 already on the remote at de2214c (published
   by the user from Windows); no tag action in this delivery.
+
+## 2026-10-30 — Full integration audit (published 2026-10-31 on user approval)
+
+- Windows news (user-reported): GUI exe built + launched; local
+  lab scan 14 findings / 32 requests / auto-saved JSON report —
+  confirms the 2026-10-29 persistence fix on Windows.
+- Headline finding: four separate pipelines share the name
+  "security lab" but almost no data. Desktop scanner findings
+  never reach any AI path by design (grep-verified: Scanner page
+  makes zero backend calls); review queue receives only
+  incident-derived training candidates, never scanner findings.
+  No external log collector exists (no firewall/proxy/system
+  ingestion, no upload endpoint) — most "missing external
+  attacks" are unobserved, not lost.
+- Fixes (2, both with regression tests): lab_analyze now
+  discloses evidence truncation (input_truncated + input_chars);
+  case CSV export now includes evidence + notes columns.
+- Cleanup verdict: ZERO tracked files deleted. Every module is
+  imported, every static asset referenced, every doc historical
+  or live. Patch file + TESTv1 + old reports classified and
+  proposed/retained, not deleted. Full report:
+  reports/FULL_INTEGRATION_AUDIT.md.
+- Suites at this tree: root 643 passed + 1 skipped, lab 101
+  passed + 1 skipped, 0 failed. Eval files NOT committed.

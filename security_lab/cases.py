@@ -154,9 +154,11 @@ class CaseStore:
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow(["id", "title", "severity", "url", "finding",
-                             "status", "created_at", "updated_at"])
+                             "status", "created_at", "updated_at",
+                             "evidence", "notes"])
             for c in self.cases:
                 writer.writerow([c.id, c.title, c.severity, c.url,
                                  c.finding_name, c.status, c.created_at,
-                                 c.updated_at])
+                                 c.updated_at, c.evidence,
+                                 json.dumps(c.notes)])
         return Path(path)

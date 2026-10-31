@@ -146,6 +146,7 @@ def _persist_run_assessment(db: Session, run, inference: dict, fused: dict, inci
 @router.post("/analyze")
 def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     log_text=None
+    input_truncated=False
     target_run=None
     if body.log_text is not None:
         log_text=body.log_text.strip()
@@ -159,15 +160,20 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         try: eids=json.loads(run.event_ids or "[]")
         except Exception: eids=[]
         rows=db.query(SecurityEvent).filter(SecurityEvent.id.in_(eids)).all() if eids else []
-        parts=[]
-        for e in rows: parts.append((e.evidence or e.event_type or "")[:1200])
+        raw_parts=[(e.evidence or e.event_type or "") for e in rows]
+        parts=[p[:1200] for p in raw_parts]
         if not parts:
             try: meta=json.loads(run.meta_json or "{}")
             except Exception: meta={}
             synth=meta.get("synthetic_evidence")
             if synth: parts=[synth]
         if not parts: raise HTTPException(status_code=422, detail="no evidence for that lab run")
-        log_text=" | ".join(parts)[:7000]
+        joined=" | ".join(parts)
+        # Disclose silent truncation: callers must know the model did
+        # not see the full evidence (per-part 1200 cap, 7000 total).
+        input_truncated=(any(len(p) > 1200 for p in raw_parts)
+                         or len(joined) > 7000) if raw_parts else False
+        log_text=joined[:7000]
         try:
             mm=json.loads(run.meta_json or "{}")
             if mm.get("is_synthetic"): log_text="[SYNTHETIC EVIDENCE] "+log_text
@@ -176,7 +182,11 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         from app.models.attact_assessment import SecurityEvent
         rows=db.query(SecurityEvent).filter(SecurityEvent.id.in_(body.event_ids)).all()
         if not rows: raise HTTPException(status_code=404, detail="no events for ids")
-        log_text=" | ".join((r.evidence or r.event_type or "")[:1200] for r in rows)[:7000]
+        raw_parts=[(r.evidence or r.event_type or "") for r in rows]
+        joined=" | ".join(p[:1200] for p in raw_parts)
+        input_truncated=(any(len(p) > 1200 for p in raw_parts)
+                         or len(joined) > 7000)
+        log_text=joined[:7000]
     else:
         raise HTTPException(status_code=422, detail="provide lab_run_id or event_ids or log_text")
     from app.services.classifier import classify_log, fuse_classification
@@ -203,7 +213,7 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         except Exception: pass
     if target_run is not None:
         _persist_run_assessment(db, target_run, inference, fused, inc, cand_id)
-    return {"log_text_preview": log_text[:800], "classification": inference, "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "ready": bool(status.ready) if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None)}
+    return {"log_text_preview": log_text[:800], "classification": inference, "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "ready": bool(status.ready) if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None), "input_truncated": input_truncated, "input_chars": len(log_text)}
 
 @router.post("/log-analyze")
 def log_analyze(body: LogAnalyzeBody, db: Session = Depends(get_db), user: User = Depends(require_admin)):

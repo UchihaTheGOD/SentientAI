@@ -119,3 +119,36 @@ def test_list_runs_limit_clamped(app, admin):
     out2 = list_runs(limit=500, db=s, user=admin)
     assert len(out2["items"]) == 50  # clamped to the cap
     s.close()
+
+
+def test_lab_analyze_reports_input_truncation(app, admin):
+    """Evidence assembled for analysis is capped (1200 per event,
+    7000 total). The response must disclose when the model did not
+    see the full evidence, and must not claim otherwise."""
+    from app.database import SessionLocal
+    from app.services.security_events import log_event
+    from tests.conftest import Client
+
+    s = SessionLocal()
+    long_ev = log_event(s, event_type="suspicious_input.sqli", category="sqli",
+                        severity="medium", source="middleware", route="/search",
+                        method="GET", http_status=200,
+                        evidence="x" * 2000)
+    short_ev = log_event(s, event_type="http.200", category=None,
+                         severity="low", source="middleware", route="/",
+                         method="GET", http_status=200, evidence="ok")
+    long_id, short_id = long_ev.id, short_ev.id
+    s.close()
+    c = _admin(app, admin)
+    r = c._client.post("/api/security/lab/analyze",
+                       json={"event_ids": [long_id]},
+                       headers={"X-CSRF-Token": c._csrf()})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["input_truncated"] is True
+    assert j["input_chars"] <= 7000
+    r2 = c._client.post("/api/security/lab/analyze",
+                        json={"event_ids": [short_id]},
+                        headers={"X-CSRF-Token": c._csrf()})
+    assert r2.status_code == 200
+    assert r2.json()["input_truncated"] is False
