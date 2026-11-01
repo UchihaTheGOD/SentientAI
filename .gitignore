@@ -82,3 +82,7 @@ Thumbs.db
 *~
 
 .venv-cyberllm/
+
+# MITRE ATT&CK bundle (55 MB, fetched by scripts/import_mitre.py).
+# The manifest, LICENSE.txt and README in app/data/mitre/ ARE tracked.
+app/data/mitre/enterprise-attack-*.json

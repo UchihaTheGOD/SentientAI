@@ -33,7 +33,69 @@
   </header>
 
   <section>
-    <h2>Controls</h2>
+    <h2 class="section-title">At a glance</h2>
+    <div class="dashboard-stats">
+      <a class="stat-card" href="/admin/logs">
+        <div class="stat-card-num">{{ stats.total_events }}</div>
+        <div class="stat-card-label">Events collected</div>
+      </a>
+      <a class="stat-card" href="/admin/automation?status=pending">
+        <div class="stat-card-num">{{ stats.awaiting_analysis }}</div>
+        <div class="stat-card-label">Awaiting analysis</div>
+      </a>
+      <a class="stat-card" href="/admin/automation?status=completed">
+        <div class="stat-card-num">{{ stats.completed }}</div>
+        <div class="stat-card-label">Analyzed</div>
+      </a>
+      <a class="stat-card" href="/admin/automation?status=failed">
+        <div class="stat-card-num">{{ stats.failed }}</div>
+        <div class="stat-card-label">Failed</div>
+      </a>
+      <a class="stat-card" href="/admin/security">
+        <div class="stat-card-num">{{ stats.likely_threats }}</div>
+        <div class="stat-card-label">Likely threats</div>
+      </a>
+      <a class="stat-card" href="/admin/training">
+        <div class="stat-card-num">{{ stats.candidates_generated }}</div>
+        <div class="stat-card-label">AI Review candidates</div>
+      </a>
+    </div>
+  </section>
+
+  {% if stats.intelligence %}
+  <section>
+    <h2 class="section-title">Attack intelligence</h2>
+    <p>
+      Dataset: MITRE ATT&CK® Enterprise {{ stats.intelligence.dataset_version or "not imported" }}
+      · Analyzed incidents: {{ stats.intelligence.analyzed_incidents }}
+      · Not mapped: {{ stats.intelligence.not_mapped }}
+      (analyzed incidents with no validatable technique — an honest unknown, not a zero).
+    </p>
+    {% if stats.intelligence.category_counts %}
+    <table class="data-table">
+      <thead><tr><th>Attack category</th><th class="num">Incidents</th></tr></thead>
+      <tbody>
+        {% for cat, count in stats.intelligence.category_counts.items() %}
+        <tr><td>{{ cat }}</td><td class="num">{{ count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if stats.intelligence.mitre_counts %}
+    <table class="data-table" style="margin-top:var(--space-md);">
+      <thead><tr><th>MITRE technique</th><th class="num">Incidents</th></tr></thead>
+      <tbody>
+        {% for tech_id, info in stats.intelligence.mitre_counts.items() %}
+        <tr><td>{{ tech_id }}{% if info.name %} — {{ info.name }}{% endif %}</td><td class="num">{{ info.count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section>
+    <h2 class="section-title">Controls</h2>
     <div class="filter-row">
       <form method="post" action="/admin/automation/start">
         {{ csrf_input() }}
@@ -65,8 +127,8 @@
   </section>
 
   <section>
-    <h2>Pipeline status (live backend data)</h2>
-    <table>
+    <h2 class="section-title">Pipeline status (live backend data)</h2>
+    <table class="data-table">
       <tbody>
         <tr><td>Automation enabled</td><td>{{ "yes" if stats.automation_enabled else "no" }}</td></tr>
         <tr><td>Worker status</td><td>{{ stats.worker.state }}{% if stats.worker.last_seen_at %} (last seen {{ stats.worker.last_seen_at }}){% endif %}</td></tr>
@@ -97,7 +159,7 @@
   </section>
 
   <section>
-    <h2>Analysis history (latest 50)</h2>
+    <h2 class="section-title">Analysis history (latest 50)</h2>
     <div class="filter-row">
       <a class="filter-chip {% if not filter_status %}filter-chip--active{% endif %}" href="/admin/automation">All</a>
       <a class="filter-chip {% if filter_status == 'pending' %}filter-chip--active{% endif %}" href="/admin/automation?status=pending">Pending</a>
@@ -106,10 +168,10 @@
       <a class="filter-chip {% if filter_status == 'failed' %}filter-chip--active{% endif %}" href="/admin/automation?status=failed">Failed</a>
     </div>
     {% if jobs %}
-    <table>
+    <table class="data-table">
       <thead>
         <tr>
-          <th>Job</th><th>Event</th><th>Status</th><th>Verdict</th><th>Score</th>
+          <th>Job</th><th>Event</th><th>Status</th><th>Verdict</th><th>Attack</th><th>MITRE</th><th>Score</th>
           <th>Incident</th><th>Review candidate</th><th>Excluded from review</th><th>Latency</th>
         </tr>
       </thead>
@@ -122,7 +184,9 @@
           </td>
           <td>{{ job.status }}{% if job.attempts %} (attempt {{ job.attempts }}/{{ job.max_attempts }}){% endif %}</td>
           <td>{{ job.verdict or "—" }}</td>
-          <td>{{ job.fused_score if job.fused_score is not none else "—" }}</td>
+          <td>{{ job.attack_type or "—" }}</td>
+          <td>{{ job.mitre_technique or "—" }}</td>
+          <td class="num">{{ job.fused_score if job.fused_score is not none else "—" }}</td>
           <td>
             {% if job.incident_id %}<a href="/admin/sentinel/incidents">#{{ job.incident_id }}</a> ({{ job.incident_outcome }}){% else %}—{% endif %}
           </td>
@@ -130,16 +194,18 @@
             {% if job.training_example_id %}<a href="/admin/training">#{{ job.training_example_id }}</a>{% else %}—{% endif %}
           </td>
           <td>{{ job.review_exclusion_reason or "—" }}</td>
-          <td>{% if job.latency_ms is not none %}{{ job.latency_ms }} ms{% else %}—{% endif %}</td>
+          <td class="num">{% if job.latency_ms is not none %}{{ job.latency_ms }} ms{% else %}—{% endif %}</td>
         </tr>
         {% if job.error_message %}
-        <tr><td colspan="9">Error: {{ job.error_message }}</td></tr>
+        <tr><td colspan="11">Error: {{ job.error_message }}</td></tr>
         {% endif %}
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <p>No analysis jobs yet. Events appear here automatically once they are logged.</p>
+    <div class="empty-state">
+      <p>No analysis jobs yet. Events appear here automatically once they are logged.</p>
+    </div>
     {% endif %}
   </section>
 

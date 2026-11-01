@@ -9,6 +9,7 @@
 <section style="background: var(--bg); padding-bottom: 0;">
   <div style="max-width:1200px;margin:0 auto;padding:0 var(--space-lg);">
     <div class="home-hero">
+      <p class="eyebrow" style="margin-bottom:var(--space-md);">A community for writers, thinkers, and builders</p>
       <h1>A place for ideas worth reading.</h1>
       <p>Discover essays, tutorials, projects, and perspectives from a community of curious people. Write something. Read something. Connect with someone.</p>
       <div class="hero-actions">
@@ -155,7 +156,7 @@
     </div>
 
     {% if not current_user %}
-    <div class="sidebar-widget card" style="background:linear-gradient(135deg,#ede9fe,#dbeafe);border-color:#c4b5fd;">
+    <div class="sidebar-widget card" style="background:var(--nx-accent-soft);border-color:var(--nx-accent-border);">
       <p style="font-size:0.9rem;margin-bottom:var(--space-md);line-height:1.6;"><strong>Join the community.</strong><br>Write, read, follow people you find interesting.</p>
       <a href="/register" class="btn btn-primary" style="width:100%;justify-content:center;">Create account — free</a>
       <div style="text-align:center;margin-top:var(--space-sm);font-size:0.8rem;color:var(--text-muted);">Already have one? <a href="/login" style="color:var(--accent);">Sign in</a></div>

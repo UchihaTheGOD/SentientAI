@@ -45,6 +45,30 @@ class SentinelIncident(Base):
     containment_until = Column(DateTime, nullable=True)
     containment_active = Column(Boolean, default=False)
     containment_meta = Column(Text, nullable=True)
+    # Attack intelligence (Stage 5, all nullable; old rows stay NULL =
+    # never analyzed by this layer). Added by the model-driven
+    # _run_migrations to existing tables; never backfilled by guessing.
+    # review_status tracks candidacy only: "unreviewed" default,
+    # "candidate" once a training candidate exists. The human verdict
+    # itself lives on the TrainingExample.
+    attack_category = Column(String(60), nullable=True, index=True)
+    attack_type = Column(String(60), nullable=True)
+    attack_subtype = Column(String(60), nullable=True)
+    classification_confidence = Column(String(20), nullable=True)
+    classification_evidence = Column(Text, nullable=True)  # JSON list of findings
+    attack_outcome = Column(String(40), nullable=True)  # attempted_or_detected | no_indicator | unknown
+    mitre_tactic = Column(String(80), nullable=True)
+    mitre_technique_id = Column(String(20), nullable=True, index=True)
+    mitre_technique_name = Column(String(120), nullable=True)
+    mitre_subtechnique_id = Column(String(20), nullable=True)
+    mitre_subtechnique_name = Column(String(120), nullable=True)
+    mitre_mapping_confidence = Column(String(20), nullable=True)
+    mitre_mapping_rationale = Column(Text, nullable=True)
+    mitre_dataset_version = Column(String(20), nullable=True)
+    model_version = Column(String(80), nullable=True)
+    adapter_version = Column(String(100), nullable=True)
+    analysis_timestamp = Column(DateTime, nullable=True)
+    review_status = Column(String(30), nullable=True, default="unreviewed")
 
 class TempBlock(Base):
     __tablename__ = "sentinel_temp_blocks"

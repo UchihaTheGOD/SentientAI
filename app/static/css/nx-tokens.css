@@ -1,0 +1,347 @@
+/* nx-tokens.css — SentientAI "Technical Editorial" design tokens (Stage 2).
+   Three tiers in spirit: primitives below are raw scales; the --nx-*
+   semantic tokens are what components reference; the legacy --* names
+   are mapped to the same values so existing pages shift palette without
+   a markup rewrite. Load AFTER theme.css and public.css so these values
+   win on equal specificity. Theme switching uses the existing mechanism:
+   <html data-theme="light|dark|system"> (see theme.js); the system case
+   is handled by the prefers-color-scheme block at the end, mirroring
+   theme.css's own selectors. */
+
+:root,
+:root[data-theme="light"] {
+  /* Primitives: violet scale (the ONE brand accent family) */
+  --nx-violet-50: #eef0fb;
+  --nx-violet-100: #dde1f7;
+  --nx-violet-200: #c3c8f0;
+  --nx-violet-300: #9d9ef0;
+  --nx-violet-500: #5a66ca;
+  --nx-violet-600: #4e58b4;
+  --nx-violet-700: #3f4a93;
+  /* Primitives: warm neutrals */
+  --nx-neutral-50: #faf9f6;
+  --nx-neutral-100: #f3f1ec;
+  --nx-neutral-200: #e7e2d9;
+  --nx-neutral-300: #d8d2c7;
+  --nx-neutral-400: #b3aa9d;
+  --nx-neutral-500: #8a837c;
+  --nx-neutral-600: #6b6560;
+  --nx-neutral-700: #4a453f;
+  --nx-neutral-800: #2c2823;
+  --nx-neutral-900: #1c1a17;
+
+  /* Semantic: surfaces and text (light, warm whites) */
+  --nx-canvas: #faf9f6;
+  --nx-surface: #ffffff;
+  --nx-surface-raised: #ffffff;
+  --nx-surface-inset: #f3f1ec;
+  --nx-border: #e7e2d9;
+  --nx-border-strong: #d8d2c7;
+  --nx-text: #1c1a17;
+  --nx-text-secondary: #4a453f;
+  --nx-text-muted: #6b6560;
+  --nx-text-faint: #8a837c;
+  --nx-nav-bg: rgba(250, 249, 246, 0.92);
+  --nx-footer-bg: #f3f1ec;
+  --nx-hover-bg: #f3f1ec;
+
+  /* Semantic: brand accent (restrained violet, punctuation only) */
+  --nx-accent: #5a66ca;
+  --nx-accent-hover: #4e58b4;
+  --nx-accent-soft: #eef0fb;
+  --nx-accent-border: #c3c8f0;
+  /* Text on top of the accent (white passes on the light accent, but
+     not on the lightened dark accent, so this flips per theme) */
+  --nx-on-accent: #ffffff;
+
+  /* Semantic: status (text + soft bg + border; never color alone) */
+  --nx-success: #157231;
+  --nx-success-soft: #e6f4ea;
+  --nx-success-border: #a3d9b1;
+  --nx-warning: #8a5c00;
+  --nx-warning-soft: #fef3c7;
+  --nx-warning-border: #f5d98b;
+  --nx-danger: #b91c1c;
+  --nx-danger-soft: #fee2e2;
+  --nx-danger-border: #f5b5b5;
+  --nx-info: #1d4ed8;
+  --nx-info-soft: #dbeafe;
+  --nx-info-border: #a8c6fa;
+
+  /* Semantic: inputs, focus, code, shadows */
+  --nx-input-bg: #ffffff;
+  --nx-input-border: #e7e2d9;
+  --nx-input-placeholder: #8a837c;
+  --nx-focus-ring: rgba(90, 102, 202, 0.35);
+  --nx-code-bg: #17171c;
+  --nx-code-fg: #e5e7eb;
+  --nx-code-border: #2a2a44;
+  --nx-shadow-sm: 0 1px 2px rgba(28, 26, 23, 0.06);
+  --nx-shadow: 0 4px 12px rgba(28, 26, 23, 0.08);
+  --nx-shadow-lg: 0 12px 32px rgba(28, 26, 23, 0.12);
+
+  /* Type scale (brief: 12/13/14/16/20/24/32/40) */
+  --nx-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --nx-font-serif: 'Merriweather', Georgia, serif;
+  --nx-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --nx-text-xs: 0.75rem;
+  --nx-text-sm: 0.8125rem;
+  --nx-text-base: 0.875rem;
+  --nx-text-md: 1rem;
+  --nx-text-lg: 1.25rem;
+  --nx-text-xl: 1.5rem;
+  --nx-text-2xl: 2rem;
+  --nx-text-3xl: 2.5rem;
+  --nx-leading-body: 1.5;
+  --nx-leading-heading: 1.2;
+
+  /* Spacing (4px base) and radii */
+  --nx-space-1: 4px;
+  --nx-space-2: 8px;
+  --nx-space-3: 12px;
+  --nx-space-4: 16px;
+  --nx-space-6: 24px;
+  --nx-space-8: 32px;
+  --nx-space-12: 48px;
+  --nx-space-16: 64px;
+  --nx-radius-sm: 4px;
+  --nx-radius-md: 6px;
+  --nx-radius-lg: 8px;
+  --nx-radius-pill: 9999px;
+
+  /* Layout */
+  --nx-header-h: 60px;
+  --nx-content-max: 1200px;
+  --nx-sidebar-w: 248px;
+  --nx-transition-fast: 150ms ease-out;
+
+  /* Legacy variable bridge: existing stylesheets read these names, so
+     mapping them here shifts legacy pages onto the new palette too. */
+  --bg: var(--nx-canvas);
+  --bg-primary: var(--nx-canvas);
+  --bg-secondary: var(--nx-surface-inset);
+  --bg-subtle: var(--nx-surface-inset);
+  --bg-surface: var(--nx-surface);
+  --bg-card: var(--nx-surface);
+  --bg-elevated: var(--nx-surface-raised);
+  --bg-overlay: rgba(255, 255, 255, 0.95);
+  --card-bg: var(--nx-surface);
+  --nav-bg: var(--nx-nav-bg);
+  --footer-bg: var(--nx-footer-bg);
+  --text-primary: var(--nx-text);
+  --text-secondary: var(--nx-text-secondary);
+  --text-muted: var(--nx-text-muted);
+  --text-faint: var(--nx-text-faint);
+  --border: var(--nx-border);
+  --border-light: var(--nx-surface-inset);
+  --border-color: var(--nx-border);
+  --border-strong: var(--nx-border-strong);
+  --brand: var(--nx-text);
+  --accent: var(--nx-accent);
+  --accent-color: var(--nx-accent);
+  --accent-light: var(--nx-violet-300);
+  --accent-hover: var(--nx-accent-hover);
+  --success: var(--nx-success);
+  --warning: var(--nx-warning);
+  --danger: var(--nx-danger);
+  --info: var(--nx-info);
+  --shadow-sm: var(--nx-shadow-sm);
+  --shadow: var(--nx-shadow);
+  --shadow-lg: var(--nx-shadow-lg);
+  --focus-ring: var(--nx-focus-ring);
+  --hover-bg: var(--nx-hover-bg);
+  --table-header-bg: transparent;
+  --input-bg: var(--nx-input-bg);
+  --input-border: var(--nx-input-border);
+  --input-placeholder: var(--nx-input-placeholder);
+  --code-bg: var(--nx-code-bg);
+  --code-fg: var(--nx-code-fg);
+  --code-border: var(--nx-code-border);
+  --font-sans: var(--nx-font-sans);
+  --font-serif: var(--nx-font-serif);
+  --font-mono: var(--nx-font-mono);
+  --space-xs: var(--nx-space-1);
+  --space-sm: var(--nx-space-2);
+  --space-md: var(--nx-space-4);
+  --space-lg: var(--nx-space-6);
+  --space-xl: var(--nx-space-8);
+  --space-2xl: var(--nx-space-12);
+  --space-3xl: var(--nx-space-16);
+  --radius-sm: var(--nx-radius-sm);
+  --radius: var(--nx-radius-lg);
+  --radius-lg: 12px;
+  --radius-pill: var(--nx-radius-pill);
+  --header-h: var(--nx-header-h);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --nx-canvas: #131210;
+  --nx-surface: #1c1b19;
+  --nx-surface-raised: #262421;
+  --nx-surface-inset: #232120;
+  --nx-border: #383531;
+  --nx-border-strong: #4a453f;
+  --nx-text: #ece9e4;
+  --nx-text-secondary: #c9c3bb;
+  --nx-text-muted: #a39d95;
+  --nx-text-faint: #857e76;
+  --nx-nav-bg: rgba(19, 18, 16, 0.92);
+  --nx-footer-bg: #1c1b19;
+  --nx-hover-bg: #262421;
+
+  --nx-accent: #9d9ef0;
+  --nx-accent-hover: #b6b7f7;
+  --nx-accent-soft: #26264d;
+  --nx-accent-border: #3d3f7a;
+  --nx-on-accent: #17171c;
+
+  --nx-success: #4ade80;
+  --nx-success-soft: #12291a;
+  --nx-success-border: #1a6b4a;
+  --nx-warning: #fbbf24;
+  --nx-warning-soft: #2a2010;
+  --nx-warning-border: #7a5a12;
+  --nx-danger: #f87171;
+  --nx-danger-soft: #2a1414;
+  --nx-danger-border: #7a2a2a;
+  --nx-info: #60a5fa;
+  --nx-info-soft: #121a2e;
+  --nx-info-border: #1e4a7a;
+
+  --nx-input-bg: #232120;
+  --nx-input-border: #383531;
+  --nx-input-placeholder: #857e76;
+  --nx-focus-ring: rgba(157, 158, 240, 0.35);
+  --nx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --nx-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --nx-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --nx-code-bg: #0f0f1e;
+  --nx-code-fg: #e5e7eb;
+  --nx-code-border: #2a2a44;
+
+  --bg: var(--nx-canvas);
+  --bg-primary: var(--nx-canvas);
+  --bg-secondary: var(--nx-surface-inset);
+  --bg-subtle: var(--nx-surface-inset);
+  --bg-surface: var(--nx-surface);
+  --bg-card: var(--nx-surface);
+  --bg-elevated: var(--nx-surface-raised);
+  --bg-overlay: rgba(19, 18, 16, 0.92);
+  --card-bg: var(--nx-surface);
+  --nav-bg: var(--nx-nav-bg);
+  --footer-bg: var(--nx-footer-bg);
+  --text-primary: var(--nx-text);
+  --text-secondary: var(--nx-text-secondary);
+  --text-muted: var(--nx-text-muted);
+  --text-faint: var(--nx-text-faint);
+  --border: var(--nx-border);
+  --border-light: var(--nx-surface-inset);
+  --border-color: var(--nx-border);
+  --border-strong: var(--nx-border-strong);
+  --brand: var(--nx-text);
+  --accent: var(--nx-accent);
+  --accent-color: var(--nx-accent);
+  --accent-light: var(--nx-violet-300);
+  --accent-hover: var(--nx-accent-hover);
+  --success: var(--nx-success);
+  --warning: var(--nx-warning);
+  --danger: var(--nx-danger);
+  --info: var(--nx-info);
+  --shadow-sm: var(--nx-shadow-sm);
+  --shadow: var(--nx-shadow);
+  --shadow-lg: var(--nx-shadow-lg);
+  --focus-ring: var(--nx-focus-ring);
+  --hover-bg: var(--nx-hover-bg);
+  --table-header-bg: var(--nx-surface-inset);
+  --input-bg: var(--nx-input-bg);
+  --input-border: var(--nx-input-border);
+  --input-placeholder: var(--nx-input-placeholder);
+  --code-bg: var(--nx-code-bg);
+  --code-fg: var(--nx-code-fg);
+  --code-border: var(--nx-code-border);
+  color-scheme: dark;
+}
+
+/* System preference: mirrors theme.css's own selector so the "system"
+   choice resolves the same way. Loaded after theme.css, so on ties
+   these values win. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --nx-canvas: #131210;
+    --nx-surface: #1c1b19;
+    --nx-surface-raised: #262421;
+    --nx-surface-inset: #232120;
+    --nx-border: #383531;
+    --nx-border-strong: #4a453f;
+    --nx-text: #ece9e4;
+    --nx-text-secondary: #c9c3bb;
+    --nx-text-muted: #a39d95;
+    --nx-text-faint: #857e76;
+    --nx-nav-bg: rgba(19, 18, 16, 0.92);
+    --nx-footer-bg: #1c1b19;
+    --nx-hover-bg: #262421;
+    --nx-accent: #9d9ef0;
+    --nx-accent-hover: #b6b7f7;
+    --nx-accent-soft: #26264d;
+    --nx-accent-border: #3d3f7a;
+    --nx-on-accent: #17171c;
+    --nx-success: #4ade80;
+    --nx-success-soft: #12291a;
+    --nx-success-border: #1a6b4a;
+    --nx-warning: #fbbf24;
+    --nx-warning-soft: #2a2010;
+    --nx-warning-border: #7a5a12;
+    --nx-danger: #f87171;
+    --nx-danger-soft: #2a1414;
+    --nx-danger-border: #7a2a2a;
+    --nx-info: #60a5fa;
+    --nx-info-soft: #121a2e;
+    --nx-info-border: #1e4a7a;
+    --nx-input-bg: #232120;
+    --nx-input-border: #383531;
+    --nx-input-placeholder: #857e76;
+    --nx-focus-ring: rgba(157, 158, 240, 0.35);
+    --nx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --nx-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --nx-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+    --bg: var(--nx-canvas);
+    --bg-primary: var(--nx-canvas);
+    --bg-secondary: var(--nx-surface-inset);
+    --bg-subtle: var(--nx-surface-inset);
+    --bg-surface: var(--nx-surface);
+    --bg-card: var(--nx-surface);
+    --bg-elevated: var(--nx-surface-raised);
+    --bg-overlay: rgba(19, 18, 16, 0.92);
+    --card-bg: var(--nx-surface);
+    --nav-bg: var(--nx-nav-bg);
+    --footer-bg: var(--nx-footer-bg);
+    --text-primary: var(--nx-text);
+    --text-secondary: var(--nx-text-secondary);
+    --text-muted: var(--nx-text-muted);
+    --text-faint: var(--nx-text-faint);
+    --border: var(--nx-border);
+    --border-light: var(--nx-surface-inset);
+    --border-color: var(--nx-border);
+    --border-strong: var(--nx-border-strong);
+    --brand: var(--nx-text);
+    --accent: var(--nx-accent);
+    --accent-color: var(--nx-accent);
+    --accent-light: var(--nx-violet-300);
+    --accent-hover: var(--nx-accent-hover);
+    --success: var(--nx-success);
+    --warning: var(--nx-warning);
+    --danger: var(--nx-danger);
+    --info: var(--nx-info);
+    --shadow-sm: var(--nx-shadow-sm);
+    --shadow: var(--nx-shadow);
+    --shadow-lg: var(--nx-shadow-lg);
+    --focus-ring: var(--nx-focus-ring);
+    --hover-bg: var(--nx-hover-bg);
+    --table-header-bg: var(--nx-surface-inset);
+    --input-bg: var(--nx-input-bg);
+    --input-border: var(--nx-input-border);
+    --input-placeholder: var(--nx-input-placeholder);
+    color-scheme: dark;
+  }
+}

@@ -14,7 +14,7 @@ from app.models.sentinel_incident import SentinelIncident, TempBlock, INCIDENT_S
 # CyberLLMv1 classification, model_b_* is always None (no second
 # model exists any more), and agreement is always None. No dual-model
 # inference is performed or implied by these columns.
-def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, classification: dict | None = None, prompt_path: str | None = None, containment_meta: str | None = None) -> SentinelIncident:
+def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused: dict, classification: dict | None = None, prompt_path: str | None = None, containment_meta: str | None = None, intelligence: dict | None = None, model_version: str | None = None, adapter_version: str | None = None) -> SentinelIncident:
     excerpt = (log_text or "")[:2000]
     evidence_json = json.dumps(fused.get("rules", {}).get("evidence", [])[:20])
     classifier_text = None
@@ -33,6 +33,13 @@ def create_incident(db: Session, *, log_text: str, ip_address: str | None, fused
         status="pending_review", severity=fused.get("fused_verdict") or "pending_review",
         containment_meta=containment_meta or "",
     )
+    if intelligence is not None:
+        # Stage 5: apply the intelligence record (never overwrites —
+        # this is a fresh row, so apply unconditionally here).
+        from app.services.attack_intelligence import apply_to_incident
+        apply_to_incident(inc, intelligence, force=True)
+        inc.model_version = model_version
+        inc.adapter_version = adapter_version
     db.add(inc); db.commit(); db.refresh(inc)
     return inc
 def update_review(db: Session, incident_id: int, reviewer_id: int, new_status: str, note: str | None = None) -> Optional[SentinelIncident]:

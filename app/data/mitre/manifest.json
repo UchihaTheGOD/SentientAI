@@ -1,0 +1,15 @@
+{
+  "dataset": "enterprise-attack",
+  "version": "20.0",
+  "bundle_file": "enterprise-attack-20.0.json",
+  "bundle_sha256": "81113ba98afa2928f3dcff62022539f7ce30c315c32e14422f11ff95ce534352",
+  "bundle_bytes": 55271014,
+  "bundle_modified": "2026-10-13T17:53:10.145Z",
+  "imported_at": "2026-11-01T10:49:08.316100+00:00",
+  "source_url": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-20.0.json",
+  "license_file": "LICENSE.txt",
+  "license_sha256": "738144f7fb054722a4ef9d3367c51710341dc12fc574c6ac3a41daaaecd8bf5e",
+  "attribution": "\u00a9 2026 The MITRE Corporation. This work is reproduced and distributed with the permission of The MITRE Corporation.",
+  "previous_versions": [],
+  "object_count": 26690
+}

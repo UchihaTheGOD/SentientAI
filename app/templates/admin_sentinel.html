@@ -14,7 +14,7 @@
       {% endfor %}
     </div>
     {% if incidents %}
-    <table class="data-table"><thead><tr><th>ID</th><th>When</th><th>Verdict</th><th>Score</th><th>IP</th><th>Status</th><th>Actions</th></tr></thead>
+    <table class="data-table"><thead><tr><th>ID</th><th>When</th><th>Verdict</th><th>Score</th><th>Attack</th><th>MITRE</th><th>IP</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
     {% for inc in incidents %}
     <tr>
@@ -22,6 +22,8 @@
       <td class="text-sm">{{ inc.created_at.strftime('%Y-%m-%d %H:%M') if inc.created_at else '' }}</td>
       <td>{{ inc.fused_verdict }}</td>
       <td>{{ inc.fused_score }}</td>
+      <td>{{ inc.attack_type or '—' }}</td>
+      <td>{{ inc.mitre_subtechnique_id or inc.mitre_technique_id or '—' }}</td>
       <td class="mono">{{ inc.ip_address or '—' }}</td>
       <td><span class="badge">{{ inc.status }}</span></td>
       <td>
@@ -32,7 +34,7 @@
         </form>
       </td>
     </tr>
-    <tr><td colspan="7" class="text-sm" style="max-width:600px;white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle)">{{ inc.log_excerpt or inc.log_text[:800] }}<div class="text-muted">A: {{ (inc.model_a_text or '')[:200] }} | B: {{ (inc.model_b_text or '')[:200] }}</div></td></tr>
+    <tr><td colspan="9" class="text-sm" style="max-width:600px;white-space:pre-wrap;word-break:break-word;background:var(--bg-subtle)">{{ inc.log_excerpt or inc.log_text[:800] }}<div class="text-muted">A: {{ (inc.model_a_text or '')[:200] }} | B: {{ (inc.model_b_text or '')[:200] }}</div>{% if inc.attack_category %}<div>Attack: {{ inc.attack_category }} / {{ inc.attack_type }} · Outcome: {{ inc.attack_outcome }} · Confidence: {{ inc.classification_confidence or '—' }}{% if inc.mitre_subtechnique_id or inc.mitre_technique_id %} · MITRE: {{ inc.mitre_subtechnique_id or inc.mitre_technique_id }}{% if inc.mitre_subtechnique_name or inc.mitre_technique_name %} ({{ inc.mitre_subtechnique_name or inc.mitre_technique_name }}){% endif %}{% else %} · MITRE: Not mapped{% endif %}</div>{% endif %}</td></tr>
     {% endfor %}
     </tbody></table>
     {% else %}<div class="empty-state"><p>No incidents.</p></div>{% endif %}

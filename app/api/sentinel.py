@@ -95,10 +95,25 @@ def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db)
     classification = classify_log(log_text, kind="log", max_new_tokens=req.max_new_tokens)
     fused = fuse_classification(log_text, classification)
     latency_ms = int((time.perf_counter() - start)*1000)
+    # Stage 5 intelligence: independent signal, never changes the
+    # verdict/score, never raises into this endpoint.
+    from app.services.attack_intelligence import build_intelligence
+    try:
+        from app.services.cyberllm_loader import get_status as _loader_status
+        _raw_status = _loader_status()
+        if isinstance(_raw_status, dict):
+            _model_version = _raw_status.get("base_model")
+            _adapter_version = _raw_status.get("adapter_sha256")
+        else:
+            _model_version = getattr(_raw_status, "base_model", None)
+            _adapter_version = getattr(_raw_status, "adapter_sha256", None)
+    except Exception:
+        _model_version = _adapter_version = None
+    intelligence = build_intelligence(log_text, metadata={"ip_address": ip_addr})
     incident = None
     if req.create_incident:
         try:
-            incident = incident_service.create_incident(db, log_text=log_text, ip_address=ip_addr, fused=fused, classification=classification)
+            incident = incident_service.create_incident(db, log_text=log_text, ip_address=ip_addr, fused=fused, classification=classification, intelligence=intelligence, model_version=_model_version, adapter_version=_adapter_version)
         except Exception as exc:
             logger.exception("incident create failed: %s", exc)
     # M2: an eligible incident from this path now enters the AI Review
@@ -128,8 +143,16 @@ def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db)
                 training_collection = "failed"
         elif not classification.get("parse_ok"):
             training_collection = "model_output_unparseable"
+    if incident is not None and training_example_id is not None \
+            and incident.review_status in (None, "unreviewed"):
+        try:
+            incident.review_status = "candidate"
+            db.commit()
+        except Exception as exc:
+            logger.exception("review_status update failed for incident %s", incident.id)
     return {
         "classification": classification,
+        "intelligence": intelligence,
         "rules": fused.get("rules"),
         "fusion": {"score": fused.get("fused_score"), "verdict": fused.get("fused_verdict"), "components": fused.get("components"), "note": fused.get("note")},
         "risk_score": fused.get("fused_score"),

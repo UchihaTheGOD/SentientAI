@@ -1,29 +1,36 @@
-{# Admin subnav, included at the top of each admin page's content. Active state
-   is derived from the request path so the current section is highlighted. These
-   links only appear inside pages already gated by require_admin — the server
-   enforces access on every /admin endpoint, the nav is just wayfinding. #}
+{# Admin sidebar navigation (Stage 3: vertical sidebar, not a chip row).
+   Included as the first child of .page-wrap on every admin page; the
+   layout stylesheet turns that wrap into a sidebar+content grid via
+   .page-wrap:has(> .admin-sidebar), so no admin page needed a markup
+   change. Active state is derived from the request path so the current
+   section is highlighted. These links only appear inside pages already
+   gated by require_admin — the server enforces access on every /admin
+   endpoint, the nav is just wayfinding. #}
 {% set path = request.url.path %}
-<nav class="filter-row admin-nav" aria-label="Admin sections">
-  <a class="filter-chip {% if path == '/admin' %}filter-chip--active{% endif %}"
+<aside class="admin-sidebar" aria-label="Admin sections">
+  <span class="admin-sidebar-label">Overview</span>
+  <a class="{% if path == '/admin' %}admin-sidebar--active{% endif %}"
      href="/admin">Dashboard</a>
-  <a class="filter-chip {% if path.startswith('/admin/users') %}filter-chip--active{% endif %}"
+  <span class="admin-sidebar-label">Manage</span>
+  <a class="{% if path.startswith('/admin/users') %}admin-sidebar--active{% endif %}"
      href="/admin/users">Users</a>
-  <a class="filter-chip {% if path.startswith('/admin/posts') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/posts') %}admin-sidebar--active{% endif %}"
      href="/admin/posts">Posts</a>
-  <a class="filter-chip {% if path.startswith('/admin/comments') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/comments') %}admin-sidebar--active{% endif %}"
      href="/admin/comments">Comments</a>
-  <a class="filter-chip {% if '/admin/moderation' in path %}filter-chip--active{% endif %}"
+  <a class="{% if '/admin/moderation' in path %}admin-sidebar--active{% endif %}"
      href="/admin/moderation">Reports</a>
-  <a class="filter-chip {% if path.startswith('/admin/training') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/training') %}admin-sidebar--active{% endif %}"
      href="/admin/training">AI review</a>
-  <a class="filter-chip {% if path.startswith('/admin/logs') %}filter-chip--active{% endif %}"
+  <span class="admin-sidebar-label">System</span>
+  <a class="{% if path.startswith('/admin/logs') %}admin-sidebar--active{% endif %}"
      href="/admin/logs">Logs</a>
-  <a class="filter-chip {% if path.startswith('/admin/settings') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/settings') %}admin-sidebar--active{% endif %}"
      href="/admin/settings">Settings</a>
-  <a class="filter-chip {% if path.startswith('/admin/security') or path.startswith('/admin/sentinel') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/security') or path.startswith('/admin/sentinel') %}admin-sidebar--active{% endif %}"
      href="/admin/security">Security</a>
-  <a class="filter-chip {% if path.startswith('/admin/security/reports') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/security/reports') %}admin-sidebar--active{% endif %}"
      href="/admin/security/reports/security">Security Reports</a>
-  <a class="filter-chip {% if path.startswith('/admin/automation') %}filter-chip--active{% endif %}"
+  <a class="{% if path.startswith('/admin/automation') %}admin-sidebar--active{% endif %}"
      href="/admin/automation">Automation</a>
-</nav>
+</aside>

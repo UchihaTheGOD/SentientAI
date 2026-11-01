@@ -1,0 +1,355 @@
+/* nx-components.css — SentientAI "Technical Editorial" reusable components
+   (Stage 2). All components reference --nx-* tokens; status is always
+   text + color together, never color alone. Loaded after public.css, so
+   on same-name classes (e.g. .btn, .card, .badge) these rules win.
+   Behaviour hooks are unchanged: .user-dropdown.open, .mobile-open,
+   .alert[data-autodismiss], .tab--active, .filter-chip--active. */
+
+:focus-visible {
+  outline: 2px solid var(--nx-accent);
+  outline-offset: 2px;
+}
+::selection { background: var(--nx-accent-soft); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Eyebrow: mono uppercase micro-label, used above titles and cards */
+.eyebrow {
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nx-text-muted);
+}
+
+/* Buttons: one primary action per view; the rest are quiet */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nx-space-2);
+  padding: 8px 16px;
+  border-radius: var(--nx-radius-md);
+  font-family: var(--nx-font-sans);
+  font-size: var(--nx-text-base);
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--nx-transition-fast), color var(--nx-transition-fast),
+    border-color var(--nx-transition-fast), box-shadow var(--nx-transition-fast);
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--nx-accent); color: var(--nx-on-accent); border-color: var(--nx-accent); }
+.btn-primary:hover { background: var(--nx-accent-hover); border-color: var(--nx-accent-hover); color: var(--nx-on-accent); }
+.btn-ghost { background: transparent; color: var(--nx-text-secondary); }
+.btn-ghost:hover { background: var(--nx-surface-inset); color: var(--nx-text); }
+.btn-outline { background: transparent; color: var(--nx-text); border-color: var(--nx-border-strong); }
+.btn-outline:hover { border-color: var(--nx-text-muted); background: var(--nx-surface-inset); }
+.btn-danger { background: var(--nx-danger); color: #ffffff; border-color: var(--nx-danger); }
+.btn-danger:hover { filter: brightness(0.92); }
+.btn-sm { padding: 6px 12px; font-size: var(--nx-text-sm); border-radius: var(--nx-radius-sm); }
+.btn-lg { padding: 12px 24px; font-size: var(--nx-text-md); }
+
+/* Cards: hairline border, no shadow by default */
+.card {
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-lg);
+  padding: var(--nx-space-6);
+}
+.card--inset { background: var(--nx-surface-inset); }
+
+/* Badges: pill + text + color. Legacy color names kept; semantic names
+   are the same values. Accent badges use the darker hover tone on the
+   soft background so small text keeps 4.5:1 contrast. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--nx-radius-pill);
+  font-size: var(--nx-text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.badge-green, .badge-success { background: var(--nx-success-soft); color: var(--nx-success); border-color: var(--nx-success-border); }
+.badge-yellow, .badge-warning { background: var(--nx-warning-soft); color: var(--nx-warning); border-color: var(--nx-warning-border); }
+.badge-red, .badge-danger { background: var(--nx-danger-soft); color: var(--nx-danger); border-color: var(--nx-danger-border); }
+.badge-purple { background: var(--nx-accent-soft); color: var(--nx-accent-hover); border-color: var(--nx-accent-border); }
+.badge-gray, .badge--muted { background: var(--nx-surface-inset); color: var(--nx-text-muted); border-color: var(--nx-border); }
+.badge-info { background: var(--nx-info-soft); color: var(--nx-info); border-color: var(--nx-info-border); }
+.badge--warning { background: var(--nx-warning-soft); color: var(--nx-warning); border-color: var(--nx-warning-border); }
+.badge--reason { background: var(--nx-danger-soft); color: var(--nx-danger); border-color: var(--nx-danger-border); }
+
+/* Alerts: full-width notices; [data-autodismiss] is handled by public.js */
+.alert {
+  padding: 12px 16px;
+  border-radius: var(--nx-radius-md);
+  border: 1px solid var(--nx-border);
+  background: var(--nx-surface);
+  color: var(--nx-text);
+  font-size: var(--nx-text-base);
+  line-height: var(--nx-leading-body);
+}
+.alert-success { background: var(--nx-success-soft); border-color: var(--nx-success-border); color: var(--nx-success); }
+.alert-error { background: var(--nx-danger-soft); border-color: var(--nx-danger-border); color: var(--nx-danger); }
+.alert-info { background: var(--nx-info-soft); border-color: var(--nx-info-border); color: var(--nx-info); }
+.alert-warning { background: var(--nx-warning-soft); border-color: var(--nx-warning-border); color: var(--nx-warning); }
+.alert-list { display: flex; flex-direction: column; gap: var(--nx-space-3); }
+
+/* Forms */
+.form-group { display: flex; flex-direction: column; gap: var(--nx-space-2); margin-bottom: var(--nx-space-4); }
+.form-label { font-size: var(--nx-text-sm); font-weight: 600; color: var(--nx-text); }
+.form-hint { font-size: var(--nx-text-sm); color: var(--nx-text-muted); }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--nx-radius-sm);
+  border: 1px solid var(--nx-input-border);
+  background: var(--nx-input-bg);
+  color: var(--nx-text);
+  font-family: var(--nx-font-sans);
+  font-size: var(--nx-text-base);
+  line-height: var(--nx-leading-body);
+  transition: border-color var(--nx-transition-fast), box-shadow var(--nx-transition-fast);
+}
+.form-input::placeholder, .form-textarea::placeholder { color: var(--nx-input-placeholder); }
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--nx-accent);
+  box-shadow: 0 0 0 3px var(--nx-focus-ring);
+  outline: none;
+}
+.form-input:disabled, .form-select:disabled, .form-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+.form-textarea { min-height: 120px; resize: vertical; }
+
+/* Tabs: underline style; the active tab is accent text + accent rule */
+.tabs { display: flex; gap: var(--nx-space-1); border-bottom: 1px solid var(--nx-border); overflow-x: auto; }
+.tab {
+  padding: 8px 12px;
+  font-size: var(--nx-text-base);
+  font-weight: 500;
+  color: var(--nx-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border-left: none; border-right: none; border-top: none;
+}
+.tab:hover { color: var(--nx-text); }
+.tab--active, .tab[aria-selected="true"] { color: var(--nx-accent); border-bottom-color: var(--nx-accent); }
+
+/* Chips and filter chips (admin sub-nav uses .filter-chip) */
+.chip, .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--nx-radius-pill);
+  border: 1px solid var(--nx-border);
+  background: var(--nx-surface);
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--nx-transition-fast), color var(--nx-transition-fast), border-color var(--nx-transition-fast);
+}
+.chip:hover, .filter-chip:hover { background: var(--nx-surface-inset); color: var(--nx-text); }
+.chip--active, .filter-chip--active {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-accent-hover);
+}
+.filter-row { display: flex; flex-wrap: wrap; gap: var(--nx-space-2); }
+
+/* Tables: semantic markup, numbers right-aligned via .num, sticky header,
+   40–56px rows, sort direction shown by the .sort-indicator */
+.data-table, .nx-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--nx-text-base);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-lg);
+  overflow: hidden;
+}
+.data-table th, .nx-table th {
+  text-align: left;
+  font-size: var(--nx-text-sm);
+  font-weight: 600;
+  color: var(--nx-text-muted);
+  background: var(--nx-surface-inset);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--nx-border);
+  white-space: nowrap;
+}
+.data-table td, .nx-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--nx-border);
+  color: var(--nx-text);
+  vertical-align: top;
+}
+.data-table tr:last-child td, .nx-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td, .nx-table tbody tr:hover td { background: var(--nx-hover-bg); }
+.data-table .num, .nx-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table th .sort-indicator, .nx-table th .sort-indicator { font-size: 0.75em; margin-left: 4px; }
+
+/* Pagination: numbered links with a visible current page */
+.pagination { display: flex; align-items: center; gap: var(--nx-space-1); flex-wrap: wrap; }
+.pagination a, .pagination span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--nx-radius-md);
+  border: 1px solid var(--nx-border);
+  background: var(--nx-surface);
+  color: var(--nx-text-secondary);
+  font-size: var(--nx-text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+.pagination a:hover { background: var(--nx-surface-inset); color: var(--nx-text); }
+.pagination .current, .pagination [aria-current="page"] {
+  background: var(--nx-accent);
+  border-color: var(--nx-accent);
+  color: var(--nx-on-accent);
+}
+.pagination .disabled { opacity: 0.5; pointer-events: none; }
+
+/* Modal and toast (presentation only; behaviour is wired per page) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 16px;
+  z-index: 300;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-lg);
+  width: 100%;
+  max-width: 560px;
+  max-height: 80vh;
+  overflow: auto;
+}
+.modal-header, .modal-body, .modal-footer { padding: 16px 24px; }
+.modal-header { border-bottom: 1px solid var(--nx-border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.modal-footer { border-top: 1px solid var(--nx-border); display: flex; gap: 8px; justify-content: flex-end; }
+.toast-stack { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 400; }
+.toast {
+  background: var(--nx-surface-raised);
+  border: 1px solid var(--nx-border);
+  border-left: 3px solid var(--nx-accent);
+  border-radius: var(--nx-radius-md);
+  box-shadow: var(--nx-shadow);
+  padding: 12px 16px;
+  font-size: var(--nx-text-base);
+  max-width: 360px;
+}
+.toast--success { border-left-color: var(--nx-success); }
+.toast--danger { border-left-color: var(--nx-danger); }
+.toast--warning { border-left-color: var(--nx-warning); }
+
+/* Skeleton loading blocks (static; no shimmer, so they stay calm) */
+.skeleton {
+  background: var(--nx-surface-inset);
+  border-radius: var(--nx-radius-md);
+  min-height: 16px;
+}
+.skeleton--title { height: 24px; width: 60%; }
+.skeleton--line { height: 16px; width: 100%; }
+.skeleton--card { height: 120px; width: 100%; }
+
+/* Empty states: say why, and give the next action */
+.empty-state {
+  text-align: center;
+  padding: var(--nx-space-12) var(--nx-space-6);
+  border: 1px dashed var(--nx-border-strong);
+  border-radius: var(--nx-radius-lg);
+  color: var(--nx-text-muted);
+}
+.empty-state h2, .empty-state h3 { color: var(--nx-text); margin-bottom: var(--nx-space-2); }
+.empty-state p { margin-bottom: var(--nx-space-4); }
+
+/* Page shell helpers and stat cards (used by admin + dashboard pages) */
+.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nx-space-4); margin-bottom: var(--nx-space-6); flex-wrap: wrap; }
+.page-title { font-size: var(--nx-text-xl); font-weight: 600; letter-spacing: -0.01em; line-height: var(--nx-leading-heading); color: var(--nx-text); }
+.page-lead { font-size: var(--nx-text-md); color: var(--nx-text-muted); line-height: var(--nx-leading-body); margin-top: var(--nx-space-1); }
+.section-title { font-size: var(--nx-text-lg); font-weight: 600; letter-spacing: -0.01em; line-height: var(--nx-leading-heading); color: var(--nx-text); }
+.stat-card {
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-lg);
+  padding: var(--nx-space-6);
+  text-decoration: none;
+  display: block;
+  transition: border-color var(--nx-transition-fast);
+}
+.stat-card:hover { border-color: var(--nx-border-strong); }
+.stat-card-num { font-size: var(--nx-text-2xl); font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--nx-text); line-height: 1.2; }
+.stat-card-label { font-size: var(--nx-text-sm); color: var(--nx-text-muted); margin-top: var(--nx-space-1); }
+
+/* Filter tabs (home categories, blog, explore, feed): chip-style row.
+   The active tab uses the accent wash, not white-on-accent, so it
+   stays readable in dark mode where the accent is lightened. */
+.filter-tabs { display: flex; gap: var(--nx-space-1); flex-wrap: wrap; margin-bottom: var(--nx-space-6); }
+.filter-tab {
+  padding: 7px 16px;
+  border-radius: var(--nx-radius-pill);
+  font-size: var(--nx-text-base);
+  font-weight: 500;
+  color: var(--nx-text-muted);
+  border: 1px solid var(--nx-border);
+  background: var(--nx-surface);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--nx-transition-fast), color var(--nx-transition-fast), border-color var(--nx-transition-fast);
+}
+.filter-tab:hover { color: var(--nx-text); background: var(--nx-surface-inset); }
+.filter-tab.active {
+  background: var(--nx-accent-soft);
+  border-color: var(--nx-accent-border);
+  color: var(--nx-accent-hover);
+}
+
+/* Tags (category chips on cards and sidebars) */
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--nx-radius-pill);
+  font-size: var(--nx-text-xs);
+  font-weight: 500;
+  background: var(--nx-surface-inset);
+  color: var(--nx-text-muted);
+  border: 1px solid var(--nx-border);
+  text-decoration: none;
+}
+.tag:hover { background: var(--nx-accent-soft); color: var(--nx-accent-hover); border-color: var(--nx-accent-border); }
+.tag--active { background: var(--nx-accent-soft); color: var(--nx-accent-hover); border-color: var(--nx-accent-border); }
+.tag--sm { padding: 2px 8px; }
+
+/* Home stat numbers use tabular figures like every other metric */
+.stat-item .stat-num { font-variant-numeric: tabular-nums; }
+
+/* Legacy bridge fixes: keep inherited components readable under the new
+   accent (white text on the lightened dark-mode accent fails contrast) */
+.theme-opt--active, .theme-opt[aria-pressed="true"] {
+  background: var(--nx-accent);
+  color: var(--nx-on-accent);
+  border-color: var(--nx-accent);
+}

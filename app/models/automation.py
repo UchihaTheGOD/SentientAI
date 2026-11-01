@@ -47,10 +47,11 @@ class AutomationJob(Base):
 
     ``verdict`` is the fused verdict (likely_benign / needs_review /
     likely_threat) or NULL when the event carried no analyzable text.
-    ``mitre_technique`` is intentionally NULL in this version: the
-    CyberLLMv1 classifier emits no MITRE technique IDs by design, and
-    this pipeline never invents one. The column exists so a future,
-    verified technique source can fill it without another migration.
+    ``mitre_technique`` holds the most specific locally validated
+    technique ID when the Stage 5 intelligence layer proposes one
+    (auth-pattern types, web-shell evidence), else NULL. The
+    CyberLLMv1 classifier itself still emits no MITRE IDs, and this
+    pipeline never invents one.
     """
 
     __tablename__ = "automation_jobs"
@@ -82,6 +83,12 @@ class AutomationJob(Base):
     evidence = Column(Text, nullable=True)
     recommended_action = Column(Text, nullable=True)
     mitre_technique = Column(String(40), nullable=True)
+    # Stage 5: primary attack classification for this job's analysis.
+    # mitre_technique holds the most specific validated ID (a
+    # sub-technique ID when applicable) — the column's documented
+    # "future verified source" has arrived; it is still never invented.
+    attack_category = Column(String(60), nullable=True)
+    attack_type = Column(String(60), nullable=True)
     decision_source = Column(String(40), nullable=True)
     assessment_json = Column(Text, nullable=True)
 
@@ -125,6 +132,8 @@ class AutomationJob(Base):
             "evidence": self.evidence,
             "recommended_action": self.recommended_action,
             "mitre_technique": self.mitre_technique,
+            "attack_category": self.attack_category,
+            "attack_type": self.attack_type,
             "decision_source": self.decision_source,
             "review_exclusion_reason": self.review_exclusion_reason,
             "incident_id": self.incident_id,

@@ -1,0 +1,337 @@
+/* nx-layout.css — SentientAI "Technical Editorial" shared layouts (Stage 2).
+   Covers the public shell (header / nav / main / footer) that every page
+   inherits from base_public.html, plus the admin shell classes that
+   Stage 3 admin pages will adopt (.admin-layout + .admin-sidebar).
+   Behaviour hooks are preserved exactly: #primary-nav.mobile-open is
+   the mobile menu panel, .user-dropdown.open is the user menu, and
+   .mobile-nav-toggle is hidden on desktop. Breakpoints: 1024 (sidebar
+   rail), 768 (nav drawer), 640 (compact). */
+
+.public-body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--nx-font-sans);
+  font-size: var(--nx-text-md);
+  line-height: var(--nx-leading-body);
+  color: var(--nx-text);
+  background: var(--nx-canvas);
+}
+
+/* Header: sticky, hairline border, translucent canvas (theme.css pins
+   the background to var(--nav-bg), which the tokens already redefine) */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--nx-header-h);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--nx-border);
+}
+.header-inner {
+  max-width: var(--nx-content-max);
+  margin: 0 auto;
+  padding: 0 var(--nx-space-6);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-6);
+}
+.site-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-2);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+  color: var(--nx-text);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.site-logo:hover { color: var(--nx-text); }
+.logo-mark { color: var(--nx-accent); font-size: 0.9rem; }
+
+/* Primary nav: quiet links, active link is accent text on accent wash */
+.primary-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-1);
+  flex: 1;
+}
+.nav-link {
+  padding: 6px 12px;
+  border-radius: var(--nx-radius-md);
+  font-size: var(--nx-text-base);
+  font-weight: 500;
+  color: var(--nx-text-secondary);
+  text-decoration: none;
+  transition: color var(--nx-transition-fast), background var(--nx-transition-fast);
+}
+.nav-link:hover { color: var(--nx-text); background: var(--nx-surface-inset); }
+.nav-link--active { color: var(--nx-accent-hover); background: var(--nx-accent-soft); }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+  margin-left: auto;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nx-radius-md);
+  color: var(--nx-text-muted);
+  position: relative;
+  transition: color var(--nx-transition-fast), background var(--nx-transition-fast);
+}
+.icon-btn:hover { color: var(--nx-text); background: var(--nx-surface-inset); }
+.notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--nx-radius-pill);
+  background: var(--nx-danger);
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* User menu: inset items with radius, not full-bleed rows */
+.user-menu-wrap { position: relative; }
+.user-avatar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--nx-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--nx-surface);
+  transition: border-color var(--nx-transition-fast);
+}
+.user-avatar-btn:hover { border-color: var(--nx-accent); }
+.user-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.user-avatar-placeholder {
+  font-size: var(--nx-text-sm);
+  font-weight: 600;
+  color: var(--nx-accent-hover);
+  background: var(--nx-accent-soft);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 200px;
+  background: var(--nx-surface);
+  border: 1px solid var(--nx-border);
+  border-radius: var(--nx-radius-lg);
+  box-shadow: var(--nx-shadow-lg);
+  padding: var(--nx-space-2);
+  display: none;
+  z-index: 200;
+}
+.user-dropdown.open { display: block; }
+.user-dropdown-header {
+  padding: var(--nx-space-2) var(--nx-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.user-dropdown-header strong { font-size: var(--nx-text-base); }
+.user-dropdown hr { border: none; border-top: 1px solid var(--nx-border); margin: var(--nx-space-2) 0; }
+.user-dropdown a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--nx-radius-md);
+  font-size: var(--nx-text-base);
+  color: var(--nx-text-secondary);
+  text-decoration: none;
+  transition: background var(--nx-transition-fast);
+}
+.user-dropdown a:hover { background: var(--nx-surface-inset); color: var(--nx-text); }
+.user-dropdown .admin-link { color: var(--nx-danger); }
+
+/* Mobile nav toggle: three bars, shown only below 768px */
+.mobile-nav-toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nx-radius-md);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.mobile-nav-toggle span { display: block; width: 18px; height: 2px; background: var(--nx-text); border-radius: 2px; }
+.mobile-nav-toggle:hover { background: var(--nx-surface-inset); }
+
+/* Main content and page wrap */
+.site-main { flex: 1; }
+.page-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--nx-space-8) var(--nx-space-6);
+}
+.page-wrap--narrow { max-width: 720px; }
+.page-wrap--wide { max-width: var(--nx-content-max); }
+
+/* Footer: quiet, border on top, no decorative weight */
+.site-footer {
+  border-top: 1px solid var(--nx-border);
+  background: var(--nx-footer-bg);
+  margin-top: var(--nx-space-16);
+}
+.footer-inner {
+  max-width: var(--nx-content-max);
+  margin: 0 auto;
+  padding: var(--nx-space-12) var(--nx-space-6);
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--nx-space-12);
+}
+.footer-brand .site-logo { margin-bottom: var(--nx-space-2); }
+.footer-brand p { font-size: var(--nx-text-base); color: var(--nx-text-muted); line-height: var(--nx-leading-body); }
+.footer-nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--nx-space-6); }
+.footer-col h4 {
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nx-text-muted);
+  margin-bottom: var(--nx-space-4);
+}
+.footer-col a { display: block; font-size: var(--nx-text-base); color: var(--nx-text-muted); margin-bottom: var(--nx-space-2); text-decoration: none; transition: color var(--nx-transition-fast); }
+.footer-col a:hover { color: var(--nx-accent); }
+.footer-bottom {
+  text-align: center;
+  padding: var(--nx-space-4) var(--nx-space-6);
+  border-top: 1px solid var(--nx-border);
+  font-size: var(--nx-text-sm);
+  color: var(--nx-text-faint);
+}
+
+/* Admin shell (Stage 3 adoption): sidebar + content grid. Below 1024px
+   the sidebar collapses to an icon rail; below 768px it becomes a
+   horizontal sub-nav above the content. */
+.admin-layout {
+  display: grid;
+  grid-template-columns: var(--nx-sidebar-w) 1fr;
+  gap: var(--nx-space-8);
+  align-items: start;
+}
+.admin-sidebar {
+  position: sticky;
+  top: calc(var(--nx-header-h) + var(--nx-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--nx-space-1);
+  padding-right: var(--nx-space-6);
+  border-right: 1px solid var(--nx-border);
+}
+.admin-sidebar a {
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-3);
+  padding: 8px 12px;
+  border-radius: var(--nx-radius-md);
+  font-size: var(--nx-text-base);
+  font-weight: 500;
+  color: var(--nx-text-secondary);
+  text-decoration: none;
+}
+.admin-sidebar a:hover { background: var(--nx-surface-inset); color: var(--nx-text); }
+.admin-sidebar a.admin-sidebar--active { background: var(--nx-accent-soft); color: var(--nx-accent-hover); }
+.admin-sidebar .admin-sidebar-label {
+  font-family: var(--nx-font-mono);
+  font-size: var(--nx-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nx-text-muted);
+  padding: var(--nx-space-4) 12px var(--nx-space-2);
+}
+.admin-content { min-width: 0; }
+
+/* Sidebar adoption without per-page rewrites: admin pages include the
+   sidebar partial as the first child of .page-wrap, so the wrap itself
+   becomes the grid. The sidebar spans all rows; every other child
+   stacks in the content column. */
+.page-wrap:has(> .admin-sidebar) {
+  display: grid;
+  grid-template-columns: var(--nx-sidebar-w) 1fr;
+  gap: var(--nx-space-8);
+  align-items: start;
+}
+.page-wrap:has(> .admin-sidebar) > .admin-sidebar {
+  grid-column: 1;
+  grid-row: 1 / -1;
+}
+.page-wrap:has(> .admin-sidebar) > :not(.admin-sidebar) {
+  grid-column: 2;
+  min-width: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .header-inner { gap: var(--nx-space-4); }
+  /* Sidebar links are text-only (no icons), so below 1024px the
+     sidebar becomes a horizontal sub-nav instead of an icon rail. */
+  .admin-layout { grid-template-columns: 1fr; }
+  .admin-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--nx-border);
+    padding-right: 0;
+    padding-bottom: var(--nx-space-4);
+  }
+  .admin-sidebar .admin-sidebar-label { display: none; }
+  .page-wrap:has(> .admin-sidebar) { grid-template-columns: 1fr; }
+  .page-wrap:has(> .admin-sidebar) > .admin-sidebar { grid-column: 1; grid-row: auto; }
+  .page-wrap:has(> .admin-sidebar) > :not(.admin-sidebar) { grid-column: 1; }
+}
+@media (max-width: 768px) {
+  .primary-nav { display: none; }
+  .primary-nav.mobile-open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: fixed;
+    top: var(--nx-header-h);
+    left: 0;
+    right: 0;
+    background: var(--nx-surface);
+    border-bottom: 1px solid var(--nx-border);
+    padding: var(--nx-space-4);
+    z-index: 99;
+    box-shadow: var(--nx-shadow);
+  }
+  .primary-nav.mobile-open .nav-link { padding: 10px 12px; }
+  .mobile-nav-toggle { display: flex; }
+}
+@media (max-width: 640px) {
+  .footer-inner { grid-template-columns: 1fr; }
+  .footer-nav { grid-template-columns: repeat(2, 1fr); }
+  .header-inner { padding: 0 var(--nx-space-4); }
+  .page-wrap { padding: var(--nx-space-6) var(--nx-space-4); }
+}

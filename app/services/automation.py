@@ -35,6 +35,11 @@ Design (no new infrastructure, by deliberate choice):
   templates, so untrusted log text is input data exactly as in the
   existing manual analyze paths, and no AI verdict triggers any
   blocking, remediation or auto-approval.
+* Stage 5 adds an independent intelligence signal (deterministic
+  rules + locally validated MITRE suggestions) recorded alongside —
+  never instead of — the AI verdict. It never changes the verdict or
+  score, and a rules-only record is never presented as an AI
+  assessment: the verdict column still comes from the model path.
 """
 
 from __future__ import annotations
@@ -51,6 +56,11 @@ from sqlalchemy import func
 from app.database import SessionLocal
 from app.models.attact_assessment import SecurityEvent
 from app.models.automation import AutomationJob, AutomationSettings
+from app.services.attack_intelligence import (
+    apply_to_incident,
+    build_intelligence,
+    job_assessment_intelligence,
+)
 from app.services.classifier import classify_log, fuse_classification
 from app.services.collection import collect_from_incident
 from app.services.incident_service import create_incident
@@ -322,6 +332,81 @@ def _fail_or_retry(db, job: AutomationJob, error: Exception) -> AutomationJob:
     return job
 
 
+def _event_metadata(event) -> dict:
+    """Structured fields for the intelligence layer: parsed meta_json
+    (string values, capped) overlaid with the event's own fields."""
+    meta: dict = {}
+    if getattr(event, "meta_json", None):
+        try:
+            parsed = json.loads(event.meta_json)
+            if isinstance(parsed, dict):
+                meta = {str(k): str(v)[:300] for k, v in parsed.items()}
+        except Exception:
+            meta = {}
+    meta.update({
+        "route": getattr(event, "route", None),
+        "method": getattr(event, "method", None),
+        "http_status": getattr(event, "http_status", None),
+        "event_type": getattr(event, "event_type", None),
+        "source": getattr(event, "source", None),
+    })
+    return {k: v for k, v in meta.items() if v is not None}
+
+
+def _is_auth_event(event) -> bool:
+    event_type = getattr(event, "event_type", "") or ""
+    return event_type.startswith("auth.") or "login" in event_type \
+        or getattr(event, "category", None) == "auth"
+
+
+def _recent_auth_attempts(db, event, window_hours: int = 24, limit: int = 200):
+    """Recent same-IP auth failures as classifier attempts, or None.
+
+    Returns None unless EVERY failure carries a usable user key
+    (user_id or a username in meta_json): collapsing unknown users
+    into one key would misclassify a multi-user burst as guessing.
+    Password hashes are never present in events, so multi-user bursts
+    classify as spraying at low confidence with the ambiguity stated
+    (see attack_rules.classify_auth_attempts)."""
+    if not _is_auth_event(event):
+        return None
+    event_type = getattr(event, "event_type", "") or ""
+    if "fail" not in event_type:
+        return None
+    ip = getattr(event, "ip_address", None)
+    if not ip:
+        return None
+    since = _utcnow_naive() - timedelta(hours=window_hours)
+    rows = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.event_type == event_type,
+                SecurityEvent.ip_address == ip,
+                SecurityEvent.created_at >= since)
+        .order_by(SecurityEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    attempts = []
+    for row in rows:
+        key = None
+        if getattr(row, "user_id", None) is not None:
+            key = str(row.user_id)
+        else:
+            try:
+                parsed = json.loads(row.meta_json or "{}")
+                if isinstance(parsed, dict):
+                    for field in ("username", "user", "login"):
+                        if parsed.get(field):
+                            key = str(parsed[field])
+                            break
+            except Exception:
+                key = None
+        if key is None:
+            return None
+        attempts.append({"username": key, "success": False})
+    return attempts or None
+
+
 def process_job(db, job: AutomationJob) -> AutomationJob:
     """Run one claimed job end to end. Raises RetryableError on failure."""
 
@@ -362,6 +447,26 @@ def process_job(db, job: AutomationJob) -> AutomationJob:
     verdict = fused.get("fused_verdict")
     score = fused.get("fused_score")
     parse_ok = bool(classification.get("parse_ok"))
+
+    # --- attack intelligence (Stage 5, independent signal) ---
+    # Never raises, never changes the verdict/score. Model/adapter
+    # versions come from the loader status (cheap metadata, no load).
+    try:
+        from app.services.cyberllm_loader import get_status as _loader_status
+        _raw_status = _loader_status()
+        if isinstance(_raw_status, dict):
+            _model_version = _raw_status.get("base_model")
+            _adapter_version = _raw_status.get("adapter_sha256")
+        else:
+            _model_version = getattr(_raw_status, "base_model", None)
+            _adapter_version = getattr(_raw_status, "adapter_sha256", None)
+    except Exception:
+        _model_version = _adapter_version = None
+    _auth_attempts = _recent_auth_attempts(db, event) if _is_auth_event(event) else None
+    # log_text is _event_log_text output: parts joined with " | ".
+    intelligence = build_intelligence(
+        log_text, _event_metadata(event), auth_attempts=_auth_attempts,
+        joined=True)
 
     # Bridge parity: a suspicious-by-construction event is never
     # suppressed as benign; floor it to needs_review like the bridge.
@@ -418,10 +523,18 @@ def process_job(db, job: AutomationJob) -> AutomationJob:
         incident = create_incident(
             db, log_text=log_text, ip_address=event.ip_address,
             fused=fused, classification=classification,
-            containment_meta=meta,
+            containment_meta=meta, intelligence=intelligence,
+            model_version=_model_version, adapter_version=_adapter_version,
         )
         outcome = "created"
         event.incident_id = incident.id
+
+    # Fill intelligence onto a linked incident only when it has none
+    # (e.g., created before Stage 5); never overwrite an analysis.
+    if incident is not None:
+        if apply_to_incident(incident, intelligence):
+            incident.model_version = _model_version
+            incident.adapter_version = _adapter_version
 
     # --- AI Review candidacy (gated; human approval still mandatory) ---
     exclusion = None
@@ -458,6 +571,12 @@ def process_job(db, job: AutomationJob) -> AutomationJob:
     if incident is not None and event.incident_id != incident.id:
         event.incident_id = incident.id
 
+    # Candidacy is the only thing that upgrades review_status: the
+    # human verdict itself still lives on the TrainingExample.
+    if incident is not None and training_example_id is not None \
+            and incident.review_status in (None, "unreviewed"):
+        incident.review_status = "candidate"
+
     summary = (classification.get("summary") or "").strip()
     reasoning = (classification.get("reasoning") or "").strip()
     explanation = " ".join(part for part in (summary, reasoning) if part)
@@ -483,6 +602,7 @@ def process_job(db, job: AutomationJob) -> AutomationJob:
         "inference_latency_ms": classification.get("latency_ms"),
         "output_tokens": classification.get("output_tokens"),
         "truncated": classification.get("truncated"),
+        "intelligence": job_assessment_intelligence(intelligence),
     }
 
     job.verdict = verdict
@@ -492,7 +612,12 @@ def process_job(db, job: AutomationJob) -> AutomationJob:
     job.explanation = explanation[:MAX_EXPLANATION_CHARS]
     job.evidence = evidence[:MAX_EVIDENCE_CHARS]
     job.recommended_action = str(recommended)[:MAX_EXPLANATION_CHARS]
-    job.mitre_technique = None  # classifier emits none; never invented
+    job.attack_category = intelligence.get("attack_category")
+    job.attack_type = intelligence.get("attack_type")
+    # The classifier itself still emits no MITRE IDs; this is the
+    # Stage 5 validated suggestion (most specific ID) or NULL.
+    job.mitre_technique = intelligence.get("mitre_subtechnique_id") \
+        or intelligence.get("mitre_technique_id")
     job.decision_source = classification.get("status")
     job.assessment_json = json.dumps(assessment, ensure_ascii=False)[:MAX_ASSESSMENT_CHARS]
     job.review_exclusion_reason = exclusion
@@ -679,9 +804,57 @@ def get_stats(db) -> dict:
                 "device": getattr(raw_status, "device", None),
             }
     worker = worker_state(db)
+    # Stage 5 intelligence summary (incident-level, analyzed only).
+    # "Not mapped" counts analyzed incidents whose rules found no
+    # validatable technique — an honest unknown, never a hidden zero.
+    intelligence_summary: dict = {
+        "analyzed_incidents": 0,
+        "category_counts": {},
+        "mitre_counts": {},
+        "not_mapped": 0,
+        "dataset_version": None,
+    }
+    try:
+        from app.models.sentinel_incident import SentinelIncident
+        from app.services.mitre_attack import MANIFEST_PATH as _mp
+        try:
+            intelligence_summary["dataset_version"] = json.loads(
+                _mp.read_text(encoding="utf-8")).get("version")
+        except Exception:
+            intelligence_summary["dataset_version"] = None
+        analyzed = db.query(SentinelIncident).filter(
+            SentinelIncident.analysis_timestamp.isnot(None))
+        intelligence_summary["analyzed_incidents"] = analyzed.count()
+        for category, count in db.query(
+                SentinelIncident.attack_category, func.count(SentinelIncident.id)
+        ).filter(SentinelIncident.analysis_timestamp.isnot(None),
+                 SentinelIncident.attack_category.isnot(None)
+                 ).group_by(SentinelIncident.attack_category).all():
+            intelligence_summary["category_counts"][category] = count
+        # Most specific ID: sub-technique when present, else technique.
+        _specific = func.coalesce(SentinelIncident.mitre_subtechnique_id,
+                                  SentinelIncident.mitre_technique_id)
+        _specific_name = func.coalesce(SentinelIncident.mitre_subtechnique_name,
+                                       SentinelIncident.mitre_technique_name)
+        for technique_id, technique_name, count in db.query(
+                _specific, _specific_name, func.count(SentinelIncident.id)
+        ).filter(SentinelIncident.analysis_timestamp.isnot(None),
+                 _specific.isnot(None)
+                 ).group_by(_specific, _specific_name
+                            ).order_by(func.count(SentinelIncident.id).desc()
+                                       ).limit(10).all():
+            intelligence_summary["mitre_counts"][technique_id] = {
+                "name": technique_name, "count": count}
+        intelligence_summary["not_mapped"] = db.query(
+            func.count(SentinelIncident.id)).filter(
+            SentinelIncident.analysis_timestamp.isnot(None),
+            SentinelIncident.mitre_technique_id.is_(None)).scalar() or 0
+    except Exception as exc:
+        logger.exception("automation intelligence summary failed: %s", exc)
     return {
         "automation_enabled": worker["enabled"],
         "worker": worker,
+        "intelligence": intelligence_summary,
         "total_events": total_events,
         "awaiting_analysis": awaiting,
         "processing": processing,
