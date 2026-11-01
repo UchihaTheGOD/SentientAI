@@ -433,3 +433,74 @@ are pre-existing working-tree churn and must NEVER be committed.
   reports/FULL_INTEGRATION_AUDIT.md.
 - Suites at this tree: root 643 passed + 1 skipped, lab 101
   passed + 1 skipped, 0 failed. Eval files NOT committed.
+
+## 2026-10-31 — AI Automation Center (UNCOMMITTED, not pushed)
+
+Built the automated security intelligence pipeline on
+feature/cyberllm-desktop-portable, extending the existing architecture
+(no rebuild, no new infrastructure, no model change):
+
+- New tables automation_jobs (persistent queue + durable
+  event->assessment->incident->candidate record) and
+  automation_settings (single-row switch/tuning). Created by init_db;
+  no existing table altered.
+- log_event now enqueues one pending job per persisted event
+  (best-effort, never breaks logging). Queueing is independent of the
+  worker switch, so a paused pipeline still shows its backlog.
+- Worker: single in-process daemon thread, one job at a time,
+  lazy model load (never per event), atomic claim, backoff retries
+  (30/60s, max 3) then failed for manual retry, stale-processing
+  reset on worker start, heartbeat in settings.
+- Assessment = existing classify_log + fuse_classification only.
+  Model-unavailable is retryable, never completed as rules-only.
+  MITRE technique stays NULL (classifier emits none; never invented).
+- Incident creation is idempotent (already-linked + bridge 10-min
+  hash dedup + containment_meta). Candidacy = bridge gate
+  (threat/review or score >= 35) + parseable output; exclusion reason
+  stored on every non-candidate job. Human approval still mandatory
+  (TrainingExample candidate, safe_to_train False).
+- M2 fixed: /api/sentinel/analyze now collects eligible incidents
+  into AI Review and reports training_example_id/training_collection
+  (created/not_eligible/model_output_unparseable/failed).
+- M1 fixed: POST /api/security/automation/scanner-import validates
+  scanner findings, stores them as source="desktop_scanner" events
+  with scan/finding identity in meta, auto-queues them, and rejects
+  duplicate scan_id imports. Scanner observations stay distinct from
+  runtime detections.
+- Dashboard: /admin/automation (real stats + history + controls) and
+  /api/security/automation/* (stats, jobs, start/pause/resume,
+  retry-failed, backfill, scanner-import). Admin-only + CSRF.
+- Audit event types added: automation.start/pause/resume/
+  retry-failed/backfill/scanner_import.
+- Out of scope / still open (documented, not silently dropped):
+  D1 for manual lab/sentinel paths, D2 lab persist failures, D4
+  assessment linkage display, D5 incident-column FK (the job row is
+  the durable edge for automation pairs), M5 (dashboard shows
+  unanalyzed-run count + link), M6 (event-driven jobs do not update
+  lab runs; lab_run_id analyze remains the run-update path).
+- Tests: tests/test_automation.py, 17 tests, all pass. Suites:
+  website 663 passed + 1 skipped, lab 101 passed + 1 skipped.
+  Eval files restored to pre-test hashes after suite runs.
+- NOT VERIFIED: real GPU inference (no GPU/weights in VM), Windows
+  exe behavior, worker behavior under uvicorn reload on Windows.
+  No commit, push, tag, or branch change made.
+
+## 2026-11-01 — Automation Center strict-review fixes R1 + R2 (UNCOMMITTED)
+
+- R1: eligible-but-failed collection now records exclusion
+  "collection_failed" (collect_from_incident returns None instead of
+  raising), and process_job re-asserts event.incident_id after the
+  candidacy step so collect's rollback cannot drop the event link.
+  Job row already recorded the same id; job and event stay linked.
+- R2: process_job now checks for an automation-created incident
+  already recorded for the same event (containment_meta
+  source_event_id + triggered_by "automation", window-free, oldest
+  first) before the 10-minute bridge dedup check, so worker recovery
+  reuses the orphan incident instead of creating a second one. The
+  triggered_by check excludes manual bridge incidents (they carry a
+  user id there). Training-example content-hash dedup unchanged.
+- Tests: 3 new regression tests in tests/test_automation.py
+  (collection-failure reason + link, crash-recovery orphan reuse,
+  duplicate-processing reuse); isolated file now 20 passed.
+  No low-priority items touched. No commit, push, tag, or branch
+  change made; publication still awaits separate approval.

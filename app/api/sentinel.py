@@ -101,6 +101,33 @@ def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db)
             incident = incident_service.create_incident(db, log_text=log_text, ip_address=ip_addr, fused=fused, classification=classification)
         except Exception as exc:
             logger.exception("incident create failed: %s", exc)
+    # M2: an eligible incident from this path now enters the AI Review
+    # workflow, like bridge/lab incidents do. The gate is the bridge
+    # gate (threat/review verdict, or score >= 35) plus a parseable
+    # model output; the outcome is reported, never silent (D3). A
+    # candidate is still only a candidate — human approval stays
+    # mandatory before any training use.
+    training_example_id = None
+    training_collection = "not_eligible"
+    if incident is not None:
+        from app.services.automation import is_review_eligible
+
+        if is_review_eligible(fused.get("fused_verdict"), fused.get("fused_score")) \
+                and classification.get("parse_ok"):
+            try:
+                from app.services.collection import collect_from_incident
+
+                example = collect_from_incident(db, incident)
+                if example is not None:
+                    training_example_id = example.id
+                    training_collection = "created"
+                else:
+                    training_collection = "failed"
+            except Exception as exc:
+                logger.exception("training collection failed for incident %s", incident.id)
+                training_collection = "failed"
+        elif not classification.get("parse_ok"):
+            training_collection = "model_output_unparseable"
     return {
         "classification": classification,
         "rules": fused.get("rules"),
@@ -108,6 +135,8 @@ def analyze(req: AnalyzeRequest, request: Request, db: Session = Depends(get_db)
         "risk_score": fused.get("fused_score"),
         "verdict": fused.get("fused_verdict"),
         "incident_id": getattr(incident, "id", None),
+        "training_example_id": training_example_id,
+        "training_collection": training_collection,
         "evidence": fused.get("rules", {}).get("evidence", []),
         "latency_ms": latency_ms,
         "inference_latency_ms": classification.get("latency_ms"),

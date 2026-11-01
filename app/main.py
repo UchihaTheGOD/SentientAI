@@ -70,7 +70,28 @@ async def lifespan(application: FastAPI):
     # block the application or its non-model features. The obsolete
     # Sentinel background warm-load was removed with its loader.
     # The endpoint POST /api/sentinel/readiness/load remains the explicit sync path.
+    # Automation worker: resume only if an admin left it enabled. This
+    # never loads the model (the worker loads it lazily on first job)
+    # and never blocks startup — a worker failure is logged, not fatal.
+    try:
+        from app.database import SessionLocal
+        from app.services import automation as _auto
+
+        _db = SessionLocal()
+        try:
+            if _auto.get_settings(_db).enabled:
+                _auto.start_worker()
+        finally:
+            _db.close()
+    except Exception:
+        logger.exception("automation worker auto-start failed; continuing without it")
     yield
+    try:
+        from app.services import automation as _auto
+
+        _auto.stop_worker()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +136,7 @@ def create_app() -> FastAPI:
     from app.api.admin_security import router as admin_security_router
     from app.api.security_lab_api import router as lab_router
     from app.api.theme import router as theme_router
+    from app.api.automation import router as automation_router
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
@@ -132,6 +154,7 @@ def create_app() -> FastAPI:
     application.include_router(lab_router)
     application.include_router(admin_security_router)
     application.include_router(theme_router)
+    application.include_router(automation_router)
     # alias /admin/reports/security -> same handler as /admin/security/reports/security (Phase 2 nav)
     from fastapi import Depends as _Dep
     from fastapi import Request as _Req2

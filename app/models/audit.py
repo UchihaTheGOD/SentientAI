@@ -48,6 +48,13 @@ AUDIT_EVENT_TYPES = (
     "admin.user_suspended",
     "admin.user_unsuspended",
     "admin.password_reset_initiated",
+    # AI Automation Center admin actions.
+    "automation.start",
+    "automation.pause",
+    "automation.resume",
+    "automation.retry_failed",
+    "automation.backfill",
+    "automation.scanner_import",
 )
 
 
