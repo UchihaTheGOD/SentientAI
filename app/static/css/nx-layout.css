@@ -335,3 +335,34 @@
   .header-inner { padding: 0 var(--nx-space-4); }
   .page-wrap { padding: var(--nx-space-6) var(--nx-space-4); }
 }
+
+/* ============================================================
+   Product homepage (index.html): hero grid + section container.
+   Tight top padding on purpose: the old centered hero pushed the
+   product below the fold behind 3xl of empty space.
+   ============================================================ */
+.product-hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: var(--nx-space-8);
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--nx-space-8) var(--space-lg) var(--nx-space-6);
+}
+.product-hero h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: var(--nx-text);
+  margin-bottom: var(--nx-space-4);
+}
+.product-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--nx-space-12) var(--space-lg) 0;
+}
+@media (max-width: 900px) {
+  .product-hero { grid-template-columns: 1fr; }
+}

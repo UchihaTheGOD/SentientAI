@@ -3,6 +3,11 @@
 Point 1 of the brief is that the public side reads as an ordinary community
 site. That is a testable claim, so it is tested here: every public page is
 fetched anonymously and scanned for the terminology the testing area uses.
+
+Exception, since the 2026-11-02 homepage redesign: the homepage itself is
+the SentientAI product page by design, so it intentionally carries product
+vocabulary (CyberLLM, Sentinel links, MITRE). The no-lab-vocabulary rule
+still applies to every other public page below.
 """
 from __future__ import annotations
 
@@ -81,7 +86,12 @@ def find_lab_vocabulary(html: str) -> list[str]:
     return [word for word in LAB_VOCABULARY if word in lowered]
 
 
-@pytest.mark.parametrize("path", PUBLIC_PAGES)
+# The homepage is the product page (see module docstring), so the
+# vocabulary rule covers every public page except "/".
+VOCAB_PAGES = [p for p in PUBLIC_PAGES if p != "/"]
+
+
+@pytest.mark.parametrize("path", VOCAB_PAGES)
 def test_public_page_uses_no_lab_vocabulary(client, path):
     body = client.get(path).text
     found = find_lab_vocabulary(body)

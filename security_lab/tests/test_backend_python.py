@@ -13,13 +13,26 @@ from ..backend import find_backend_python
 from ..config import Settings
 
 
-def _make_venv(root, name, nt=False):
-    if nt:
-        p = root / name / "Scripts" / "python.exe"
-    else:
-        p = root / name / "bin" / "python"
-    p.parent.mkdir(parents=True)
-    p.write_text("fake python")
+def _make_venv(root, name, nt=None):
+    """Create a fake venv python in ``root``.
+
+    ``nt`` defaults to the HOST layout (``Scripts/python.exe`` on
+    Windows, ``bin/python`` elsewhere). The old default was always
+    the POSIX layout, so on Windows the helper built venvs the
+    backend (which selects layout by runtime platform) never looks
+    in — three tests failed there while passing on Linux.
+
+    The path is built by a single assignment, never by branches
+    that could leave it unassigned: a helper edited to add a layout
+    branch without an ``else`` raises UnboundLocalError, which is
+    exactly the failure a manual edit introduced on V2.
+    """
+    if nt is None:
+        nt = os.name == "nt"
+    exe_rel = "Scripts/python.exe" if nt else "bin/python"
+    p = root / name / exe_rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("fake python", encoding="utf-8")
     return p
 
 
@@ -65,3 +78,21 @@ def test_windows_layout_prefers_dot_venv(tmp_path, monkeypatch):
     dot_py = _make_venv(tmp_path, ".venv", nt=True)
     _make_venv(tmp_path, "venv", nt=True)
     assert find_backend_python(Settings(), tmp_path) == dot_py
+
+
+def test_discovery_is_rooted_in_given_project(tmp_path):
+    """Discovery must never escape its given root to a real venv.
+
+    Regression for the V2 failure mode where tests appeared to
+    select the project's real .venv instead of the temporary test
+    environment: whatever root is passed in, the returned python
+    must live under that root.
+    """
+    other_root = tmp_path / "other"
+    _make_venv(other_root, ".venv")
+    dot_py = _make_venv(tmp_path, ".venv")
+    found = find_backend_python(Settings(), tmp_path)
+    assert found == dot_py
+    assert tmp_path in found.parents
+    assert found != other_root / ".venv" / (
+        "Scripts/python.exe" if os.name == "nt" else "bin/python")

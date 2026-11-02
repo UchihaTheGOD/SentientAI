@@ -199,6 +199,12 @@ Future retrain prerequisites (gated): properly labeled moderation dataset 80/20 
 .\venv\Scripts\python.exe -m pytest tests/test_e2e_review_queue_verification.py -v
 ```
 
+The Security Lab suite additionally needs the GUI dependencies
+(PySide6, requests, reportlab) in the same venv, or its GUI, PDF,
+and scanner-client tests fail on import — install them with
+`pip install -r security_lab/packaging/requirements-gui.txt` before
+running `security_lab/tests/`.
+
 Baseline on this branch (2026-10-28, Linux): website 635 passed + 1 skipped (pre-existing template skip); Security Lab 86 passed + 1 skipped (real-model smoke, needs weights + `CYBERLLM_REAL_MODEL=1`).
 
 Covers: auth, blog lifecycle, admin, moderation, csrf, sanitization, scoring, ATTACT scope/checks, classifier adapter and fusion, log validation, bruteforce regression, evaluation isolation, moderation contract, E2E review queue, Security Lab GUI smoke, scanner safety, client/admin API, model/evaluation, reports redaction. Passing unit tests does not establish detection accuracy.

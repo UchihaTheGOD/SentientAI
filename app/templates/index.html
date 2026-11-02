@@ -1,64 +1,162 @@
 {% extends "base_public.html" %}
-{% set user = current_user %}
-{% block title %}Sentient — Read. Write. Connect.{% endblock %}
-{% block meta_description %}A community platform for writers, thinkers, and builders. Discover ideas, share your work, and connect with people who care about the same things you do.{% endblock %}
+{% block title %}SentientAI — AI cybersecurity and threat intelligence{% endblock %}
+{% block meta_description %}SentientAI analyzes security logs and events with deterministic rules and CyberLLM, maps findings to MITRE ATT&CK, and queues them for human review. Security analysis with evidence, not verdicts without proof.{% endblock %}
+{% block footer_brand %}AI-powered cybersecurity and threat intelligence.{% endblock %}
 
 {% block content %}
 
-{# ---- Hero ---- #}
-<section style="background: var(--bg); padding-bottom: 0;">
-  <div style="max-width:1200px;margin:0 auto;padding:0 var(--space-lg);">
-    <div class="home-hero">
-      <p class="eyebrow" style="margin-bottom:var(--space-md);">A community for writers, thinkers, and builders</p>
-      <h1>A place for ideas worth reading.</h1>
-      <p>Discover essays, tutorials, projects, and perspectives from a community of curious people. Write something. Read something. Connect with someone.</p>
-      <div class="hero-actions">
-        {% if not current_user %}
-        <a href="/register" class="btn btn-primary btn-lg">Start reading — free</a>
-        <a href="/explore" class="btn btn-ghost btn-lg">Browse posts</a>
-        {% else %}
-        <a href="/write" class="btn btn-primary btn-lg">Write something</a>
-        <a href="/feed" class="btn btn-ghost btn-lg">Your feed</a>
+{# ---- Product hero: tight, two-column, no stats, no community framing ---- #}
+<section>
+  <div class="product-hero">
+    <div>
+      <p class="eyebrow" style="margin-bottom:var(--nx-space-4);">AI cybersecurity · Threat intelligence · Automation</p>
+      <h1>Turn security logs into threat intelligence.</h1>
+      <p class="page-lead" style="margin-bottom:var(--nx-space-6);">SentientAI analyzes logs, events, and scan findings with deterministic rules and CyberLLM, maps them to MITRE ATT&CK, and queues everything for human review. Evidence first — never a verdict without proof, never automation without a human.</p>
+      <div class="hero-actions" style="justify-content:flex-start;">
+        <a href="/sentinel" class="btn btn-primary btn-lg">Analyze a log</a>
+        <a href="#capabilities" class="btn btn-ghost btn-lg">See capabilities</a>
+        {% if current_user and current_user.is_admin %}
+        <a href="/admin/automation" class="btn btn-ghost btn-lg">Automation Center</a>
         {% endif %}
       </div>
     </div>
 
-    {# Stats #}
-    {% if total_posts > 0 or total_users > 0 %}
-    <div class="home-stats">
-      <div class="stat-item">
-        <span class="stat-num">{{ total_posts or 0 }}</span>
-        <span class="stat-label">Posts</span>
+    {# ---- Product preview: the shape of a real analysis, labeled as an example ---- #}
+    <div class="preview-panel" aria-label="Example analysis output">
+      <div class="preview-head">
+        <strong>Analysis preview</strong>
+        <span class="badge badge-gray">Example — not a live detection</span>
       </div>
-      <div class="stat-item">
-        <span class="stat-num">{{ total_users or 0 }}</span>
-        <span class="stat-label">Members</span>
+      <div class="preview-input">
+        <span class="preview-label">Input</span>
+        <code>GET /uploads/c99.php?cmd=id</code>
       </div>
-      <div class="stat-item">
-        <span class="stat-num">{{ categories|length }}</span>
-        <span class="stat-label">Topics</span>
+      <div class="preview-row">
+        <span class="preview-label">Classification</span>
+        <span><span class="badge badge-red">likely_threat</span> <span class="text-muted text-sm">(example)</span></span>
       </div>
+      <div class="preview-row">
+        <span class="preview-label">Attack type</span>
+        <span>Web shell indicator</span>
+      </div>
+      <div class="preview-row">
+        <span class="preview-label">MITRE ATT&CK</span>
+        <span>T1505.003 — Web Shell (Persistence)</span>
+      </div>
+      <div class="preview-row">
+        <span class="preview-label">Confidence</span>
+        <span>high — pattern signal, not proof</span>
+      </div>
+      <div class="preview-row">
+        <span class="preview-label">Evidence</span>
+        <code>c99.php with ?cmd= parameter</code>
+      </div>
+      <div class="preview-row">
+        <span class="preview-label">Review status</span>
+        <span>Unreviewed — human approval required before any training use</span>
+      </div>
+      <p class="preview-foot">This is the shape of a real analysis. Your own logs produce their own results — including Unknown when the evidence is insufficient. <a href="/sentinel">Try it with your own log →</a></p>
     </div>
-    {% endif %}
   </div>
 </section>
 
-{# ---- Categories ---- #}
-<section style="padding: var(--space-xl) 0; border-bottom: 1px solid var(--border);">
-  <div style="max-width:1200px;margin:0 auto;padding:0 var(--space-lg);">
-    <div style="overflow-x:auto;">
-      <div style="display:flex;gap:var(--space-sm);white-space:nowrap;padding-bottom:var(--space-xs);">
-        <a href="/explore" class="filter-tab active">All</a>
-        {% for cat in categories %}
-        <a href="/explore?category={{ cat|urlencode }}" class="filter-tab">{{ cat }}</a>
-        {% endfor %}
+{# ---- Pipeline: how an event becomes intelligence ---- #}
+<section class="product-section">
+  <h2 class="section-title">How it works</h2>
+  <ol class="pipeline-steps">
+    <li>
+      <span class="pipeline-num">01</span>
+      <div><strong>Collect</strong><p>Security events, desktop scanner findings, and manual analyses enter one queue.</p></div>
+    </li>
+    <li>
+      <span class="pipeline-num">02</span>
+      <div><strong>Detect</strong><p>Deterministic, explainable rules flag known patterns. A single suspicious string never proves exploitation.</p></div>
+    </li>
+    <li>
+      <span class="pipeline-num">03</span>
+      <div><strong>Reason</strong><p>CyberLLM (Qwen3-1.7B + v8 adapter) interprets ambiguity, explains evidence, and states uncertainty.</p></div>
+    </li>
+    <li>
+      <span class="pipeline-num">04</span>
+      <div><strong>Map &amp; review</strong><p>Findings are validated against the local MITRE ATT&CK v20.0 dataset and queued for human review. Nothing is auto-approved, auto-blocked, or auto-remediated.</p></div>
+    </li>
+  </ol>
+</section>
+
+{# ---- Capabilities: real features, real routes, no invented metrics ---- #}
+<section class="product-section" id="capabilities">
+  <h2 class="section-title">Capabilities</h2>
+  <p class="page-lead" style="margin-bottom:var(--nx-space-6);">Everything below exists in this application today. No demo data, no invented integrations.</p>
+  <div class="cap-grid">
+    <div class="card cap-card">
+      <h3>Security log analysis</h3>
+      <p>Paste a log, URL, or HTTP request. Get a classification with evidence, confidence, and reasoning.</p>
+      <div class="cap-cta"><a href="/sentinel">Analyze a log →</a></div>
+    </div>
+    <div class="card cap-card">
+      <h3>MITRE ATT&CK mapping</h3>
+      <p>Technique and sub-technique IDs validated against the local Enterprise ATT&CK v20.0 dataset. No live lookup per event; unknown stays Unknown.</p>
+      <div class="cap-cta"><a href="/sentinel">See mappings on an analysis →</a></div>
+    </div>
+    <div class="card cap-card">
+      <h3>Automation Center</h3>
+      <p>A persistent queue with a one-at-a-time worker, retry with backoff, and full job history.</p>
+      <div class="cap-cta">
+        {% if current_user and current_user.is_admin %}
+        <a href="/admin/automation">Open Automation Center →</a>
+        {% elif current_user %}
+        <span class="text-muted">Available to workspace admins</span>
+        {% else %}
+        <a href="/login">Sign in →</a>
+        {% endif %}
       </div>
+    </div>
+    <div class="card cap-card">
+      <h3>Human-reviewed training</h3>
+      <p>Eligible incidents become training candidates only with human approval. Nothing trains without a reviewer.</p>
+      <div class="cap-cta">
+        {% if current_user and current_user.is_admin %}
+        <a href="/admin/training">Open AI Review →</a>
+        {% elif current_user %}
+        <span class="text-muted">Available to workspace admins</span>
+        {% else %}
+        <a href="/login">Sign in →</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card cap-card">
+      <h3>Desktop Security Lab</h3>
+      <p>The Security Lab desktop app scans authorized targets and imports findings into the same queue.</p>
+      <div class="cap-cta"><span class="text-muted">Desktop app · CyberLLMv1 Security Lab</span></div>
     </div>
   </div>
 </section>
 
-{# ---- Main layout ---- #}
-<div class="home-layout" style="padding-top: var(--space-2xl);">
+{# ---- Honesty strip: the product guarantees, in plain language ---- #}
+<section class="product-section">
+  <h2 class="section-title">How SentientAI stays honest</h2>
+  <div class="honesty-strip">
+    <div><strong>Evidence over fluency.</strong><p>Every finding carries its evidence snippet.</p></div>
+    <div><strong>Unknown is an answer.</strong><p>Insufficient evidence is reported as Unknown / Not mapped, never forced.</p></div>
+    <div><strong>Humans decide.</strong><p>Training approval, blocking, and remediation are never automatic.</p></div>
+  </div>
+</section>
+
+{# ---- Community / blog: preserved as a section, no longer the identity ---- #}
+<section class="product-section" id="community">
+  <h2 class="section-title">From the community</h2>
+  <p class="page-lead" style="margin-bottom:var(--nx-space-6);">Essays, tutorials, and notes from the community.</p>
+  <div style="overflow-x:auto;">
+    <div style="display:flex;gap:var(--space-sm);white-space:nowrap;padding-bottom:var(--space-xs);">
+      <a href="/explore" class="filter-tab active">All</a>
+      {% for cat in categories %}
+      <a href="/explore?category={{ cat|urlencode }}" class="filter-tab">{{ cat }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<div class="home-layout" style="padding-top: var(--nx-space-6);">
 
   {# Main column #}
   <main>
@@ -157,7 +255,7 @@
 
     {% if not current_user %}
     <div class="sidebar-widget card" style="background:var(--nx-accent-soft);border-color:var(--nx-accent-border);">
-      <p style="font-size:0.9rem;margin-bottom:var(--space-md);line-height:1.6;"><strong>Join the community.</strong><br>Write, read, follow people you find interesting.</p>
+      <p style="font-size:0.9rem;margin-bottom:var(--space-md);line-height:1.6;"><strong>Create an account.</strong><br>Analyze logs, review findings, and write.</p>
       <a href="/register" class="btn btn-primary" style="width:100%;justify-content:center;">Create account — free</a>
       <div style="text-align:center;margin-top:var(--space-sm);font-size:0.8rem;color:var(--text-muted);">Already have one? <a href="/login" style="color:var(--accent);">Sign in</a></div>
     </div>
@@ -166,5 +264,17 @@
   </aside>
 
 </div>
+
+{# ---- Closing CTA: back to the real product ---- #}
+<section class="product-section" style="text-align:center;">
+  <h2>Start with a real analysis.</h2>
+  <p class="page-lead" style="margin-bottom:var(--nx-space-6);">Paste a log and see what SentientAI finds — with its evidence attached.</p>
+  <div class="hero-actions">
+    <a href="/sentinel" class="btn btn-primary btn-lg">Analyze a log</a>
+    {% if not current_user %}
+    <a href="/register" class="btn btn-ghost btn-lg">Create account</a>
+    {% endif %}
+  </div>
+</section>
 
 {% endblock %}
