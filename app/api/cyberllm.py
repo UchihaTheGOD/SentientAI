@@ -35,7 +35,11 @@ from pydantic import BaseModel, Field
 from app.models.user import User
 from app.services import cyberllm_rules
 from app.services.cyberllm_evidence import check_evidence
-from app.services.auth_service import get_current_user, require_admin
+from app.services.auth_service import (
+    get_current_user,
+    get_current_user_optional,
+    require_admin,
+)
 from app.template_env import templates
 from app.services.cyberllm_inference import ModelUnavailable, generate
 from app.services.cyberllm_loader import ensure_loaded, get_status
@@ -48,8 +52,19 @@ router = APIRouter(tags=["cyberllm"])
 
 
 @router.get("/api/cyberllm/readiness")
-def readiness():
+def readiness(user=Depends(get_current_user_optional)):
+    """Model liveness for everyone, operational detail for signed-in users.
+
+    The Security Lab's backend manager polls this endpoint without a
+    session only to learn whether the backend answers (HTTP 200), so
+    anonymous callers still get a 200 with liveness fields. Server
+    paths, device, memory, adapter hash, and load time are private
+    operational information and are returned only to authenticated
+    callers. Model loading itself stays admin-only.
+    """
     s = get_status()
+    if user is None:
+        return {"ready": s.ready, "state": s.state}
     return {
         "ready": s.ready,
         "state": s.state,

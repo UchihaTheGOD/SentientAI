@@ -1,42 +1,38 @@
-"""Homepage product identity: the home page must present SentientAI
-as a cybersecurity product, not a generic writing community.
+"""Homepage marketing identity: the public home page introduces the
+product; it is not the security dashboard.
 
-The blog is preserved as a section (featured/latest posts, categories,
-sidebar), but the hero, preview, and capabilities above it must be
-security-focused, link to real routes, and never invent metrics,
-threat counts, or capabilities.
+Since the public/private separation, the homepage must NOT show an
+analysis preview, pipeline internals, technique IDs, verdict badges,
+or any security record. Those live in the private security workspace
+(/sentinel). The homepage keeps marketing copy, capability descriptions
+in marketing terms, and the blog section. Signed-in users get a link
+to the security dashboard; anonymous visitors get Get started / Sign
+in / Explore only — never a security link.
 """
 
 from tests.conftest import _make_user
 
 
-def test_homepage_is_product_hero_not_community_hero(client):
+def test_homepage_is_marketing_not_dashboard(client):
     html = client.get("/").text
     assert "Turn security logs into threat intelligence." in html
-    assert "MITRE ATT&CK" in html
-    assert 'href="/sentinel"' in html
-    assert "Analysis preview" in html
-    assert "A place for ideas worth reading." not in html
-    assert "Start reading — free" not in html
-    assert "A community for writers, thinkers, and builders" not in html
-
-
-def test_homepage_preview_is_labeled_example_not_live_data(client):
-    html = client.get("/").text
-    assert "Example — not a live detection" in html
-    assert "T1505.003" in html
-    assert "Unreviewed" in html
+    assert "Analysis preview" not in html
+    assert "pipeline-steps" not in html
+    assert "T1505.003" not in html
+    assert "likely_threat" not in html
+    assert "How it works" not in html
     assert "threats blocked" not in html
     assert "attacks stopped" not in html
-
-
-def test_homepage_capabilities_link_to_real_routes(client):
-    html = client.get("/").text
-    assert 'id="capabilities"' in html
-    assert "Automation Center" in html
-    assert "Human-reviewed training" in html
-    assert "Desktop Security Lab" in html
+    assert 'href="/sentinel"' not in html
+    assert 'href="/register"' in html
     assert 'href="/explore"' in html
+
+
+def test_homepage_signed_in_links_to_security_dashboard(auth_client):
+    html = auth_client.get("/").text
+    assert 'href="/sentinel"' in html
+    assert "Analysis preview" not in html
+    assert "T1505.003" not in html
 
 
 def test_homepage_admin_sees_automation_link_anonymous_does_not(client):

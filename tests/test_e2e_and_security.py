@@ -83,8 +83,11 @@ def test_e2e_cyberllm_oversize_input_is_rejected(admin_client):
     assert r.status_code == 422
 
 
-def test_e2e_classifier_readiness_is_honest(client):
-    r = client.get("/api/sentinel/readiness")
+def test_e2e_classifier_readiness_is_honest(auth_client):
+    # Full readiness detail is authenticated-only since the
+    # public/private separation; anonymous callers get liveness only
+    # (see tests/test_app_separation.py).
+    r = auth_client.get("/api/sentinel/readiness")
     assert r.status_code == 200
     body = r.json()
     assert body["ready"] is False

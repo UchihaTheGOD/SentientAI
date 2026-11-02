@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+{# Private security workspace chrome. Deliberately NOT base_public.html:
+   the security application has its own navigation and identity, and
+   must never render public-site chrome (Explore/Blog/Community) around
+   security content. Every page using this base is login-gated
+   server-side; the nav below is wayfinding only, exactly like the
+   admin sidebar — admin links render only for admins, and every
+   /admin endpoint enforces require_admin itself. #}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SentientAI Security — Private workspace{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}SentientAI private security workspace.{% endblock %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@0,400;0,500&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#ffffff">
+    <script src="/static/js/theme_bootstrap.js"></script>
+    <link rel="stylesheet" href="/static/css/theme.css">
+    <link rel="stylesheet" href="/static/css/public.css">
+    <link rel="stylesheet" href="/static/css/nx-tokens.css">
+    <link rel="stylesheet" href="/static/css/nx-components.css">
+    <link rel="stylesheet" href="/static/css/nx-layout.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="public-body">
+
+    <header class="security-header">
+        <div class="security-header-inner">
+            <a href="/sentinel" class="site-logo">
+                <span class="logo-mark">◆</span>
+                <span class="logo-text">SentientAI Security</span>
+            </a>
+            {% include "partials/security_nav.html" %}
+            <div class="security-header-actions">
+                {% include "partials/theme_selector.html" %}
+                {% if current_user %}
+                <span class="text-sm text-muted">{{ current_user.display }}</span>
+                <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main class="site-main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="security-footer">
+        <div class="footer-inner">
+            <p>SentientAI Security — private workspace. Security activity here is never shown on public pages.</p>
+            <a href="/">Back to the public site →</a>
+        </div>
+    </footer>
+
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/public.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

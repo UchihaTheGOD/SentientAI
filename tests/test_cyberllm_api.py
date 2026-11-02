@@ -29,8 +29,11 @@ def _post(c, url, payload):
     return c._client.post(url, json=payload, headers={"X-CSRF-Token": c._csrf()})
 
 
-def test_readiness_reports_state(client):
-    r = client._client.get("/api/cyberllm/readiness")
+def test_readiness_reports_state(auth_client):
+    # Full operational detail is authenticated-only since the
+    # public/private separation; anonymous callers get liveness only
+    # (see tests/test_app_separation.py).
+    r = auth_client._client.get("/api/cyberllm/readiness")
     assert r.status_code == 200
     body = r.json()
     assert body["state"] in ("not_loaded", "loaded", "failed")
@@ -38,8 +41,8 @@ def test_readiness_reports_state(client):
     assert "adapter_sha256" in body
 
 
-def test_readiness_reports_quantization(client):
-    r = client._client.get("/api/cyberllm/readiness")
+def test_readiness_reports_quantization(auth_client):
+    r = auth_client._client.get("/api/cyberllm/readiness")
     assert r.status_code == 200
     assert r.json()["quantization"] in ("none", "8bit")
 

@@ -366,3 +366,55 @@
 @media (max-width: 900px) {
   .product-hero { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Marketing hero (single column) + private security workspace
+   chrome (base_security.html). Token-driven, so both themes hold.
+   ============================================================ */
+.product-hero--single { grid-template-columns: 1fr; }
+.security-header {
+  background: var(--nx-surface);
+  border-bottom: 1px solid var(--nx-border);
+}
+.security-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--nx-space-4) var(--space-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-6);
+  flex-wrap: wrap;
+}
+.security-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--nx-space-4);
+}
+.security-nav {
+  display: flex;
+  gap: var(--nx-space-4);
+  flex-wrap: wrap;
+}
+.security-nav a {
+  color: var(--nx-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+.security-nav a:hover { color: var(--nx-text); }
+.security-nav a.security-nav--active { color: var(--nx-accent); }
+.security-footer {
+  border-top: 1px solid var(--nx-border);
+  margin-top: var(--nx-space-12);
+}
+.security-footer .footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--nx-space-6) var(--space-lg);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nx-space-4);
+  flex-wrap: wrap;
+  color: var(--nx-text-muted);
+  font-size: var(--nx-text-sm);
+}

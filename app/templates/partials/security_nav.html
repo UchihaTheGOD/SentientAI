@@ -1,0 +1,21 @@
+{# Security workspace navigation. Rendered only inside base_security.html,
+   whose pages are all login-gated server-side. Admin links render only
+   for admins, and every /admin endpoint enforces require_admin itself —
+   this nav hides nothing that the server would otherwise allow. #}
+{% set path = request.url.path %}
+<nav class="security-nav" aria-label="Security sections">
+  <a class="{% if path == '/sentinel' %}security-nav--active{% endif %}"
+     href="/sentinel">Sentinel</a>
+  <a class="{% if path == '/cyberllm' %}security-nav--active{% endif %}"
+     href="/cyberllm">CyberLLM</a>
+  {% if current_user and current_user.is_admin %}
+  <a class="{% if path.startswith('/admin/sentinel') %}security-nav--active{% endif %}"
+     href="/admin/sentinel/incidents">Incidents</a>
+  <a class="{% if path.startswith('/admin/automation') %}security-nav--active{% endif %}"
+     href="/admin/automation">Automation</a>
+  <a class="{% if path.startswith('/admin/training') %}security-nav--active{% endif %}"
+     href="/admin/training">AI review</a>
+  <a class="{% if path.startswith('/admin/security') %}security-nav--active{% endif %}"
+     href="/admin/security">Security</a>
+  {% endif %}
+</nav>

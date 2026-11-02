@@ -5,82 +5,30 @@
 
 {% block content %}
 
-{# ---- Product hero: tight, two-column, no stats, no community framing ---- #}
+{# ---- Marketing hero: product introduction only. No analysis output,
+   no pipeline internals, no security records — those live in the
+   private security workspace (/sentinel), never on a public page. ---- #}
 <section>
-  <div class="product-hero">
-    <div>
-      <p class="eyebrow" style="margin-bottom:var(--nx-space-4);">AI cybersecurity · Threat intelligence · Automation</p>
+  <div class="product-hero product-hero--single">
+    <div style="max-width:720px;">
+      <p class="eyebrow" style="margin-bottom:var(--nx-space-4);">AI cybersecurity · Threat intelligence</p>
       <h1>Turn security logs into threat intelligence.</h1>
       <p class="page-lead" style="margin-bottom:var(--nx-space-6);">SentientAI analyzes logs, events, and scan findings with deterministic rules and CyberLLM, maps them to MITRE ATT&CK, and queues everything for human review. Evidence first — never a verdict without proof, never automation without a human.</p>
       <div class="hero-actions" style="justify-content:flex-start;">
-        <a href="/sentinel" class="btn btn-primary btn-lg">Analyze a log</a>
-        <a href="#capabilities" class="btn btn-ghost btn-lg">See capabilities</a>
-        {% if current_user and current_user.is_admin %}
+        {% if current_user %}
+        <a href="/sentinel" class="btn btn-primary btn-lg">Open security dashboard</a>
+        <a href="/explore" class="btn btn-ghost btn-lg">Explore posts</a>
+        {% if current_user.is_admin %}
         <a href="/admin/automation" class="btn btn-ghost btn-lg">Automation Center</a>
+        {% endif %}
+        {% else %}
+        <a href="/register" class="btn btn-primary btn-lg">Get started</a>
+        <a href="/explore" class="btn btn-ghost btn-lg">Explore posts</a>
+        <a href="/login" class="btn btn-ghost btn-lg">Sign in</a>
         {% endif %}
       </div>
     </div>
-
-    {# ---- Product preview: the shape of a real analysis, labeled as an example ---- #}
-    <div class="preview-panel" aria-label="Example analysis output">
-      <div class="preview-head">
-        <strong>Analysis preview</strong>
-        <span class="badge badge-gray">Example — not a live detection</span>
-      </div>
-      <div class="preview-input">
-        <span class="preview-label">Input</span>
-        <code>GET /uploads/c99.php?cmd=id</code>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">Classification</span>
-        <span><span class="badge badge-red">likely_threat</span> <span class="text-muted text-sm">(example)</span></span>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">Attack type</span>
-        <span>Web shell indicator</span>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">MITRE ATT&CK</span>
-        <span>T1505.003 — Web Shell (Persistence)</span>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">Confidence</span>
-        <span>high — pattern signal, not proof</span>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">Evidence</span>
-        <code>c99.php with ?cmd= parameter</code>
-      </div>
-      <div class="preview-row">
-        <span class="preview-label">Review status</span>
-        <span>Unreviewed — human approval required before any training use</span>
-      </div>
-      <p class="preview-foot">This is the shape of a real analysis. Your own logs produce their own results — including Unknown when the evidence is insufficient. <a href="/sentinel">Try it with your own log →</a></p>
-    </div>
   </div>
-</section>
-
-{# ---- Pipeline: how an event becomes intelligence ---- #}
-<section class="product-section">
-  <h2 class="section-title">How it works</h2>
-  <ol class="pipeline-steps">
-    <li>
-      <span class="pipeline-num">01</span>
-      <div><strong>Collect</strong><p>Security events, desktop scanner findings, and manual analyses enter one queue.</p></div>
-    </li>
-    <li>
-      <span class="pipeline-num">02</span>
-      <div><strong>Detect</strong><p>Deterministic, explainable rules flag known patterns. A single suspicious string never proves exploitation.</p></div>
-    </li>
-    <li>
-      <span class="pipeline-num">03</span>
-      <div><strong>Reason</strong><p>CyberLLM (Qwen3-1.7B + v8 adapter) interprets ambiguity, explains evidence, and states uncertainty.</p></div>
-    </li>
-    <li>
-      <span class="pipeline-num">04</span>
-      <div><strong>Map &amp; review</strong><p>Findings are validated against the local MITRE ATT&CK v20.0 dataset and queued for human review. Nothing is auto-approved, auto-blocked, or auto-remediated.</p></div>
-    </li>
-  </ol>
 </section>
 
 {# ---- Capabilities: real features, real routes, no invented metrics ---- #}
@@ -91,16 +39,28 @@
     <div class="card cap-card">
       <h3>Security log analysis</h3>
       <p>Paste a log, URL, or HTTP request. Get a classification with evidence, confidence, and reasoning.</p>
-      <div class="cap-cta"><a href="/sentinel">Analyze a log →</a></div>
+      <div class="cap-cta">
+        {% if current_user %}
+        <a href="/sentinel">Open security dashboard →</a>
+        {% else %}
+        <a href="/register">Get started →</a>
+        {% endif %}
+      </div>
     </div>
     <div class="card cap-card">
       <h3>MITRE ATT&CK mapping</h3>
-      <p>Technique and sub-technique IDs validated against the local Enterprise ATT&CK v20.0 dataset. No live lookup per event; unknown stays Unknown.</p>
-      <div class="cap-cta"><a href="/sentinel">See mappings on an analysis →</a></div>
+      <p>Findings are mapped to MITRE ATT&CK techniques from a local dataset. When the evidence is insufficient, the result stays Unknown.</p>
+      <div class="cap-cta">
+        {% if current_user %}
+        <a href="/sentinel">Open security dashboard →</a>
+        {% else %}
+        <a href="/register">Get started →</a>
+        {% endif %}
+      </div>
     </div>
     <div class="card cap-card">
       <h3>Automation Center</h3>
-      <p>A persistent queue with a one-at-a-time worker, retry with backoff, and full job history.</p>
+      <p>Security events flow into a managed analysis queue. Nothing is approved, blocked, or used for training without a human review.</p>
       <div class="cap-cta">
         {% if current_user and current_user.is_admin %}
         <a href="/admin/automation">Open Automation Center →</a>
@@ -265,14 +225,16 @@
 
 </div>
 
-{# ---- Closing CTA: back to the real product ---- #}
+{# ---- Closing CTA ---- #}
 <section class="product-section" style="text-align:center;">
-  <h2>Start with a real analysis.</h2>
-  <p class="page-lead" style="margin-bottom:var(--nx-space-6);">Paste a log and see what SentientAI finds — with its evidence attached.</p>
+  <h2>Start with SentientAI.</h2>
+  <p class="page-lead" style="margin-bottom:var(--nx-space-6);">Create an account to analyze logs, review findings, and follow the community.</p>
   <div class="hero-actions">
-    <a href="/sentinel" class="btn btn-primary btn-lg">Analyze a log</a>
-    {% if not current_user %}
-    <a href="/register" class="btn btn-ghost btn-lg">Create account</a>
+    {% if current_user %}
+    <a href="/sentinel" class="btn btn-primary btn-lg">Open security dashboard</a>
+    {% else %}
+    <a href="/register" class="btn btn-primary btn-lg">Create account</a>
+    <a href="/explore" class="btn btn-ghost btn-lg">Explore posts</a>
     {% endif %}
   </div>
 </section>
