@@ -70,6 +70,14 @@ class Settings:
     base_model: str = EXPECTED_BASE_MODEL
     base_revision: str = EXPECTED_BASE_REVISION
     adapter_sha256: str = EXPECTED_ADAPTER_SHA256
+    # Public adapter download source (base URL, no credentials). When set,
+    # the download manager fetches the adapter files over plain HTTPS from
+    # <adapter_source_url>/<canonical filename>. When empty, the Kaggle CLI
+    # (with ~/.kaggle/kaggle.json credentials) is used instead.
+    # Default: the public Hugging Face repo Uchiha80971/CyberLLM-v8, which
+    # hosts only the 6 v8 adapter files under their canonical names.
+    adapter_source_url: str = (
+        "https://huggingface.co/Uchiha80971/CyberLLM-v8/resolve/main")
     device: str = "auto"  # auto | cpu | cuda
     load_in_8bit: bool = False
 

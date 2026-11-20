@@ -126,7 +126,9 @@ class ArtifactCheck:
 
     @property
     def ok(self) -> bool:
-        return not self.missing and self.adapter_sha_status in ("match", "unchecked")
+        # "unchecked" is NOT ok: an adapter whose SHA was never verified
+        # must never be reported as ready. Only an exact SHA match counts.
+        return not self.missing and self.adapter_sha_status == "match"
 
 
 def check_artifacts(settings: Settings, project_root: Path) -> ArtifactCheck:

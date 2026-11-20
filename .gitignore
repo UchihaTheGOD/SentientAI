@@ -31,6 +31,7 @@ local_models/
 cyberLLMv1/*
 !cyberLLMv1/manifest.json
 !cyberLLMv1/README.md
+!cyberLLMv1/MODEL_CARD.md
 *.pt
 *.safetensors
 *.bin

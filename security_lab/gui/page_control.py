@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
 
 from .. import backend as backend_mod
 from ..config import save_settings
+from ..tunnel import (OFFICIAL_DOWNLOADS, PROVIDER_AUTH, build_command,
+                      detect_providers, start_tunnel)
 from .context import AppContext
 from .workers import BackendWorker, InferenceWorker
 
@@ -137,6 +139,67 @@ class ControlCenterPage(QWidget):
         self.btn_diag.clicked.connect(
             lambda: self.ctx.navigate("diagnostics")
             if self.ctx.navigate else None)
+
+        # -- tunnel manager ------------------------------------------------
+        # Expose the local website publicly via Cloudflare Tunnel, ngrok,
+        # Pinggy, or zrok. The provider binary must be installed by the
+        # user from its official source (Pinggy needs no install: it uses
+        # the stock ssh client). No token is stored here — ngrok/zrok use
+        # their own one-time setup, and a Pinggy Pro token is held in
+        # memory only for the tunnel session. Starting a tunnel shows a
+        # pre-exposure warning first — the site must not be shared until
+        # auth, admin routes, and debug settings are checked.
+        tunnel_box = QGroupBox("Tunnel Manager — public access (optional)")
+        t_layout = QVBoxLayout(tunnel_box)
+        self.lbl_tunnel_providers = QLabel("Checking providers…")
+        self.lbl_tunnel_providers.setObjectName("muted")
+        t_layout.addWidget(self.lbl_tunnel_providers)
+        self.lbl_tunnel_warn = QLabel(
+            "Warning: starting a tunnel makes the website reachable from the "
+            "internet. Before sharing, confirm: authentication is on, there "
+            "are no default accounts, admin routes require admin, debug is "
+            "off, and no secrets are in the repo. The tunnel only ever "
+            "forwards to this machine's local backend.")
+        self.lbl_tunnel_warn.setWordWrap(True)
+        t_layout.addWidget(self.lbl_tunnel_warn)
+        self.lbl_tunnel_auth = QLabel("")
+        self.lbl_tunnel_auth.setObjectName("muted")
+        self.lbl_tunnel_auth.setWordWrap(True)
+        t_layout.addWidget(self.lbl_tunnel_auth)
+        t_row = QHBoxLayout()
+        self.cb_tunnel_provider = QComboBox()
+        self.cb_tunnel_provider.addItems(
+            ["cloudflared", "ngrok", "pinggy", "zrok"])
+        self.cb_tunnel_provider.currentTextChanged.connect(
+            self._refresh_tunnel_auth_note)
+        self.cb_tunnel_mode = QComboBox()
+        self.cb_tunnel_mode.addItems(["temporary", "persistent"])
+        self.ed_tunnel_name = QLineEdit()
+        self.ed_tunnel_name.setPlaceholderText(
+            "Tunnel/domain name (persistent mode only)")
+        self.ed_tunnel_token = QLineEdit()
+        self.ed_tunnel_token.setEchoMode(QLineEdit.Password)
+        self.ed_tunnel_token.setPlaceholderText(
+            "Pinggy Pro token (persistent Pinggy only — never saved)")
+        self.btn_tunnel_start = QPushButton("Start tunnel")
+        self.btn_tunnel_stop = QPushButton("Stop tunnel")
+        self.btn_tunnel_stop.setEnabled(False)
+        for w in (QLabel("Provider:"), self.cb_tunnel_provider,
+                  QLabel("Mode:"), self.cb_tunnel_mode,
+                  self.ed_tunnel_name, self.ed_tunnel_token,
+                  self.btn_tunnel_start, self.btn_tunnel_stop):
+            t_row.addWidget(w)
+        t_row.addStretch()
+        t_layout.addLayout(t_row)
+        self.lbl_tunnel_url = QLabel("No tunnel running.")
+        self.lbl_tunnel_url.setObjectName("muted")
+        self.lbl_tunnel_url.setWordWrap(True)
+        t_layout.addWidget(self.lbl_tunnel_url)
+        layout.addWidget(tunnel_box)
+        self._tunnel = None
+        self.btn_tunnel_start.clicked.connect(self._start_tunnel)
+        self.btn_tunnel_stop.clicked.connect(self._stop_tunnel)
+        self._refresh_tunnel_providers()
 
         # -- logs ----------------------------------------------------------
         log_box = QGroupBox("Backend logs")
@@ -346,3 +409,92 @@ class ControlCenterPage(QWidget):
                 f"Artifacts OK — base: {data['base']}; adapter: "
                 f"{data['adapter']} (SHA {data['sha']}). Note: the loader "
                 "re-verifies the SHA at load time.")
+
+    # -- tunnel manager ---------------------------------------------------
+    def _refresh_tunnel_providers(self) -> None:
+        lines = []
+        for st in detect_providers():
+            if st.installed:
+                lines.append(f"{st.name}: installed"
+                             + (f" ({st.version})" if st.version else ""))
+            else:
+                lines.append(
+                    f"{st.name}: NOT installed — official download: "
+                    f"{OFFICIAL_DOWNLOADS[st.name]}")
+        self.lbl_tunnel_providers.setText(" | ".join(lines))
+        self._refresh_tunnel_auth_note()
+
+    def _refresh_tunnel_auth_note(self) -> None:
+        provider = self.cb_tunnel_provider.currentText()
+        self.lbl_tunnel_auth.setText(
+            PROVIDER_AUTH.get(provider, ""))
+
+    def _start_tunnel(self) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        if self._tunnel is not None and self._tunnel.running:
+            self.lbl_tunnel_url.setText("A tunnel is already running.")
+            return
+        provider = self.cb_tunnel_provider.currentText()
+        mode = self.cb_tunnel_mode.currentText()
+        name = self.ed_tunnel_name.text().strip()
+        token = self.ed_tunnel_token.text().strip()
+        if mode == "persistent" and not name and provider != "pinggy":
+            self.lbl_tunnel_url.setText(
+                "Persistent mode needs a tunnel/domain name. For Cloudflare, "
+                "create one first with `cloudflared tunnel create <name>`; "
+                "for ngrok, enter a reserved domain; for zrok, enter a "
+                "reserved share token.")
+            return
+        if provider == "pinggy" and mode == "persistent" and not token:
+            self.lbl_tunnel_url.setText(
+                "Pinggy persistent mode needs your Pinggy Pro token "
+                "(paste it in the token field — it is never saved). "
+                "For no-token sharing use temporary mode.")
+            return
+        answer = QMessageBox.question(
+            self, "Start public tunnel?",
+            "This makes the local website reachable from the internet via "
+            f"{provider} ({mode}). Confirm you checked: authentication is "
+            "on, no default accounts, admin routes require admin, debug is "
+            "off, and no secrets are in the repo.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self.lbl_tunnel_url.setText("Starting tunnel…")
+        self.btn_tunnel_start.setEnabled(False)
+        try:
+            tunnel = start_tunnel(
+                provider, mode, self.ctx.settings.api_base,
+                tunnel_name=name, token=token,
+                on_url=lambda url: self.lbl_tunnel_url.setText(
+                    f"Public URL: {url}  (provider: {provider}, mode: {mode})"))
+        except Exception as exc:
+            self.lbl_tunnel_url.setText(f"Tunnel failed to start: {exc}")
+            self.btn_tunnel_start.setEnabled(True)
+            return
+        self._tunnel = tunnel
+        # Clear the token field once the tunnel is running: it is held
+        # only by the running process, never stored in the app.
+        self.ed_tunnel_token.clear()
+        self.btn_tunnel_stop.setEnabled(True)
+        if tunnel.public_url:
+            self.lbl_tunnel_url.setText(
+                f"Public URL: {tunnel.public_url}  (provider: {provider}, "
+                f"mode: {mode})")
+        else:
+            self.lbl_tunnel_url.setText(
+                f"Tunnel running (provider: {provider}, mode: {mode}, "
+                f"pid {tunnel.pid}). Waiting for the provider to report "
+                "its public URL…")
+
+    def _stop_tunnel(self) -> None:
+        if self._tunnel is not None:
+            try:
+                self._tunnel.stop()
+            except Exception:
+                pass
+            self._tunnel = None
+        self.btn_tunnel_stop.setEnabled(False)
+        self.btn_tunnel_start.setEnabled(True)
+        self.lbl_tunnel_url.setText("No tunnel running.")

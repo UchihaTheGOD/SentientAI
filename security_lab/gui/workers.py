@@ -100,3 +100,28 @@ class BatchWorker(QThread):
             self.finished.emit(self._fn(self.progress.emit))
         except Exception as exc:
             self.error.emit(str(exc))
+
+
+class DownloadWorker(QThread):
+    """Runs a model download in the background; the GUI stays responsive.
+
+    progress(downloaded_bytes, total_bytes, message) — the page updates
+    the progress bar and status label from this signal only.
+    finished(result) — a security_lab.model_download.DownloadResult.
+    error(message) — a human-readable failure (or "cancelled").
+    """
+
+    progress = Signal(int, int, str)
+    finished = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, fn: Callable[
+            [Callable[[int, int, str], None]], object], parent=None):
+        super().__init__(parent)
+        self._fn = fn
+
+    def run(self) -> None:
+        try:
+            self.finished.emit(self._fn(self.progress.emit))
+        except Exception as exc:
+            self.error.emit(str(exc))

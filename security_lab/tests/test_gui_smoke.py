@@ -85,8 +85,10 @@ def ctx(tmp_path):
 
 def test_main_window_builds_all_pages(qapp, ctx):
     window = MainWindow(ctx)
-    assert window.stack.count() == len(PAGES) == 9
+    assert window.stack.count() == len(PAGES) == 10
     window.switch_page("users")
+    assert window.nav.currentRow() == 4
+    window.switch_page("testlab")
     assert window.nav.currentRow() == 3
     window.switch_page("scanner")
     assert window.nav.currentRow() == 1

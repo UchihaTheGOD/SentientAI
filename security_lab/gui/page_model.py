@@ -8,20 +8,26 @@ mappings appear only when the API actually returns them.
 
 from __future__ import annotations
 
+import shutil
+import threading
 from pathlib import Path
 
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QGroupBox, QHBoxLayout,
-                               QLabel, QPlainTextEdit, QProgressBar,
-                               QPushButton, QTableWidget, QTableWidgetItem,
-                               QTextEdit, QVBoxLayout, QWidget)
+                               QLabel, QMessageBox, QPlainTextEdit,
+                               QProgressBar, QPushButton, QTableWidget,
+                               QTableWidgetItem, QTextEdit, QVBoxLayout,
+                               QWidget)
 
+from ..backend import check_artifacts
 from ..client import BackendClient
 from ..evaluation import (compare_baseline, export_eval_csv,
                           export_eval_json, load_cases, run_evaluation,
                           save_baseline)
 from ..model import EXAMPLE_CASES, mark_abstained, shape_analysis
+from ..model_download import (STATE_CORRUPTED, STATE_VERIFIED,
+                              download_all, model_state)
 from .context import AppContext
-from .workers import BatchWorker, InferenceWorker
+from .workers import BatchWorker, DownloadWorker, InferenceWorker
 
 
 class ModelTestingPage(QWidget):
@@ -52,6 +58,45 @@ class ModelTestingPage(QWidget):
         layout.addLayout(sign_row)
         self.btn_signin.clicked.connect(self._signin_lab)
         self.btn_signin_own.clicked.connect(self._signin_own)
+
+        # -- model management ------------------------------------------------
+        # One-click download / verify / remove for the CyberLLM model. The
+        # download runs on a background thread so the GUI never freezes.
+        mgmt = QGroupBox("Model Management — CyberLLM (Pilot v8)")
+        m_layout = QVBoxLayout(mgmt)
+        self.lbl_model_state = QLabel("Model state: checking…")
+        self.lbl_model_state.setObjectName("muted")
+        m_layout.addWidget(self.lbl_model_state)
+        m_row = QHBoxLayout()
+        self.btn_download = QPushButton("Download CyberLLM")
+        self.btn_cancel_dl = QPushButton("Cancel download")
+        self.btn_cancel_dl.setEnabled(False)
+        self.btn_verify = QPushButton("Verify (SHA-256)")
+        self.btn_open_model = QPushButton("Open model folder")
+        self.btn_remove_model = QPushButton("Remove model…")
+        for btn in (self.btn_download, self.btn_cancel_dl, self.btn_verify,
+                    self.btn_open_model, self.btn_remove_model):
+            m_row.addWidget(btn)
+        m_row.addStretch()
+        m_layout.addLayout(m_row)
+        self.dl_progress = QProgressBar()
+        self.dl_progress.setRange(0, 100)
+        self.dl_progress.setValue(0)
+        m_layout.addWidget(self.dl_progress)
+        self.lbl_dl = QLabel("")
+        self.lbl_dl.setObjectName("muted")
+        m_layout.addWidget(self.lbl_dl)
+        layout.addWidget(mgmt)
+        self._dl_worker = None
+        self._dl_cancel = threading.Event()
+        self._dl_started_at = 0.0
+        self._dl_last_bytes = 0
+        self.btn_download.clicked.connect(self._start_download)
+        self.btn_cancel_dl.clicked.connect(self._cancel_download)
+        self.btn_verify.clicked.connect(self._verify_model)
+        self.btn_open_model.clicked.connect(self._open_model_folder)
+        self.btn_remove_model.clicked.connect(self._remove_model)
+        self._refresh_model_state()
 
         # -- single test ---------------------------------------------------------
         single = QGroupBox("Single analysis")
@@ -177,6 +222,159 @@ class ModelTestingPage(QWidget):
             return
         self.lbl_auth.setText(
             f"Signed in as {username.strip()}." if ok else f"Sign-in failed: {msg}")
+
+    # -- model management ---------------------------------------------------
+    def _model_dirs(self) -> tuple[Path, Path]:
+        """Resolve base_dir / adapter_dir the same way the backend does."""
+        from ..backend import find_project_root
+
+        s = self.ctx.settings
+        root = find_project_root(s)
+        if s.base_dir:
+            base_dir = Path(s.base_dir)
+        elif s.model_root:
+            base_dir = Path(s.model_root) / "base"
+        else:
+            base_dir = root / "cyberLLMv1" / "base"
+        if s.adapter_dir:
+            adapter_dir = Path(s.adapter_dir)
+        elif s.model_root:
+            adapter_dir = Path(s.model_root) / "adapter"
+        else:
+            adapter_dir = root / "cyberLLMv1" / "adapter"
+        return base_dir, adapter_dir
+
+    def _refresh_model_state(self) -> None:
+        s = self.ctx.settings
+        base_dir, adapter_dir = self._model_dirs()
+        state = model_state(base_dir, adapter_dir, s.adapter_sha256)
+        detail = f"Base: {base_dir} | Adapter: {adapter_dir}"
+        self.lbl_model_state.setText(f"Model state: {state}. {detail}")
+
+    def _start_download(self) -> None:
+        import time
+
+        s = self.ctx.settings
+        base_dir, adapter_dir = self._model_dirs()
+        state = model_state(base_dir, adapter_dir, s.adapter_sha256)
+        if state == STATE_VERIFIED:
+            self.lbl_dl.setText(
+                "Model is already downloaded and verified (pilot v8).")
+            return
+        if state == STATE_CORRUPTED:
+            self.lbl_dl.setText(
+                "Adapter is corrupted (SHA mismatch). Re-downloading will "
+                "replace the bad files.")
+        self._dl_cancel.clear()
+        self._dl_started_at = time.monotonic()
+        self._dl_last_bytes = 0
+        self.btn_download.setEnabled(False)
+        self.btn_cancel_dl.setEnabled(True)
+        self.dl_progress.setValue(0)
+        self.lbl_dl.setText("Starting download…")
+
+        def _run(progress_cb):
+            return download_all(
+                base_dir, adapter_dir,
+                s.base_model, s.base_revision, s.adapter_sha256,
+                source_url=s.adapter_source_url,
+                progress=progress_cb, cancel=self._dl_cancel,
+            )
+
+        self._dl_worker = DownloadWorker(_run)
+        self._dl_worker.progress.connect(self._on_dl_progress)
+        self._dl_worker.finished.connect(self._on_dl_finished)
+        self._dl_worker.error.connect(self._on_dl_error)
+        self._dl_worker.start()
+
+    def _on_dl_progress(self, downloaded: int, total: int,
+                        message: str) -> None:
+        import time
+
+        if total:
+            self.dl_progress.setValue(int(downloaded * 100 / total))
+        else:
+            self.dl_progress.setValue(0)
+        # Speed + ETA from the bytes delta since the last progress event.
+        now = time.monotonic()
+        elapsed = max(now - self._dl_started_at, 0.001)
+        speed = downloaded / elapsed if elapsed else 0
+        if total and speed > 0 and downloaded < total:
+            eta = (total - downloaded) / speed
+            eta_text = f" — ETA {eta / 60:.1f} min" if eta > 60 else f" — ETA {eta:.0f}s"
+        else:
+            eta_text = ""
+        speed_text = f" ({speed / 1e6:.1f} MB/s)" if speed > 0 else ""
+        self.lbl_dl.setText(
+            f"{message} {downloaded / 1e6:.0f} / {total / 1e6:.0f} MB"
+            f"{speed_text}{eta_text}")
+        self._dl_last_bytes = downloaded
+
+    def _on_dl_finished(self, result) -> None:
+        self.btn_download.setEnabled(True)
+        self.btn_cancel_dl.setEnabled(False)
+        self.dl_progress.setValue(100)
+        self.lbl_dl.setText(result.message)
+        self._refresh_model_state()
+
+    def _on_dl_error(self, message: str) -> None:
+        self.btn_download.setEnabled(True)
+        self.btn_cancel_dl.setEnabled(False)
+        self.lbl_dl.setText(f"Download failed: {message}")
+        self._refresh_model_state()
+
+    def _cancel_download(self) -> None:
+        self._dl_cancel.set()
+        self.lbl_dl.setText("Cancelling download… (finishing the current file)")
+        self.btn_cancel_dl.setEnabled(False)
+
+    def _verify_model(self) -> None:
+        from ..backend import find_project_root
+
+        s = self.ctx.settings
+        root = find_project_root(s)
+        result = check_artifacts(s, root)
+        if result.ok:
+            self.lbl_dl.setText(
+                "Verified: base + adapter present, adapter SHA-256 matches "
+                "pilot v8.")
+        else:
+            problems = "; ".join(result.missing) or (
+                f"adapter SHA status: {result.adapter_sha_status}")
+            self.lbl_dl.setText(f"Verification failed: {problems}")
+        self._refresh_model_state()
+
+    def _open_model_folder(self) -> None:
+        import os
+        import subprocess
+
+        base_dir, _ = self._model_dirs()
+        target = base_dir.parent if base_dir.parent.is_dir() else base_dir
+        target.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            os.startfile(str(target))  # noqa: S606 - user-chosen local dir
+        elif shutil.which("xdg-open"):
+            subprocess.Popen(["xdg-open", str(target)])  # noqa: S603
+        else:
+            self.lbl_dl.setText(f"Model folder: {target}")
+
+    def _remove_model(self) -> None:
+        import shutil
+
+        answer = QMessageBox.question(
+            self, "Remove model",
+            "Delete the downloaded base model (~4.1 GB) and the pilot v8 "
+            "adapter (~82 MB)? You can re-download them afterwards. "
+            "This does not touch your settings or the project code.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        base_dir, adapter_dir = self._model_dirs()
+        for d in (base_dir, adapter_dir):
+            if d.is_dir():
+                shutil.rmtree(d, ignore_errors=True)
+        self.lbl_dl.setText("Model removed. Use 'Download CyberLLM' to get it again.")
+        self._refresh_model_state()
 
     # -- single -------------------------------------------------------------------
     def _load_example(self, index: int) -> None:

@@ -1,5 +1,5 @@
 import pathlib, json, hashlib, sqlite3, sys
-ROOT = pathlib.Path(r"C:\Users\DARK\Desktop\wild clude\SentientAI")
+ROOT = pathlib.Path(__file__).resolve().parents[2]  # project root, resolved from this file (portable, no hardcoded path)
 print("=== PHASE 1 AUDIT ===")
 print("config.json:", (ROOT/"local_models/sentinel/config.json").read_text()[:800])
 import torch

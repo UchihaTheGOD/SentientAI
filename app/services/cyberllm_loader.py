@@ -202,10 +202,15 @@ def _get_rss_mb() -> Optional[float]:
 
 
 def _adapter_sha_ok(paths: Optional[CyberLLMPaths] = None) -> bool:
-    """Verify the adapter file against the configured SHA-256 digest."""
+    """Verify the adapter file against the configured SHA-256 digest.
+
+    Fail-closed: an empty expected SHA means "unverified", never "verified".
+    (In practice the pinned v8 default fills this in, so an empty value only
+    arises if someone explicitly clears it — and then loading must refuse.)
+    """
     resolved = paths or resolve_cyberllm_paths()
     if not resolved.adapter_sha256:
-        return True
+        return False
 
     adapter_file = resolved.adapter_dir / "adapter_model.safetensors"
 
@@ -313,12 +318,26 @@ def ensure_loaded() -> CyberLLMStatus:
 
             local_base_exists = paths.base_dir.is_dir()
 
-            base_path: Any = str(paths.base_dir) if local_base_exists else paths.base_model_id
+            # Portability fix (v2): a missing base directory must NOT fall
+            # back to a Hugging Face download into the default HF cache
+            # (~/.cache/huggingface). That silently ignores the configured
+            # model directory and breaks portability — the model would load
+            # from a location the user never chose. Refuse with a clear,
+            # actionable error instead; the EXE download manager (or
+            # scripts/setup_cyberllm.py --download-base) downloads the base
+            # into the configured directory.
+            if not local_base_exists:
+                raise RuntimeError(
+                    "CyberLLM base model not downloaded yet: "
+                    f"{paths.base_dir} does not exist. "
+                    "Download it first with the desktop app's Model Management "
+                    "(Download CyberLLM) or run: "
+                    "python scripts/setup_cyberllm.py --download-base"
+                )
+
+            base_path: Any = str(paths.base_dir)
 
             model_kwargs: dict[str, Any] = {}
-
-            if not local_base_exists:
-                model_kwargs["revision"] = paths.base_revision
 
             if DEVICE_ENV == "cuda":
                 if not torch.cuda.is_available():
