@@ -6,6 +6,42 @@ Current version: `1.0.0-rc.2` (release candidate — see `VERSION`, `CHANGELOG.m
 
 Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skipped, Security Lab suite 86 passed + 1 skipped. NOT yet verified: Windows test run, Windows exe build/double-click, GPU fit/latency, real 1.7B inference on the reference PC. Linux results are not proof of Windows compatibility.
 
+## Contents
+
+- [1. Project Overview](#1-project-overview)
+- [2. Current Project Status](#2-current-project-status)
+- [3. Features](#3-features)
+- [4. Architecture](#4-architecture)
+- [5. Technology Stack](#5-technology-stack)
+- [6. Project Directory Structure](#6-project-directory-structure)
+- [7. System Requirements](#7-system-requirements)
+- [8. Installation](#8-installation)
+- [9. Environment Configuration](#9-environment-configuration)
+- [10. Running SentientAI](#10-running-sentientai)
+- [11. CyberLLMv1 Model Details](#11-cyberllmv1-model-details-sentinel-models-removed-2026-10-27)
+- [12. Security Detection and Moderation](#12-security-detection-and-moderation)
+- [13. Training and Data Governance](#13-training-and-data-governance)
+- [14. Testing](#14-testing)
+- [15. Evaluation and Diagnostics](#15-evaluation-and-diagnostics)
+- [16. Database and Administration](#16-database-and-administration)
+- [17. Troubleshooting](#17-troubleshooting)
+- [18. Security and Responsible Use](#18-security-and-responsible-use)
+- [19. Limitations and Roadmap](#19-limitations-and-roadmap)
+- [20. Contributing and Development](#20-contributing-and-development)
+- [21. License](#21-license)
+- [22. Project Disclaimer](#22-project-disclaimer)
+- [23. Documentation Links](#23-documentation-links)
+
+### Key docs
+
+- [CYBERLLM_WINDOWS_SETUP.md](CYBERLLM_WINDOWS_SETUP.md) — Windows setup (Python, CUDA, model download, verification)
+- [CYBERLLM_PORTABLE_SETUP.md](CYBERLLM_PORTABLE_SETUP.md) — portable install and model setup
+- [cyberLLMv1/MODEL_CARD.md](cyberLLMv1/MODEL_CARD.md) — CyberLLM Pilot v8 model card (base, adapter SHA, eval, limits)
+- [security_lab/README.md](security_lab/README.md) — desktop Security Lab user guide
+- [security_lab/ARCHITECTURE.md](security_lab/ARCHITECTURE.md) — Security Lab architecture
+- [CHANGELOG.md](CHANGELOG.md) — version history and release notes
+- [WINDOWS_TEST_CHECKLIST.md](WINDOWS_TEST_CHECKLIST.md) — Windows verification checklist
+
 ## 1. Project Overview
 
 **What it is:** FastAPI + Jinja2 + SQLAlchemy community publishing platform with authentication, posts/comments/likes/bookmarks/follows/messages/notifications/search, plus an internal "Sentinel" assistant and the ATTACT assessment toolkit.
