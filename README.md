@@ -34,6 +34,7 @@ Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skippe
 
 ### Key docs
 
+- [INSTALL.md](INSTALL.md) — complete beginner installation guide (code, dependencies, model download, config, admin, module map, verify checklist)
 - [CYBERLLM_WINDOWS_SETUP.md](CYBERLLM_WINDOWS_SETUP.md) — Windows setup (Python, CUDA, model download, verification)
 - [CYBERLLM_PORTABLE_SETUP.md](CYBERLLM_PORTABLE_SETUP.md) — portable install and model setup
 - [cyberLLMv1/MODEL_CARD.md](cyberLLMv1/MODEL_CARD.md) — CyberLLM Pilot v8 model card (base, adapter SHA, eval, limits)
@@ -147,30 +148,137 @@ SentientAI/
 
 ## 8. Installation
 
-Portable (after clone):
+> **Full beginner guide:** [`INSTALL.md`](INSTALL.md) — the same steps
+> below, plus what the project is, prerequisites, a map of every module,
+> a verify-it-works checklist, and more troubleshooting. Start here if
+> you have never installed the project before.
+
+### 8.1 Get the code
 
 ```bash
 git clone https://github.com/UchihaTheGOD/SentientAI.git
 cd SentientAI
+```
+
+### 8.2 Create and activate a virtual environment
+
+```bash
 python -m venv venv
 # Windows PowerShell:
 .\venv\Scripts\Activate.ps1
 # Linux/macOS:
 source venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-# Model runtime (not in requirements.txt; CUDA 12.1 wheel supports Turing):
-.\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-cp .env.example .env   # then edit SECRET_KEY
-python scripts\setup_cyberllm.py --check   # then --download-base / --download-adapter
-python manage.py seed-admin
-python run.py  # or run.bat start
-# Desktop GUI (from source): python -m security_lab (GUI deps first, see security_lab/README.md)
-# Windows exe: security_lab\packaging\build_windows.bat (GUI only; backend + model stay on the machine)
 ```
 
-Windows execution-policy note: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` for the current PowerShell process if activation is blocked.
+(`.venv` works too — `run.bat` / `run.sh` look for `.venv` first, then
+`venv`. If a `venv` folder already exists, reuse it; no need to recreate
+it.) If PowerShell blocks activation, run
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` for
+the current window, then activate again.
 
-If `venv/` already exists, reuse it; no need to recreate.
+### 8.3 Install dependencies
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+# torch is NOT in requirements.txt (large, platform-specific). GPU (CUDA 12.1, supports Turing e.g. GTX 1660):
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+# CPU only:
+pip install torch
+# Model runtime (needed only to run the AI model):
+pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0 huggingface_hub
+```
+
+Skip `torch` entirely if you do not want the model — the website starts
+and works in rules-only mode without it.
+
+### 8.4 Download the model (~4.2 GB total)
+
+Two parts, into the project-local folders `cyberLLMv1/base/` and
+`cyberLLMv1/adapter/` (weights are never committed to Git):
+
+```bash
+# Check what is missing (no download, no credentials):
+python scripts/setup_cyberllm.py --check
+# Base model — Qwen/Qwen3-1.7B @ pinned revision 70d244cc…, ~4.1 GB, free, no login, resumable:
+python scripts/setup_cyberllm.py --download-base
+# Adapter — CyberLLM pilot v8 LoRA, ~82 MB.
+# Easiest: public Hugging Face repo, no account, no token:
+huggingface-cli download Uchiha80971/CyberLLM-v8 --local-dir cyberLLMv1/adapter --local-dir-use-symlinks False
+# Alternative: Kaggle CLI (private dataset uchihamadarum/cyber-llm-artifacts, needs ~/.kaggle/kaggle.json):
+python scripts/setup_cyberllm.py --download-adapter
+# Verify (the loader refuses a SHA mismatch by design):
+python scripts/setup_cyberllm.py --check
+# Must print: OK: base + adapter present; adapter SHA-256 matches (d624ed79…).
+# Adapter SHA-256: d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1
+```
+
+Do not substitute another base revision, `adapter_17b_datav2_*` (pilot
+v4), or `adapter_datav2_*` (pilot v3, 0.6B) — those are different
+checkpoints. Details: `cyberLLMv1/README.md`, `CYBERLLM_PORTABLE_SETUP.md`.
+
+### 8.5 Configure
+
+```bash
+# Windows PowerShell:
+Copy-Item .env.example .env
+# Linux/macOS:
+cp .env.example .env
+```
+
+Then edit `.env` and set `SECRET_KEY` to a long random value (generate
+one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+It signs login sessions; in production the app refuses to start without
+a real one. Leave `CYBERLLM_DEVICE=auto` (CUDA when a GPU is found, else
+CPU), `DATABASE_URL=sqlite:///./app.db` (the `app.db` file is created on
+first run), and the `CYBERLLM_*` paths unset — the loader defaults to
+`cyberLLMv1/` inside the project. Full table: §9.
+
+### 8.6 Start the server
+
+```bash
+python run.py  # or: run.bat start (Windows) / ./run.sh start (Linux/macOS)
+```
+
+Open **http://127.0.0.1:8000**. Stop with `Ctrl+C`. API docs:
+http://127.0.0.1:8000/api/docs. The database is created automatically
+on first start; the model loads lazily on the first analysis, so the
+site works even without it.
+
+### 8.7 Create the admin account
+
+There is **no default password** — `seed-admin` generates a fresh random
+one and prints it exactly once, so save it immediately:
+
+```bash
+python manage.py seed-admin
+# [OK] Initial admin created: admin (admin@12345)
+# [IMPORTANT] Generated admin password (shown once — save it now):
+#     <a random 22-character password>
+```
+
+Or choose your own: `python manage.py seed-admin --password "YourStrongPasswordHere"`.
+Safe to re-run — if `admin` already exists it just says `[SKIP]`.
+Then log in at http://127.0.0.1:8000/login as `admin`; the admin panel
+is at http://127.0.0.1:8000/admin. Change the password right after first
+login. Other commands: `create-admin`, `set-role`, `list-users`,
+`seed-blog`, `reset-db --yes` (destructive — see §16).
+
+### 8.8 Check it works
+
+- `python scripts/setup_cyberllm.py --check` → `OK: base + adapter present; adapter SHA-256 matches (d624ed79…).`
+- http://127.0.0.1:8000/api/cyberllm/readiness → `state: not_loaded` before any analysis is normal (lazy load); after loading, `ready: true`.
+- Log in, open http://127.0.0.1:8000/cyberllm, analyze one log line — a single failed login should return `needs_review` (one line is not enough evidence, and that honest uncertainty is correct).
+
+### 8.9 Desktop Security Lab (optional)
+
+```bash
+pip install -r security_lab/packaging/requirements-gui.txt
+python -m security_lab
+```
+
+Windows exe: `security_lab\packaging\build_windows.bat` →
+`dist\CyberLLMv1-Security-Lab.exe` (GUI only; backend + model stay on
+the machine). See `security_lab/README.md`.
 
 ## 9. Environment Configuration
 
