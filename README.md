@@ -2,7 +2,7 @@
 
 Local cybersecurity-oriented web application with CyberLLMv1 model integration, deterministic security rules, and a human-reviewed moderation pipeline. A public blogging and community site backed by a private administration panel, plus a native desktop Security Lab.
 
-Current version: `1.0.0-rc.2` (release candidate — see `VERSION`, `CHANGELOG.md`). The obsolete Sentinel model pipeline was removed on 2026-10-27 and replaced by CyberLLMv1 (see §2, §11). Deterministic rules and model-based analysis are separate components; human review remains the gate.
+Current version: `1.0.0-rc.2` (release candidate — see `VERSION`, `CHANGELOG.md`). The obsolete Sentinel model pipeline was removed on 2026-10-27 and replaced by CyberLLMv1 (see §2, §12). Deterministic rules and model-based analysis are separate components; human review remains the gate.
 
 Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skipped, Security Lab suite 86 passed + 1 skipped. NOT yet verified: Windows test run, Windows exe build/double-click, GPU fit/latency, real 1.7B inference on the reference PC. Linux results are not proof of Windows compatibility.
 
@@ -16,21 +16,22 @@ Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skippe
 - [6. Project Directory Structure](#6-project-directory-structure)
 - [7. System Requirements](#7-system-requirements)
 - [8. Installation](#8-installation)
-- [9. Environment Configuration](#9-environment-configuration)
-- [10. Running SentientAI](#10-running-sentientai)
-- [11. CyberLLMv1 Model Details](#11-cyberllmv1-model-details-sentinel-models-removed-2026-10-27)
-- [12. Security Detection and Moderation](#12-security-detection-and-moderation)
-- [13. Training and Data Governance](#13-training-and-data-governance)
-- [14. Testing](#14-testing)
-- [15. Evaluation and Diagnostics](#15-evaluation-and-diagnostics)
-- [16. Database and Administration](#16-database-and-administration)
-- [17. Troubleshooting](#17-troubleshooting)
-- [18. Security and Responsible Use](#18-security-and-responsible-use)
-- [19. Limitations and Roadmap](#19-limitations-and-roadmap)
-- [20. Contributing and Development](#20-contributing-and-development)
-- [21. License](#21-license)
-- [22. Project Disclaimer](#22-project-disclaimer)
-- [23. Documentation Links](#23-documentation-links)
+- [9. Desktop Security Lab .exe (Windows)](#9-desktop-security-lab-exe-windows)
+- [10. Environment Configuration](#10-environment-configuration)
+- [11. Running SentientAI](#11-running-sentientai)
+- [12. CyberLLMv1 Model Details](#12-cyberllmv1-model-details-sentinel-models-removed-2026-10-27)
+- [13. Security Detection and Moderation](#13-security-detection-and-moderation)
+- [14. Training and Data Governance](#14-training-and-data-governance)
+- [15. Testing](#15-testing)
+- [16. Evaluation and Diagnostics](#16-evaluation-and-diagnostics)
+- [17. Database and Administration](#17-database-and-administration)
+- [18. Troubleshooting](#18-troubleshooting)
+- [19. Security and Responsible Use](#19-security-and-responsible-use)
+- [20. Limitations and Roadmap](#20-limitations-and-roadmap)
+- [21. Contributing and Development](#21-contributing-and-development)
+- [22. License](#22-license)
+- [23. Project Disclaimer](#23-project-disclaimer)
+- [24. Documentation Links](#24-documentation-links)
 
 ### Key docs
 
@@ -40,6 +41,7 @@ Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skippe
 - [cyberLLMv1/MODEL_CARD.md](cyberLLMv1/MODEL_CARD.md) — CyberLLM Pilot v8 model card (base, adapter SHA, eval, limits)
 - [security_lab/README.md](security_lab/README.md) — desktop Security Lab user guide
 - [security_lab/ARCHITECTURE.md](security_lab/ARCHITECTURE.md) — Security Lab architecture
+- [security_lab/packaging/BUILD_GUIDE.md](security_lab/packaging/BUILD_GUIDE.md) — Windows exe build guide (compile, first run, feature checklist)
 - [CHANGELOG.md](CHANGELOG.md) — version history and release notes
 - [WINDOWS_TEST_CHECKLIST.md](WINDOWS_TEST_CHECKLIST.md) — Windows verification checklist
 
@@ -51,7 +53,7 @@ Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skippe
 
 **Who it is for:** Developers and reviewers who want a runnable local app with real auth, moderation, and evaluation harnesses.
 
-**What currently works:** Public site, auth, admin moderation queue, deterministic brute-force/port-scan rules, CyberLLMv1 classification + rules fusion, ATTACT checks, rate limiting, CSRF, audit log, training review queue, native desktop Security Lab GUI (Control Center, authorized scanner, model testing, user management, reports, cases, demo, diagnostics, settings), admin users API with backend-enforced guards, portable Windows runtime (`run.bat`/`run.sh`, `.venv` or `venv`). (The obsolete Sentinel Model A/B pipeline was removed on 2026-10-27; see §11.)
+**What currently works:** Public site, auth, admin moderation queue, deterministic brute-force/port-scan rules, CyberLLMv1 classification + rules fusion, ATTACT checks, rate limiting, CSRF, audit log, training review queue, native desktop Security Lab GUI (Control Center, authorized scanner, model testing, user management, reports, cases, demo, diagnostics, settings), admin users API with backend-enforced guards, portable Windows runtime (`run.bat`/`run.sh`, `.venv` or `venv`). (The obsolete Sentinel Model A/B pipeline was removed on 2026-10-27; see §12.)
 
 **What remains experimental:** Per-category detection beyond rules, automated training. CyberLLMv1 classification is validated JSON with evidence checks, but it is not a deployable detector on its own — human review is still required for consequential decisions.
 
@@ -231,7 +233,7 @@ It signs login sessions; in production the app refuses to start without
 a real one. Leave `CYBERLLM_DEVICE=auto` (CUDA when a GPU is found, else
 CPU), `DATABASE_URL=sqlite:///./app.db` (the `app.db` file is created on
 first run), and the `CYBERLLM_*` paths unset — the loader defaults to
-`cyberLLMv1/` inside the project. Full table: §9.
+`cyberLLMv1/` inside the project. Full table: §10.
 
 ### 8.6 Start the server
 
@@ -261,7 +263,7 @@ Safe to re-run — if `admin` already exists it just says `[SKIP]`.
 Then log in at http://127.0.0.1:8000/login as `admin`; the admin panel
 is at http://127.0.0.1:8000/admin. Change the password right after first
 login. Other commands: `create-admin`, `set-role`, `list-users`,
-`seed-blog`, `reset-db --yes` (destructive — see §16).
+`seed-blog`, `reset-db --yes` (destructive — see §17).
 
 ### 8.8 Check it works
 
@@ -278,9 +280,169 @@ python -m security_lab
 
 Windows exe: `security_lab\packaging\build_windows.bat` →
 `dist\CyberLLMv1-Security-Lab.exe` (GUI only; backend + model stay on
-the machine). See `security_lab/README.md`.
+the machine). Full guide: §9 below; see also `security_lab/README.md`.
 
-## 9. Environment Configuration
+## 9. Desktop Security Lab .exe (Windows)
+
+The desktop Security Lab is a native Windows GUI app (PySide6) that talks
+HTTP to the SentientAI backend. **It is not the website itself** — the
+website runs in a browser (see §8); the exe is the desktop app you
+double-click. It does **not** bundle the backend, the backend's Python
+dependencies, or any model weights (base ~4.1 GB, adapter ~82 MB). Those
+stay on the machine; the exe finds them through the project folder.
+
+> **Honest status:** the exe build + double-click run has **not** been done
+> on a Windows PC yet. Everything below is verified by reading the code,
+> the build script (`security_lab/packaging/build_windows.bat`), the
+> PyInstaller spec, and `security_lab/packaging/BUILD_GUIDE.md`. This Linux
+> environment cannot build or run a Windows GUI exe, so the real build,
+> first run, and visual check are a Windows-PC step. Nothing here is
+> claimed from a live run.
+
+### 9.1 What is in the exe
+
+Ten pages (from `security_lab/gui/main.py`): **Website & Model Control
+Center**, **Authorized Website Security Scanner**, **Model Testing &
+Evaluation**, **Prompt & Output Test Lab**, **User Management**, **Reports
+& History**, **Case Management**, **Classroom Demo**, **Diagnostics**,
+**Settings**. The exe bundles only PySide6, `requests`, and `reportlab`
+(see `security_lab/packaging/requirements-gui.txt`).
+
+### 9.2 How to compile it (Windows 10/11)
+
+Prerequisites (do §8 first — code, dependencies, model, `.env`):
+
+1. Python 3.11 or 3.12 from python.org, with **"Add python to PATH"**
+   checked.
+2. The SentientAI project with its venv and dependencies installed.
+3. Model files downloaded (or download them later from inside the exe —
+   see §9.4).
+
+From the project root, run:
+
+```bat
+security_lab\packaging\build_windows.bat
+```
+
+What the script does: it creates a build venv in
+`%TEMP%\seclab-build-venv` (so the repo stays clean), installs the GUI
+dependencies plus PyInstaller, then runs
+`pyinstaller --noconfirm security_lab\packaging\security-lab.spec`.
+The build takes a few minutes.
+
+Output: `dist\CyberLLMv1-Security-Lab.exe` — a single-file exe with no
+console window. Double-click it; no PowerShell, VS Code, or browser is
+needed.
+
+If Windows Defender / SmartScreen flags the unsigned exe, that is
+expected for a locally built PyInstaller app: unblock it in the file
+properties, or sign it with your own certificate. A one-folder build
+(`COLLECT` in the spec instead of a single-file `EXE`) is the usual
+fallback if one-file packaging trips antivirus tooling.
+
+### 9.3 How to set it up (first run)
+
+1. Double-click `dist\CyberLLMv1-Security-Lab.exe`.
+2. On first run it asks for (or auto-detects) the **project root** and
+   the **backend Python** (the project venv's `python.exe`). Settings are
+   saved in your per-user data folder, not in the repo.
+3. Open the **Control Center** and confirm: Project root, Backend
+   Python, API host `127.0.0.1`, API port `8000` (the backend's default
+   from `run.py`; change it only if you changed `SENTIENTAI_HOST` /
+   `SENTIENTAI_PORT`).
+4. Click **"Verify adapter SHA + artifacts"** — it must report OK
+   (adapter SHA-256 `d624ed79…5a5b1`).
+5. Click **"Start backend"** — status shows running. **"Refresh status"**
+   shows readiness `not_loaded` until the first analysis (lazy load —
+   normal, not an error).
+6. Model Testing → sign in (the lab account from Settings, or your own
+   login) → run an example case. First inference on CPU is slow
+   (minutes); on the GTX 1660 SUPER it uses the CUDA path when
+   available, else falls back to CPU or 8-bit.
+7. User Management needs a real admin session (the lab account is a
+   normal user). From the project folder:
+   ```bat
+   .\venv\Scripts\python.exe manage.py create-admin --username <name> --email <mail> --password <pass>
+   .\venv\Scripts\python.exe manage.py set-role --username <name> --role admin
+   ```
+   Then sign in on the User Management page with those credentials
+   (kept in memory only, never saved). The backend enforces every
+   guard: no self role-change / deactivation / suspension, and no
+   removing the last active administrator.
+
+### 9.4 How to check the exe works (feature checklist)
+
+Work through this list after the first run. Every item below was
+confirmed in the code (`security_lab/tunnel.py`,
+`security_lab/model_download.py`, `security_lab/gui/page_control.py`,
+`security_lab/gui/page_model.py`, `security_lab/gui/page_testlab.py`,
+`security_lab/gui/page_scanner.py`).
+
+- [ ] **Window opens** on the Control Center, with a sidebar listing
+      all ten pages.
+- [ ] **Control Center:** "Start backend", "Stop backend", "Restart
+      backend", "Refresh status" buttons; a readiness label; fields for
+      Project root, Backend Python, API host, API port; a "Verify adapter
+      SHA + artifacts" button.
+- [ ] **Tunnel Manager** (on the Control Center): a **Provider**
+      dropdown with all four providers — **cloudflared, ngrok, pinggy,
+      zrok** — plus a per-provider auth note and a status line showing
+      which provider tools were detected. Temporary (quick share) and
+      persistent (named/reserved) modes. What each provider needs:
+      - **cloudflared** — quick tunnel needs no account; named tunnel
+        needs `cloudflared tunnel login` once.
+      - **ngrok** — needs an authtoken once
+        (`ngrok config add-authtoken <token>`).
+      - **Pinggy** — free tier needs no token (60-minute tunnels, uses
+        the stock `ssh` client, nothing to install); Pro needs your
+        token, entered in the **"Pinggy Pro token"** field (password
+        echo, held in memory only for the session, never saved).
+      - **zrok** — needs `zrok enable <token>` once.
+- [ ] **Download manager / Model Management** (Model Testing page):
+      **"Download CyberLLM"**, **"Cancel download"**, and **"Verify
+      (SHA-256)"** buttons, with a progress bar showing MB downloaded,
+      speed, and ETA. It downloads the base model from Hugging Face
+      (resumable) and the adapter from the public HF repo
+      `Uchiha80971/CyberLLM-v8` by default (or via Kaggle CLI if the
+      source URL is cleared). The SHA-256 check is fatal on mismatch
+      and the loader refuses a bad adapter; a cancelled or failed
+      download resumes instead of starting over.
+- [ ] **Prompt Test Lab:** type or paste a prompt, run it against the
+      real CyberLLM model through the backend API. Generation is
+      **greedy/deterministic** (same prompt → same output). Every run is
+      saved to history (`test_lab_history.jsonl` in the user data
+      folder); **"Compare selected (2 runs)"** compares two runs side by
+      side, and **"Clear history"** wipes it.
+- [ ] **Model Testing:** example dropdown, **"Run Inference"** button,
+      **"Run batch evaluation"**, and sign-in as the lab account or
+      your own login.
+- [ ] **Scanner:** target + authorization checkbox, allowlist, and a
+      **"Stop scan"** button. Detection-only, GET-only, rate-limited —
+      it never proves exploitation.
+- [ ] **The other pages open:** User Management, Reports & History,
+      Case Management, Classroom Demo, Diagnostics, Settings.
+
+### 9.5 If the exe does not work
+
+- **Exe will not start / SmartScreen blocks it:** unblock it in the
+  file properties (right-click → Properties → Unblock), or rebuild as a
+  one-folder build (see §9.2). This VM cannot reproduce Windows
+  SmartScreen behavior.
+- **Cannot connect to the backend:** check the Control Center's Project
+  root, Backend Python, API host, and API port. Start the backend from
+  the Control Center, or run `python run.py` in the project folder
+  yourself and confirm http://127.0.0.1:8000 loads in a browser.
+- **Model not loaded:** run `python scripts/setup_cyberllm.py --check`
+  in the project folder, or use the Model Testing page's download +
+  verify buttons. Check the adapter SHA matches `d624ed79…5a5b1`.
+- **First inference is very slow:** normal on CPU (minutes). On the
+  GTX 1660 SUPER it should use CUDA when available; otherwise use the
+  8-bit (`CYBERLLM_LOAD_IN_8BIT=1`) or CPU fallback. GPU fit on 6 GB is
+  still an unverified estimate — see §18.
+- **Full troubleshooting list:** §18. Full build guide:
+  `security_lab/packaging/BUILD_GUIDE.md`.
+
+## 10. Environment Configuration
 
 Copy `.env.example` -> `.env` (never commit `.env`). Verified vars from `app/config.py` and `.env.example`:
 
@@ -302,7 +464,7 @@ Copy `.env.example` -> `.env` (never commit `.env`). Verified vars from `app/con
 
 Runs fully locally; no external LLM API required (local CyberLLMv1). Model paths come from `CYBERLLM_*` (see the table above and `.env.example`).
 
-## 10. Running SentientAI
+## 11. Running SentientAI
 
 - `python run.py` -> Uvicorn 127.0.0.1:8000, reload on `app/` (excludes `data/*.db`, `*.log`)
 - `run.bat start` / `run.bat test` / `run.bat status` / `run.bat export` / `run.bat export-eval` / `run.bat backfill [--apply]`
@@ -313,7 +475,7 @@ Runs fully locally; no external LLM API required (local CyberLLMv1). Model paths
 - Docs: http://127.0.0.1:8000/api/docs ; health: `GET /api/health`
 - Stop: Ctrl+C
 
-## 11. CyberLLMv1 Model Details (Sentinel models removed 2026-10-27)
+## 12. CyberLLMv1 Model Details (Sentinel models removed 2026-10-27)
 
 The old Sentinel models (`SentinelModel`, `sentinel_best_model.pt`, `best_autolab_checkpoint.pt`, `sentinel_tokenizer.json`, `prompts/prompt.txt`, `sentinel_loader.py`, `sentinel_inference.py`, `sentinel_fusion.py`, `sentinel_schema.py`, `sentinel_moderation.py`, `prompt_service.py`) were removed. Do not download the old checkpoints; nothing requires them.
 
@@ -321,20 +483,20 @@ CyberLLMv1: base `Qwen/Qwen3-1.7B` @ revision `70d244cc86ccca08cf5af4e1e306ecf90
 
 Limitations: CyberLLMv1 is a research candidate, not a deployable detector on its own; it has no MITRE field by design (exact technique-ID prediction measured 0.000–0.025 across pilots); it is not a content-moderation model. Human review is required for consequential decisions. No retraining in this release.
 
-## 12. Security Detection and Moderation
+## 13. Security Detection and Moderation
 
 Rules vs models are separate. Working deterministic rules: XSS probe contextual (`_is_xss_probe` tag+handler), SQLi probe keyword+operator, traversal `../` + `etc/passwd`/`win.ini`, brute-force `>=5` failed in 10m per IP (window dedup, supports single-line/JSON/syslog/mixed via `_segment_log_text`), port scan `>=8` distinct ports or `nmap`, success-after-fail, rate buckets (7 buckets, sliding window `limit_login 30/300s`), headers/cookie/cors/info-disclosure checks. Evidence capped (`[:2000]` etc), redacted before storage, pseudonymous `ip_hash`.
 
 Model path: CyberLLMv1 classification via `classifier.classify_log`, fused by `fuse_classification` (rules 50% + confident model 50%; SSRF/metadata deterministic override; unavailable/unparseable/mismatched/truncated -> `needs_review`). Empty/invalid/uncertain -> human review; `TrainingExample` never auto-approves (`safe_to_train` only via `apply_review`).
 
 No OS firewall rule is created; `TempBlock` is application-layer only and reversible.
-## 13. Training and Data Governance
+## 14. Training and Data Governance
 
 Lifecycle: candidate (`CANDIDATE`, `safe_to_train False`, from moderation decision only via `collection.collect_from_moderation`) -> human review (`approve`/`reject`/`needs_edit` with reason, `apply_review` sets `safe_to_train`) -> approved `safe_to_train True` -> export train split only (`SPLIT_TRAIN`). Rejected kept with reason (`REJECTION_REASONS`), not deleted. Dedup via `dedup_hash` (SHA256 of normalized instruction+input). Eval split (`SPLIT_EVAL`) isolated; `test_evaluation_set_not_in_training_data` guards against leakage. No auto-promotion. Snapshots limited to 600 chars. Sentinel `sentinel_*` columns stored separately from deterministic `quality_score/band`, never gate approval.
 
-Future retrain prerequisites (gated): properly labeled moderation dataset 80/20 per-category stratified (benign, spam, harassment, prompt_injection, ambiguous, attack sub-categories), benign/suspicious pairs, encoding variants, multiline vs single-line, JSON schema validated, `completion_only` emits after `<output>`, eval isolated, do not overwrite baselines; candidates are exported as JSONL via the review queue (§16); no model weights are stored in the repo.
+Future retrain prerequisites (gated): properly labeled moderation dataset 80/20 per-category stratified (benign, spam, harassment, prompt_injection, ambiguous, attack sub-categories), benign/suspicious pairs, encoding variants, multiline vs single-line, JSON schema validated, `completion_only` emits after `<output>`, eval isolated, do not overwrite baselines; candidates are exported as JSONL via the review queue (§17); no model weights are stored in the repo.
 
-## 14. Testing
+## 15. Testing
 
 ```bash
 .\venv\Scripts\python.exe -m pytest tests/ -q
@@ -347,23 +509,23 @@ Baseline on this branch (2026-10-28, Linux): website 635 passed + 1 skipped (pre
 
 Covers: auth, blog lifecycle, admin, moderation, csrf, sanitization, scoring, ATTACT scope/checks, classifier adapter and fusion, log validation, bruteforce regression, evaluation isolation, moderation contract, E2E review queue, Security Lab GUI smoke, scanner safety, client/admin API, model/evaluation, reports redaction. Passing unit tests does not establish detection accuracy.
 
-## 15. Evaluation and Diagnostics
+## 16. Evaluation and Diagnostics
 
 - `evaluation_matrix.py`: 26 fixed log cases (benign 10 inc. 2 suspicious, auth_abuse 8, port_scan 1, xss/sqli/traversal/cmdi/ssrf/ssti/upload 1 each). Each records `ground_truth`, `log_text`, deterministic `rules` verdict/score/latency, single CyberLLMv1 `classification`, `fusion`. CLI: `python evaluation_matrix.py [--with-models --max-new-tokens 24] --output-dir evaluation`
 - `evaluation_moderation.py`: 13-case moderation split (benign 4, spam 3, harassment 2, prompt_injection 2, ambiguous 2) with `attack` bool, metrics `valid_rate/tp/fp/tn/fn/precision/recall/f1` to `evaluation/moderation_latest.json`. No model is run (moderation is human-only since the 2026-10-27 migration); `valid_rate` is honestly 0.0. CLI: `python evaluation_moderation.py --output-dir evaluation`
-- `evaluation/latest.json` and `evaluation/moderation_latest.json`: the committed baselines are Sentinel-era (pre-migration, 26-case rules F1 0.69, Sentinel models 0% valid JSON) and are kept as history. For current test status see §14 and `reports/TEST_RESULTS.md`. The working-tree evaluation files are uncommitted churn — never commit them. Historical `results_*.json` removed as duplicate clutter; only latest baselines retained.
+- `evaluation/latest.json` and `evaluation/moderation_latest.json`: the committed baselines are Sentinel-era (pre-migration, 26-case rules F1 0.69, Sentinel models 0% valid JSON) and are kept as history. For current test status see §15 and `reports/TEST_RESULTS.md`. The working-tree evaluation files are uncommitted churn — never commit them. Historical `results_*.json` removed as duplicate clutter; only latest baselines retained.
 - `Documentation/SENTINEL_DIAGNOSTIC_REPORT.md`: loader/prompt/generation root cause.
 - `Documentation/EVALUATION.md` and `DETECTION_REPORT.md`: honest results and coverage table.
 
 Valid JSON vs correct security classification are distinct; empty is not a prediction. Small-n categories (`n=1`) flagged insufficient.
 
-## 16. Database and Administration
+## 17. Database and Administration
 
 SQLite file database (gitignored via `*.db`; path from `DATABASE_URL`). `init_db()` creates tables, then `_run_migrations` adds any missing columns non-destructively and backfills legacy rows. Admin access: every `/admin` route depends on `require_admin`. Management: `python manage.py seed-admin` (creates a bootstrap admin — change its password immediately after first login), `list-users`, `set-role`, `remove-all-users`, `reset-db --yes` (destructive: drop + recreate + seed one admin). Review queue: `/admin/training` pending/rejected, approve/reject/needs_edit, export train JSONL via `/admin/export` or `run.bat export` (eval via `export-eval`).
 
 Do not expose admin credentials in logs or docs. Default bootstrap credentials are for local development only.
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 - Missing deps: `pip install -r requirements.txt -r requirements-dev.txt` in activated venv; verify with `.\venv\Scripts\python.exe -c "import app.main; app.main.create_app(); print('ok')"`
 - venv activation: PowerShell `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` for current process
@@ -374,17 +536,17 @@ Do not expose admin credentials in logs or docs. Default bootstrap credentials a
 - Invalid model JSON: `cyberllm_schema.parse_model_output` rejects malformed output; the adapter returns `needs_review` with the raw text preserved for a human.
 - Test failures: ensure clean venv, no running server needed (`tests/conftest.py` uses throwaway SQLite file), `ratelimit.reset()` per test; `pytest.ini` (`testpaths = tests`)
 
-## 18. Security and Responsible Use
+## 19. Security and Responsible Use
 
 Experimental. Not a guaranteed defense. Human review and independent validation required. CyberLLMv1 assessments are provisional (`likely_benign`/`needs_review`/`likely_threat`) and require a reviewer. Do not test systems without authorization. ATTACT requires `--confirm-authorized` and allowlist for non-loopback. No secrets in logs/docs. Reports are monitor-only; application-level `TempBlock` does not create OS firewall rules.
 
-## 19. Limitations and Roadmap
+## 20. Limitations and Roadmap
 
 Current limitations: CyberLLMv1 exact MITRE technique-ID prediction measured 0.000–0.025 across pilots (no MITRE field by design); no per-category precision/recall beyond auth_abuse/port_scan; narrow rules; small-n categories (n=1 each for xss/sqli/traversal/cmdi/ssrf/ssti/upload); in-process rate limit (single process only); prompt injection handled as DATA ONLY only in moderation path; Windows exe build, GPU fit/latency, and real 1.7B inference unverified (Linux CPU results only).
 
 Roadmap (future work): Windows battery (exe build + double-click, GPU fit/latency, real 1.7B inference, Windows test run) to promote `1.0.0-rc.2` to stable `v1.0.0`; properly labeled moderation dataset 80/20 stratified per category with benign/suspicious pairs and encoding variants; eval isolated; per-category precision/recall + ECE; injection robustness; preserve baselines; improve structured generation reliability.
 
-## 20. Contributing and Development
+## 21. Contributing and Development
 
 - Use venv, run `pytest` before committing, keep `.env` and model weights out of git (see `.gitignore`).
 - Work on `feature/cyberllm-desktop-portable`; do not force-push, rewrite history, or push to other branches.
@@ -392,15 +554,15 @@ Roadmap (future work): Windows battery (exe build + double-click, GPU fit/latenc
 
 No license file is present; add one deliberately if you intend to license.
 
-## 21. License
+## 22. License
 
 No LICENSE file was found in this repository at the time of this cleanup. Reuse and redistribution permissions should not be assumed.
 
-## 22. Project Disclaimer
+## 23. Project Disclaimer
 
 Evolving project. Experimental detections require independent validation. Model outputs are provisional and require human review. Do not rely on this app as a sole security control.
 
-## 23. Documentation Links
+## 24. Documentation Links
 
 - `CHANGELOG.md`, `VERSION`, `DEVELOPMENT_LOG.md` -- version history, release notes, development record
 - `CYBERLLM_PORTABLE_SETUP.md`, `CYBERLLM_WINDOWS_SETUP.md`, `WINDOWS_TEST_CHECKLIST.md` -- setup + Windows verification

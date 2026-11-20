@@ -15,9 +15,10 @@
 - [6. Step 4 — Configure the app](#6-step-4--configure-the-app)
 - [7. Step 5 — Start the server](#7-step-5--start-the-server)
 - [8. Step 6 — Create the admin account](#8-step-6--create-the-admin-account)
-- [9. What each part of the project does](#9-what-each-part-of-the-project-does)
-- [10. Check it works](#10-check-it-works)
-- [11. If something goes wrong](#11-if-something-goes-wrong)
+- [9. Step 7 — Build and check the desktop .exe (Windows, optional)](#9-step-7--build-and-check-the-desktop-exe-windows-optional)
+- [10. What each part of the project does](#10-what-each-part-of-the-project-does)
+- [11. Check it works](#11-check-it-works)
+- [12. If something goes wrong](#12-if-something-goes-wrong)
 
 ---
 
@@ -406,7 +407,97 @@ Other useful admin commands (all from the project folder):
 
 ---
 
-## 9. What each part of the project does
+## 9. Step 7 — Build and check the desktop .exe (Windows, optional)
+
+The desktop Security Lab is a native Windows GUI app (PySide6) that talks
+HTTP to the backend at http://127.0.0.1:8000. **It is not the website** —
+the website runs in a browser; the exe is the desktop app. It does **not**
+bundle the backend or any model weights; those stay on the machine.
+
+> **Honest status:** the exe build + double-click run has **not** been done
+> on a Windows PC yet. The steps below come from the build script
+> (`security_lab/packaging/build_windows.bat`), the PyInstaller spec, and
+> `security_lab/packaging/BUILD_GUIDE.md`, and every feature listed was
+> confirmed in the GUI code. This Linux environment cannot build or run a
+> Windows GUI exe, so the real build and visual check are a Windows-PC
+> step.
+
+### 9a. Compile it (Windows 10/11)
+
+Do Steps 1–6 first. Then, from the project root:
+
+```bat
+security_lab\packaging\build_windows.bat
+```
+
+The script creates a build venv in `%TEMP%\seclab-build-venv`, installs
+PySide6 + `requests` + `reportlab` + PyInstaller, and runs PyInstaller on
+`security_lab\packaging\security-lab.spec`. It takes a few minutes.
+Output: `dist\CyberLLMv1-Security-Lab.exe` — double-click it, no console
+or browser needed. If SmartScreen flags the unsigned exe, unblock it in
+the file properties (expected for a locally built PyInstaller app).
+
+### 9b. Set it up (first run)
+
+1. On first run it asks for (or auto-detects) the **project root** and
+   the **backend Python** (the project venv's `python.exe`).
+2. In the **Control Center**, confirm: Project root, Backend Python, API
+   host `127.0.0.1`, API port `8000`.
+3. Click **"Verify adapter SHA + artifacts"** — it must report OK.
+4. Click **"Start backend"** — status shows running; **"Refresh
+   status"** shows readiness `not_loaded` until the first analysis.
+5. User Management needs a real admin — create one from the project
+   folder (`manage.py create-admin ...` then `manage.py set-role
+   --username <name> --role admin`) and sign in on that page.
+
+### 9c. Check it works (feature checklist)
+
+Every item below was confirmed in the code — if one is missing, the build
+is wrong, not the guide.
+
+- [ ] **Control Center** opens with Start/Stop/Restart backend,
+      Refresh status, readiness, and the project/Python/host/port
+      fields.
+- [ ] **Tunnel Manager** (Control Center): Provider dropdown shows all
+      four — **cloudflared, ngrok, pinggy, zrok**. Pinggy free needs no
+      token (60-minute tunnels); Pinggy Pro uses the token field (never
+      saved); ngrok needs an authtoken once; zrok needs `zrok enable`
+      once; cloudflared quick tunnel needs no account.
+- [ ] **Download manager** (Model Testing page): **"Download
+      CyberLLM"**, **"Cancel download"**, **"Verify (SHA-256)"** with a
+      progress bar (MB, speed, ETA). Base comes from Hugging Face
+      (resumable); the adapter from the public repo
+      `Uchiha80971/CyberLLM-v8` by default. A SHA mismatch fails the
+      check and the loader refuses the adapter; a cancelled download
+      resumes.
+- [ ] **Prompt Test Lab:** run a prompt against the real model —
+      generation is **greedy/deterministic**. History is saved;
+      **"Compare selected (2 runs)"** compares two runs; **"Clear
+      history"** wipes it.
+- [ ] **Model Testing:** example dropdown, **"Run Inference"**,
+      **"Run batch evaluation"**.
+- [ ] **Scanner:** target + authorization checkbox, allowlist,
+      **"Stop scan"** button. Detection-only.
+- [ ] **Other pages open:** User Management, Reports & History, Case
+      Management, Classroom Demo, Diagnostics, Settings.
+
+### 9d. If the exe does not work
+
+- **SmartScreen blocks it:** unblock in file properties, or rebuild as
+  a one-folder build.
+- **Cannot connect:** check the Control Center's project root, backend
+  Python, host, and port — or start the backend yourself with
+  `python run.py` and confirm http://127.0.0.1:8000 loads.
+- **Model not loaded:** `python scripts/setup_cyberllm.py --check`, or
+  use the Model Testing page's download + verify buttons.
+- **Slow first inference:** normal on CPU (minutes). Use CUDA or the
+  8-bit / CPU fallback on the 6 GB card.
+
+Full EXE guide: README section **9. Desktop Security Lab .exe
+(Windows)**. Full build guide:
+`security_lab/packaging/BUILD_GUIDE.md`.
+
+## 10. What each part of the project does
 
 A short map so a new person can find their way around. (The README
 sections 4 and 6 have the full version.)
@@ -438,7 +529,7 @@ unparseable, truncated, or lacking evidence downgrades to
 
 ---
 
-## 10. Check it works
+## 11. Check it works
 
 Run through this list after installing:
 
@@ -461,7 +552,7 @@ Run through this list after installing:
       (lab suite). Baseline on this branch: website 666 passed +
       1 skipped; lab 100 passed (non-GUI).
 
-## 11. If something goes wrong
+## 12. If something goes wrong
 
 - **PowerShell blocks venv activation:** run
   `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
@@ -491,7 +582,7 @@ Run through this list after installing:
   `python manage.py reset-db --yes` to start over, or create a second
   admin first and use it to reset the first one.
 
-Full troubleshooting list: README section **17. Troubleshooting**.
+Full troubleshooting list: README section **18. Troubleshooting**.
 Full Windows setup (GPU detail, live test battery, v3 fallback):
 `CYBERLLM_WINDOWS_SETUP.md`. Portable setup:
 `CYBERLLM_PORTABLE_SETUP.md`. Model card: `cyberLLMv1/MODEL_CARD.md`.
