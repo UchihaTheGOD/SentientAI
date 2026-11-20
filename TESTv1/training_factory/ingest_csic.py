@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Phase 2: Bounded CSIC ingestion + validation. Raw unchanged, normalized + reports only."""
 import pathlib, hashlib, csv, json, collections
-ROOT = pathlib.Path(r"C:\Users\DARK\Desktop\wild clude\SentientAI")
+ROOT = pathlib.Path(__file__).resolve().parents[2]  # project root, resolved from this file (portable, no hardcoded path)
 RAW = ROOT / "datasets/raw/web/csic_database.csv"
 MANIFEST = ROOT / "datasets/manifests/csic_database.json"
 OUT_NORMALIZED = ROOT / "datasets/normalized/csic_normalized.jsonl"

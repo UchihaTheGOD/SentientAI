@@ -71,6 +71,10 @@ def _report_links(db, run) -> dict:
 
 @router.get("/runs")
 def list_runs(limit: int = 20, test_type: str | None = None, status: str | None = None, severity: str | None = None, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    # Clamp at entry: a negative limit made min(limit, 50) negative,
+    # and SQLAlchemy renders LIMIT -1 on SQLite as "no limit", so the
+    # intended 50-row cap was defeated by a one-character input.
+    limit = min(max(limit, 1), 50)
     from app.models.security_lab import SecurityLabRun
     q=db.query(SecurityLabRun).order_by(SecurityLabRun.created_at.desc())
     if test_type: q=q.filter(SecurityLabRun.test_type==test_type)
@@ -87,10 +91,10 @@ def list_runs(limit: int = 20, test_type: str | None = None, status: str | None 
                 elif not sev and severity.lower()=="unavailable": filtered.append(_r)
             except Exception: 
                 if severity.lower()=="unavailable": filtered.append(_r)
-            if len(filtered)>=min(limit,50): break
-        rows=filtered[:min(limit,50)]
+            if len(filtered)>=limit: break
+        rows=filtered[:limit]
     else:
-        rows=q.limit(min(limit,50)).all()
+        rows=q.limit(limit).all()
     out=[]
     for r in rows:
         d=_lab_row_dict(r); d.update(_report_links(db,r)); out.append(d)
@@ -116,13 +120,14 @@ def get_run(rid: int, db: Session = Depends(get_db), user: User = Depends(requir
     return {**d, "event_ids": eids, "events": evs, "links": links, "fusion": fusion, "model_a_text": getattr(r,"model_a_text",None), "model_b_text": getattr(r,"model_b_text",None)}
 
 def _persist_run_assessment(db: Session, run, inference: dict, fused: dict, incident, cand_id: int | None, *, analysis_error: str | None = None) -> None:
-    ma=(inference.get("model_a") or {}); mb=(inference.get("model_b") or {})
+    # Legacy-named storage columns (see incident_service note): the
+    # classifier slot holds the single CyberLLMv1 summary/status.
     try:
-        run.model_a_text=(ma.get("text") or "")[:4000] if ma.get("text") else None
-        run.model_a_status=ma.get("status")
-        run.model_b_text=(mb.get("text") or "")[:4000] if mb.get("text") else None
-        run.model_b_status=mb.get("status")
-        run.agreement=inference.get("agreement")
+        run.model_a_text=(inference.get("summary") or "")[:4000] if inference.get("summary") else None
+        run.model_a_status=inference.get("status")
+        run.model_b_text=None
+        run.model_b_status=None
+        run.agreement=None
         run.fused_verdict=fused.get("fused_verdict")
         try: run.fused_score=int(fused.get("fused_score")) if fused.get("fused_score") is not None else None
         except Exception: run.fused_score=None
@@ -141,6 +146,7 @@ def _persist_run_assessment(db: Session, run, inference: dict, fused: dict, inci
 @router.post("/analyze")
 def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     log_text=None
+    input_truncated=False
     target_run=None
     if body.log_text is not None:
         log_text=body.log_text.strip()
@@ -154,15 +160,20 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         try: eids=json.loads(run.event_ids or "[]")
         except Exception: eids=[]
         rows=db.query(SecurityEvent).filter(SecurityEvent.id.in_(eids)).all() if eids else []
-        parts=[]
-        for e in rows: parts.append((e.evidence or e.event_type or "")[:1200])
+        raw_parts=[(e.evidence or e.event_type or "") for e in rows]
+        parts=[p[:1200] for p in raw_parts]
         if not parts:
             try: meta=json.loads(run.meta_json or "{}")
             except Exception: meta={}
             synth=meta.get("synthetic_evidence")
             if synth: parts=[synth]
         if not parts: raise HTTPException(status_code=422, detail="no evidence for that lab run")
-        log_text=" | ".join(parts)[:7000]
+        joined=" | ".join(parts)
+        # Disclose silent truncation: callers must know the model did
+        # not see the full evidence (per-part 1200 cap, 7000 total).
+        input_truncated=(any(len(p) > 1200 for p in raw_parts)
+                         or len(joined) > 7000) if raw_parts else False
+        log_text=joined[:7000]
         try:
             mm=json.loads(run.meta_json or "{}")
             if mm.get("is_synthetic"): log_text="[SYNTHETIC EVIDENCE] "+log_text
@@ -171,27 +182,27 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         from app.models.attact_assessment import SecurityEvent
         rows=db.query(SecurityEvent).filter(SecurityEvent.id.in_(body.event_ids)).all()
         if not rows: raise HTTPException(status_code=404, detail="no events for ids")
-        log_text=" | ".join((r.evidence or r.event_type or "")[:1200] for r in rows)[:7000]
+        raw_parts=[(r.evidence or r.event_type or "") for r in rows]
+        joined=" | ".join(p[:1200] for p in raw_parts)
+        input_truncated=(any(len(p) > 1200 for p in raw_parts)
+                         or len(joined) > 7000)
+        log_text=joined[:7000]
     else:
         raise HTTPException(status_code=422, detail="provide lab_run_id or event_ids or log_text")
-    from app.services.prompt_service import PROMPT_PATH, build_analysis_prompt
-    from app.services.sentinel_inference import run_dual_inference
-    from app.services.sentinel_schema import fuse_structured
+    from app.services.classifier import classify_log, fuse_classification
     from app.services.incident_service import create_incident
-    from app.services.sentinel_loader import get_status
+    from app.services.cyberllm_loader import get_status
     import time, re, ipaddress
-    try: prompt_text=build_analysis_prompt(log_text)
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
     ip_cands=re.findall(r"(?:\d{1,3}\.){3}\d{1,3}", log_text); ip_addr=None
     for c in ip_cands:
         try: ipaddress.ip_address(c); ip_addr=c; break
         except Exception: pass
     status=get_status()
     t0=time.perf_counter()
-    inference=run_dual_inference(prompt_text, max_new_tokens=body.max_new_tokens, timeout_s=18)
-    fused=fuse_structured(log_text, inference)
+    inference=classify_log(log_text, kind="log", max_new_tokens=body.max_new_tokens)
+    fused=fuse_classification(log_text, inference)
     inc=None
-    try: inc=create_incident(db, log_text=log_text, ip_address=ip_addr, fused={"fused_score": fused.get("fused_score", 50), "fused_verdict": fused.get("fused_verdict","needs_review"), "rules": fused.get("rules", {}) if isinstance(fused.get("rules"), dict) else {}}, inference=inference, prompt_path=str(PROMPT_PATH))
+    try: inc=create_incident(db, log_text=log_text, ip_address=ip_addr, fused={"fused_score": fused.get("fused_score", 50), "fused_verdict": fused.get("fused_verdict","needs_review"), "rules": fused.get("rules", {}) if isinstance(fused.get("rules"), dict) else {}}, classification=inference)
     except Exception: pass
     cand_id=None
     if inc is not None:
@@ -202,18 +213,7 @@ def lab_analyze(body: AnalyzeBody, request: Request, db: Session = Depends(get_d
         except Exception: pass
     if target_run is not None:
         _persist_run_assessment(db, target_run, inference, fused, inc, cand_id)
-    try: prompt_chars=len(prompt_text)
-    except Exception: prompt_chars=None
-    truncated=None
-    try:
-        from app.services.sentinel_loader import get_bundle
-        tok=get_bundle().get("tokenizer")
-        if tok and prompt_text:
-            ids=tok.encode(prompt_text).ids
-            budget=768 - body.max_new_tokens - 4
-            truncated=len(ids) > budget
-    except Exception: pass
-    return {"log_text_preview": log_text[:800], "model_a": inference.get("model_a"), "model_b": inference.get("model_b"), "agreement": inference.get("agreement"), "agreement_detail": inference.get("agreement_detail"), "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "prompt_path": str(PROMPT_PATH), "prompt_chars": prompt_chars, "prompt_truncated": truncated, "ready": status.ready if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None)}
+    return {"log_text_preview": log_text[:800], "classification": inference, "fusion": fused, "incident_id": getattr(inc,"id",None), "training_candidate_id": cand_id, "ready": bool(status.ready) if hasattr(status,"ready") else None, "latency_ms": int((time.perf_counter()-t0)*1000), "lab_run_id": getattr(target_run,"id",None), "input_truncated": input_truncated, "input_chars": len(log_text)}
 
 @router.post("/log-analyze")
 def log_analyze(body: LogAnalyzeBody, db: Session = Depends(get_db), user: User = Depends(require_admin)):

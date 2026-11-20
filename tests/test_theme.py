@@ -21,16 +21,24 @@ def test_theme_selector_in_base():
     assert "theme_selector" in t, "base_public missing theme_selector include"
     assert "theme.js" in t, "theme.js not included"
     assert "theme.css" in t
-    assert 'data-theme' in t
+    # The no-flash script is now an external file (CSP script-src 'self'
+    # only, no unsafe-inline) — it must still be referenced from base.
+    assert "theme_bootstrap.js" in t
 
 
 def test_inline_no_flash_script_sets_data_theme():
+    # Behaviour preserved, location changed for CSP: the script lives in
+    # app/static/js/theme_bootstrap.js and must be referenced from <head>
+    # before the first stylesheet to avoid FOUC.
+    bootstrap = pathlib.Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "theme_bootstrap.js"
+    assert bootstrap.exists()
+    js = bootstrap.read_text(encoding="utf-8")
+    assert "sentient_theme" in js
+    assert "prefers-color-scheme" in js
+    assert "data-theme" in js
     t = BASE.read_text(encoding="utf-8")
-    assert "sentient_theme" in t
-    assert "prefers-color-scheme" in t
-    assert "data-theme" in t
-    # must be before first stylesheet to avoid FOUC
-    assert t.index("sentient_theme") < t.index("theme.css")
+    assert "theme_bootstrap.js" in t
+    assert t.index("theme_bootstrap.js") < t.index("theme.css")
 
 
 def test_theme_js_implements_three_modes():
@@ -64,9 +72,14 @@ def test_selector_accessibility_markers():
     assert t.count("data-theme-value") >= 3
 
 
-def test_csp_allows_inline_theme_script():
+def test_csp_script_src_has_no_unsafe_inline():
+    # Theme script is external now, so script-src must not allow inline
+    # scripts; style-src still needs 'unsafe-inline' for style attributes.
     main = (pathlib.Path(__file__).resolve().parent.parent / "app" / "main.py").read_text(encoding="utf-8")
-    assert "'unsafe-inline'" in main
+    script_src = [line for line in main.splitlines() if "script-src" in line]
+    assert script_src and "unsafe-inline" not in script_src[0]
+    style_src = [line for line in main.splitlines() if "style-src" in line]
+    assert style_src and "unsafe-inline" in style_src[0]
 
 
 def _get_theme_helpers():

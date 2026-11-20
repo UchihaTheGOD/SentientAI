@@ -84,7 +84,15 @@ def run_and_persist(
         assessment.elapsed_ms = report.elapsed_ms
         assessment.allowlist = json.dumps(report.allowlist, ensure_ascii=False)
         assessment.limitations = json.dumps(report.limitations, ensure_ascii=False)
-        assessment.report_json = json.dumps(report.to_dict(), ensure_ascii=False)[:100000]
+        # Finding rows are stored redacted; the report blob must be
+        # too, or it persists the same raw response material (error
+        # bodies, sensitive-file bodies, cookie excerpts) unredacted
+        # in the assessment row.
+        report_dict = report.to_dict()
+        for _f in report_dict.get("findings", []):
+            if isinstance(_f, dict) and _f.get("evidence"):
+                _f["evidence"] = redact(_f["evidence"])
+        assessment.report_json = json.dumps(report_dict, ensure_ascii=False)[:100000]
         assessment.finished_at = datetime.now(timezone.utc)
         assessment.status = "completed"
         db.commit()

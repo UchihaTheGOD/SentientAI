@@ -7,7 +7,7 @@
 - No dataset download, no Kaggle push, no overwrite of local_models/sentinel/*
 """
 import pathlib, json, hashlib, time, sys
-ROOT = pathlib.Path(r"C:\Users\DARK\Desktop\wild clude\SentientAI")
+ROOT = pathlib.Path(__file__).resolve().parents[2]  # project root, resolved from this file (portable, no hardcoded path)
 sys.path.insert(0, str(ROOT))
 from tokenizers import Tokenizer
 import torch

@@ -1,5 +1,5 @@
 import pathlib, hashlib, csv, json, collections
-ROOT = pathlib.Path(r"C:\Users\DARK\Desktop\wild clude\SentientAI")
+ROOT = pathlib.Path(__file__).resolve().parents[2]  # project root, resolved from this file (portable, no hardcoded path)
 raw = ROOT / "datasets/raw/web/csic_database.csv"
 h = hashlib.sha256()
 with open(raw, "rb") as f:

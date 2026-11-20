@@ -44,7 +44,7 @@ def test_evaluation_set_not_in_training_data(db):
 def test_metrics_separate_rules_and_models():
     import evaluation_matrix as m
     payload = m.run_evaluation(with_models=False, output_dir="evaluation")
-    assert "rules" in payload["metrics"] and "model_a" in payload["metrics"]
+    assert "rules" in payload["metrics"] and "classification" in payload["metrics"]
     assert "fusion" in payload["metrics"]
     # rules should have recall > 0, models without inference should have recall 0
     assert payload["metrics"]["rules"]["recall"] > 0
@@ -53,7 +53,7 @@ def test_json_probe_invalid_without_retraining():
     import evaluation_matrix as m
     # Without models, json probe is None; with mocked empty, it should be invalid
     rec = m.evaluate_case(m.EVAL_CASES[0], with_models=False)
-    assert rec["model_a"] is None  # no model run
+    assert rec["classification"] is None  # no model run
 
 def test_evaluation_records_latency_and_errors():
     import evaluation_matrix as m

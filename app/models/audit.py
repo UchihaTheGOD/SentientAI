@@ -40,6 +40,21 @@ AUDIT_EVENT_TYPES = (
     "training.candidate_approved",
     "training.candidate_rejected",
     "training.candidate_needs_edit",
+    # Admin user management (CyberLLMv1 Security Lab JSON API).
+    "admin.user_created",
+    "admin.user_role_changed",
+    "admin.user_activated",
+    "admin.user_deactivated",
+    "admin.user_suspended",
+    "admin.user_unsuspended",
+    "admin.password_reset_initiated",
+    # AI Automation Center admin actions.
+    "automation.start",
+    "automation.pause",
+    "automation.resume",
+    "automation.retry_failed",
+    "automation.backfill",
+    "automation.scanner_import",
 )
 
 

@@ -11,8 +11,11 @@ logger = logging.getLogger("sentientai.training")
 from app.models.sentinel_incident import SentinelIncident
 
 # lightweight smoke train: never run multi-hour automatically
-CANDIDATE_DIR = Path("local_models/sentinel/candidates")
-ACTIVE_PTR = Path("local_models/sentinel/active_candidate.txt")
+# Project-root-relative (not cwd-relative): candidate promotion must not
+# depend on which directory the server was launched from.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+CANDIDATE_DIR = _PROJECT_ROOT / "local_models" / "sentinel" / "candidates"
+ACTIVE_PTR = _PROJECT_ROOT / "local_models" / "sentinel" / "active_candidate.txt"
 
 def collect_reviewed_example(db, incident: SentinelIncident) -> Optional[dict]:
     if incident.status not in ("confirmed_threat","false_positive"):

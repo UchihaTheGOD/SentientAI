@@ -1,3 +1,4 @@
+param([string]$ProjectPath = $PSScriptRoot)
 # Restart SentientAI server correctly using venv
 $ErrorActionPreference = "SilentlyContinue"
 Write-Host "=== Killing stale python processes on :8000 ==="
@@ -19,10 +20,11 @@ Write-Host "=== Checking remaining python ==="
 tasklist | findstr /i python | Write-Host
 Start-Sleep 1
 # Start server with venv
-$proj = "c:\Users\DARK\Desktop\wild clude\SentientAI"
-Write-Host "=== Starting server via venv ==="
+$venvPython = Join-Path $ProjectPath ".venv\Scripts\python.exe"
+if (-not (Test-Path $venvPython)) { $venvPython = Join-Path $ProjectPath "venv\Scripts\python.exe" }
+Write-Host "=== Starting server via venv ($venvPython) ==="
 # Use Start-Process to detach
-$proc = Start-Process -FilePath "$proj\venv\Scripts\python.exe" -ArgumentList "run.py" -WorkingDirectory $proj -PassThru -WindowStyle Hidden
+$proc = Start-Process -FilePath $venvPython -ArgumentList "run.py" -WorkingDirectory $ProjectPath -PassThru -WindowStyle Hidden
 Write-Host "Started PID $($proc.Id)"
 Start-Sleep 3
 # Poll health

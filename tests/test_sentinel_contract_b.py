@@ -1,26 +1,28 @@
 def test_fusion_ignores_invalid():
-    from app.services.sentinel_fusion import fuse
+    from app.services.classifier import fuse_classification
     benign="2024-01-01 10:00:00 INFO user alice fetched /blog 200"
-    inf={"model_a": {"text": "likely_threat attack confirmed!!!", "status": "ok"}, "model_b": {"text": "likely_threat", "status": "ok"}}
-    r=fuse(benign, inf)
-    assert r["model_a_valid"] is False and r["model_b_valid"] is False
+    # An unparseable CyberLLM result must not move fusion away from the rules.
+    inf={"source": "cyberllm", "status": "unparseable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []}
+    r=fuse_classification(benign, inf)
     assert r["fused_verdict"]=="likely_benign" and r["fused_score"]==0
-    assert "invalid structure" in r["components"][1]["evidence"][0]
+    assert r["components"][1]["source"] == "cyberllm" and r["components"][1]["verdict"] is None
 def test_fusion_empty_no_fake_threat():
-    from app.services.sentinel_fusion import fuse
-    inf={"model_a": {"text": "", "status": "empty"}, "model_b": {"text": "", "status": "empty"}}
-    r=fuse("", inf)
+    from app.services.classifier import fuse_classification
+    inf={"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []}
+    r=fuse_classification("", inf)
     assert r["fused_verdict"]=="likely_benign" and r["fused_score"]==0
-    assert r["model_a_valid"] is False
+    assert r["model_status"] == "unavailable"
 def test_fusion_valid_contributes():
-    from app.services.sentinel_fusion import fuse
-    valid_a=("Summary:\nAttack detected: 6 failures.\nIndicators:\n- 198.51.100.23 6 failed logins 401\nReasoning:\nRepeated failures exceed threshold.\nProvisional assessment: likely_threat\nInput status: valid")
-    valid_b=("Summary:\nSuspicious repeated failures.\nIndicators:\n- same IP repeated\nReasoning:\nNeeds review.\nProvisional assessment: needs_review\nInput status: valid")
+    from app.services.classifier import fuse_classification
     log="\n".join([f"2024-01-01 10:00:{i:02d} WARN 198.51.100.23 login failed 401" for i in range(6)])
-    inf={"model_a": {"text": valid_a, "status": "ok"}, "model_b": {"text": valid_b, "status": "ok"}, "agreement": None}
-    r=fuse(log, inf)
-    assert r["model_a_valid"] is True and r["model_b_valid"] is True
-    assert r["components"][1]["structured_valid"] is True
+    inf={"source": "cyberllm", "status": "ok", "classification": "likely_threat", "confidence": "high",
+         "summary": "Attack detected: 6 failures.", "indicators": ["198.51.100.23 6 failed logins 401"],
+         "reasoning": "Repeated failures exceed threshold.", "deterministic_findings": []}
+    r=fuse_classification(log, inf)
+    assert r["model_classification"] == "likely_threat"
+    assert r["components"][1]["source"] == "cyberllm" and r["components"][1]["verdict"] == "likely_threat"
+    # Rules 40 + model 85 -> 62, i.e. needs_review under the 65 threat threshold.
+    assert r["fused_score"] == 62 and r["fused_verdict"] == "needs_review"
 def test_api_rejects_empty():
     from app.main import create_app
     from tests.conftest import Client
@@ -55,4 +57,4 @@ def test_api_valid_flow():
     assert r2.status_code==200
     data=r2.json()
     assert data["verdict"] in ("likely_benign","needs_review","likely_threat")
-    assert data["model_a"] is not None and data["model_b"] is not None
+    assert data["classification"] is not None and data["classification"]["source"] == "cyberllm"

@@ -1,5 +1,5 @@
 import pathlib, json, hashlib, csv, collections
-ROOT = pathlib.Path(r"C:\Users\DARK\Desktop\wild clude\SentientAI")
+ROOT = pathlib.Path(__file__).resolve().parents[3]  # project root, resolved from this file (portable, no hardcoded path)
 RAW = ROOT / "datasets/raw/web/csic_database.csv"
 REPORT = ROOT / "datasets/reports/csic_validation.json"
 NORMALIZED = ROOT / "datasets/normalized/csic_normalized.jsonl"

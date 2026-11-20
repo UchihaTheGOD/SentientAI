@@ -161,22 +161,16 @@ def collect_from_moderation(
             is_duplicate=is_duplicate,
         )
 
-        # Honest Sentinel moderation: only if ready + budget; save actual result separately.
-        sentinel_info = None
-        try:
-            from app.services.sentinel_loader import get_status as _sent_status
-            _st = _sent_status()
-            _ready = bool(_st.ready)
-            # Budget guard: respect max_pos
-            if _ready:
-                from app.services import sentinel_moderation as _sm
-                # Invoke on the reported content snapshot (untrusted data as data)
-                sentinel_info = _sm.run_moderation_for_text(content, max_new_tokens=_sm.MAX_MODERATION_TOKENS, timeout_s=_sm.TIMEOUT_S)
-            else:
-                sentinel_info = {"status": "skipped_not_ready", "json_valid": False, "parsed": None, "error": "model_not_ready", "raw_text": "", "text": "", "tokens": 0, "latency_ms": 0}
-        except Exception as exc:
-            logger.warning("sentinel moderation invocation failed: %s", exc)
-            sentinel_info = {"status": "error", "json_valid": False, "parsed": None, "error": str(exc)[:300], "raw_text": "", "text": "", "tokens": 0, "latency_ms": 0}
+        # Moderation is now human-only: the obsolete Sentinel moderation
+        # model was removed, and CyberLLMv1 is a security-log classifier,
+        # not a content-moderation classifier — forcing it to moderate
+        # blog posts/comments would be a misuse of the model. The
+        # training candidate itself is born from the moderator's own
+        # decision (see module docstring), so removing the model
+        # annotation does not change what the candidate teaches.
+        # Legacy-named sentinel_* columns are kept as storage (existing
+        # DB) and record the honest removal status.
+        sentinel_info = {"status": "model_removed_human_review_only", "json_valid": False, "parsed": None, "error": "legacy Sentinel moderation model removed; human review is the sole moderation authority", "raw_text": "", "text": "", "tokens": 0, "latency_ms": 0}
         # Prepare sentinel columns for storage (honest, may be not-ready/empty)
         _sent_status_val = (sentinel_info or {}).get("status")
         _sent_raw = (sentinel_info or {}).get("raw_text") or (sentinel_info or {}).get("text") or ""

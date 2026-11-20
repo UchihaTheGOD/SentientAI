@@ -237,4 +237,16 @@ def log_event(
         except Exception:
             pass
         raise
+    # Automation queue: every persisted event enters the persistent
+    # analysis queue. Queueing is a best-effort insert on its own
+    # session and must never break event logging or the request that
+    # produced the event — a failure here is logged, not raised.
+    try:
+        from app.services.automation import enqueue_event as _auto_enqueue
+
+        _auto_enqueue(ev.id)
+    except Exception:
+        _logger.warning(
+            "automation enqueue failed for event %s", ev.id, exc_info=True
+        )
     return ev

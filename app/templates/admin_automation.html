@@ -1,0 +1,147 @@
+{% extends "base_public.html" %}
+{% block title %}AI Automation Center — Sentient Admin{% endblock %}
+
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+
+  {% include "partials/admin_nav.html" %}
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/admin">Admin</a> <span class="breadcrumb-sep">›</span>
+    <span>AI Automation Center</span>
+  </nav>
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">AI Automation Center</h1>
+      <p class="page-lead">
+        Security events are queued automatically when they are logged and analyzed
+        by CyberLLMv1 in the background. AI verdicts are advisory: they never block
+        addresses, never approve training data, and never run remediation. Only a
+        human reviewer can approve a candidate for training.
+      </p>
+    </div>
+    <div class="mod-actions">
+      {% if stats.automation_enabled %}
+      <span class="badge badge-green">Automation on</span>
+      {% else %}
+      <span class="badge badge-yellow">Automation paused</span>
+      {% endif %}
+      <span class="badge">Worker: {{ stats.worker.state }}</span>
+      <a href="/admin/training" class="btn btn-outline btn-sm">AI review queue</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>Controls</h2>
+    <div class="filter-row">
+      <form method="post" action="/admin/automation/start">
+        {{ csrf_input() }}
+        <button class="btn btn-sm" type="submit">Start automation</button>
+      </form>
+      <form method="post" action="/admin/automation/pause">
+        {{ csrf_input() }}
+        <button class="btn btn-outline btn-sm" type="submit">Pause automation</button>
+      </form>
+      <form method="post" action="/admin/automation/resume">
+        {{ csrf_input() }}
+        <button class="btn btn-outline btn-sm" type="submit">Resume automation</button>
+      </form>
+      <form method="post" action="/admin/automation/retry-failed">
+        {{ csrf_input() }}
+        <button class="btn btn-outline btn-sm" type="submit">Retry failed jobs</button>
+      </form>
+      <form method="post" action="/admin/automation/backfill">
+        {{ csrf_input() }}
+        <button class="btn btn-outline btn-sm" type="submit">Queue unqueued events</button>
+      </form>
+      <a href="/admin/automation" class="btn btn-outline btn-sm">Refresh</a>
+    </div>
+    <p>
+      Pausing stops the worker; events keep queueing so the backlog stays visible.
+      Retrying re-queues failed jobs with a fresh attempt budget. Queueing
+      unqueued events covers events logged before automation existed.
+    </p>
+  </section>
+
+  <section>
+    <h2>Pipeline status (live backend data)</h2>
+    <table>
+      <tbody>
+        <tr><td>Automation enabled</td><td>{{ "yes" if stats.automation_enabled else "no" }}</td></tr>
+        <tr><td>Worker status</td><td>{{ stats.worker.state }}{% if stats.worker.last_seen_at %} (last seen {{ stats.worker.last_seen_at }}){% endif %}</td></tr>
+        <tr><td>Model status</td><td>{% if stats.model.ready %}ready ({{ stats.model.device or "unknown device" }}){% else %}not loaded — {{ stats.model.state }}{% if stats.model.reason %}: {{ stats.model.reason }}{% endif %}{% endif %}</td></tr>
+        <tr><td>Total events collected</td><td>{{ stats.total_events }}</td></tr>
+        <tr><td>Events awaiting analysis</td><td>{{ stats.awaiting_analysis }}</td></tr>
+        <tr><td>Events currently being analyzed</td><td>{{ stats.processing }}</td></tr>
+        <tr><td>Successfully analyzed events</td><td>{{ stats.completed }}</td></tr>
+        <tr><td>Benign events</td><td>{{ stats.benign }}</td></tr>
+        <tr><td>Suspicious events</td><td>{{ stats.suspicious }}</td></tr>
+        <tr><td>Likely threats</td><td>{{ stats.likely_threats }}</td></tr>
+        <tr><td>Incidents created</td><td>{{ stats.incidents_created }}</td></tr>
+        <tr><td>Incidents updated (linked)</td><td>{{ stats.incidents_updated }}</td></tr>
+        <tr><td>AI Review candidates generated</td><td>{{ stats.candidates_generated }}</td></tr>
+        <tr><td>Failed analyses</td><td>{{ stats.failed }}</td></tr>
+        <tr><td>Retry queue (failed + scheduled retries)</td><td>{{ stats.retry_queue }}</td></tr>
+        <tr><td>Average analysis latency</td><td>{% if stats.avg_latency_ms is not none %}{{ stats.avg_latency_ms }} ms{% else %}not measured yet{% endif %}</td></tr>
+        <tr><td>Lab runs not yet analyzed</td><td>{{ stats.unanalyzed_runs }} — <a href="/admin/reports/security">open Security Reports to analyze a run</a></td></tr>
+      </tbody>
+    </table>
+    <p>
+      MITRE ATT&amp;CK technique is shown only when a verified source provides one;
+      the current classifier emits none, so assessments leave it blank rather than
+      inventing a technique ID. Scanner findings imported from the desktop Security
+      Lab appear here with source <code>desktop_scanner</code> and are analyzed
+      independently of runtime detections.
+    </p>
+  </section>
+
+  <section>
+    <h2>Analysis history (latest 50)</h2>
+    <div class="filter-row">
+      <a class="filter-chip {% if not filter_status %}filter-chip--active{% endif %}" href="/admin/automation">All</a>
+      <a class="filter-chip {% if filter_status == 'pending' %}filter-chip--active{% endif %}" href="/admin/automation?status=pending">Pending</a>
+      <a class="filter-chip {% if filter_status == 'processing' %}filter-chip--active{% endif %}" href="/admin/automation?status=processing">Processing</a>
+      <a class="filter-chip {% if filter_status == 'completed' %}filter-chip--active{% endif %}" href="/admin/automation?status=completed">Completed</a>
+      <a class="filter-chip {% if filter_status == 'failed' %}filter-chip--active{% endif %}" href="/admin/automation?status=failed">Failed</a>
+    </div>
+    {% if jobs %}
+    <table>
+      <thead>
+        <tr>
+          <th>Job</th><th>Event</th><th>Status</th><th>Verdict</th><th>Score</th>
+          <th>Incident</th><th>Review candidate</th><th>Excluded from review</th><th>Latency</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td>#{{ job.id }}</td>
+          <td>
+            {% if job.event %}{{ job.event.event_type }} ({{ job.event.source or "?" }}){% else %}event #{{ job.event_id }}{% endif %}
+          </td>
+          <td>{{ job.status }}{% if job.attempts %} (attempt {{ job.attempts }}/{{ job.max_attempts }}){% endif %}</td>
+          <td>{{ job.verdict or "—" }}</td>
+          <td>{{ job.fused_score if job.fused_score is not none else "—" }}</td>
+          <td>
+            {% if job.incident_id %}<a href="/admin/sentinel/incidents">#{{ job.incident_id }}</a> ({{ job.incident_outcome }}){% else %}—{% endif %}
+          </td>
+          <td>
+            {% if job.training_example_id %}<a href="/admin/training">#{{ job.training_example_id }}</a>{% else %}—{% endif %}
+          </td>
+          <td>{{ job.review_exclusion_reason or "—" }}</td>
+          <td>{% if job.latency_ms is not none %}{{ job.latency_ms }} ms{% else %}—{% endif %}</td>
+        </tr>
+        {% if job.error_message %}
+        <tr><td colspan="9">Error: {{ job.error_message }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No analysis jobs yet. Events appear here automatically once they are logged.</p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}

@@ -97,10 +97,7 @@ def triage_finding(fid: int, body: TriageBody, request: Request, db: Session = D
 @router.post("/demo/run/{case_id}")
 def demo_run(case_id: str, request: Request, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     from app.services.demo_cases import get_case
-    from app.services.sentinel_loader import ensure_loaded
-    from app.services.prompt_service import build_analysis_prompt
-    from app.services.sentinel_inference import run_dual_inference
-    from app.services.sentinel_schema import fuse_structured
+    from app.services.classifier import classify_log, fuse_classification
     from app.services.security_events import log_event, redact
     case = get_case(case_id)
     if not case:
@@ -140,14 +137,12 @@ def demo_run(case_id: str, request: Request, db: Session = Depends(get_db), user
         resp_headers = {}
     evidence = f"case {case_id} {method} {path} -> {resp_status} hdrs={list(resp_headers.keys())[:8]} body={resp_text[:600]}"
     evidence = redact(evidence) or evidence
-    ensure_loaded()
     try:
-        prompt = build_analysis_prompt(evidence, extra_prompt=f"Demo {case_id} {case.get('category')}")
-        inference = run_dual_inference(prompt, max_new_tokens=64, timeout_s=12)
-        fusion = fuse_structured(evidence, inference)
+        inference = classify_log(evidence, kind="log", max_new_tokens=64)
+        fusion = fuse_classification(evidence, inference)
     except Exception as e:
-        inference = {"model_a": {"status": "error", "error": str(e)[:300]}, "model_b": {"status": "error", "error": str(e)[:300]}}
-        fusion = {"fused_verdict": "needs_review", "fused_score": 50, "error": str(e)[:500]}
+        inference = {"source": "cyberllm", "status": "error", "error": str(e)[:300], "classification": "needs_review", "confidence": "low"}
+        fusion = {"fused_verdict": "needs_review", "fused_score": 50, "error": str(e)[:500], "rules": {"evidence": []}}
     inc_id = None
     try:
         from datetime import datetime as _dt, timezone as _tz, timedelta as _td
@@ -157,7 +152,7 @@ def demo_run(case_id: str, request: Request, db: Session = Depends(get_db), user
         if dup:
             inc_id = dup.id
         else:
-            inc = create_incident(db, log_text=evidence, ip_address="127.0.0.1", fused={"fused_score": fusion.get("fused_score", 50), "fused_verdict": fusion.get("fused_verdict", "needs_review"), "rules": {"evidence": fusion.get("rules", {}).get("evidence", []) if isinstance(fusion.get("rules"), dict) else []}}, inference=inference)
+            inc = create_incident(db, log_text=evidence, ip_address="127.0.0.1", fused={"fused_score": fusion.get("fused_score", 50), "fused_verdict": fusion.get("fused_verdict", "needs_review"), "rules": {"evidence": fusion.get("rules", {}).get("evidence", []) if isinstance(fusion.get("rules"), dict) else []}}, classification=inference)
             inc_id = inc.id
     except Exception:
         pass
@@ -165,4 +160,4 @@ def demo_run(case_id: str, request: Request, db: Session = Depends(get_db), user
         log_event(db, event_type="demo.run", category=case.get("category"), severity="info", confidence="high", source="demo", request=request, route=path, http_status=resp_status, evidence=evidence, meta={"case_id": case_id, "fusion": fusion.get("fused_verdict"), "incident_id": inc_id})
     except Exception:
         pass
-    return {"case_id": case_id, "app_status": resp_status, "ground_truth": case.get("ground_truth", ""), "evidence": evidence, "fusion": fusion, "inference": inference, "incident_id": inc_id, "limitations": fusion.get("legacy_fusion", {}).get("limitations", []) if isinstance(fusion.get("legacy_fusion"), dict) else []}
+    return {"case_id": case_id, "app_status": resp_status, "ground_truth": case.get("ground_truth", ""), "evidence": evidence, "fusion": fusion, "classification": inference, "incident_id": inc_id, "limitations": inference.get("limitations", [])}

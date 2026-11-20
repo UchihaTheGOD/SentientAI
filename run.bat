@@ -3,12 +3,14 @@ REM SentientAI development task runner. Usage: run ^<task^> [args]
 setlocal
 cd /d "%~dp0"
 
-set "PY=venv\Scripts\python.exe"
+REM The project supports both .venv (the current dev environment) and venv.
+set "PY=.venv\Scripts\python.exe"
+if not exist "%PY%" set "PY=venv\Scripts\python.exe"
 if not exist "%PY%" (
-    echo [run] Python venv not found at %PY%
+    echo [run] Python venv not found (.venv or venv)
     echo [run] Create it and install deps first:
-    echo        python -m venv venv
-    echo        %PY% -m pip install -r requirements.txt -r requirements-dev.txt
+    echo        python -m venv .venv
+    echo        .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
     exit /b 1
 )
 

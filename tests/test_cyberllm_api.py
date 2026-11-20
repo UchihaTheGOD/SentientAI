@@ -55,7 +55,13 @@ def test_cyberllm_page_renders_for_user(admin_client):
     assert r.status_code == 200
     assert "CyberLLM" in r.text
     assert "csrf-token" in r.text
-    assert "/api/cyberllm/analyze" in r.text
+    # Form JS is external now (CSP script-src 'self'): the page must
+    # reference it, and that file must call the analyze endpoint.
+    assert "/static/js/cyberllm_form.js" in r.text
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "cyberllm_form.js").read_text(encoding="utf-8")
+    assert "/api/cyberllm/analyze" in js
 
 
 def test_screen_requires_auth(client):
@@ -94,6 +100,29 @@ def test_analyze_model_unavailable_is_503_not_a_verdict(admin_client):
         )
 
     assert r.status_code == 503
+
+
+def test_analyze_generation_failure_is_503_with_findings(admin_client):
+    """A non-ModelUnavailable generate() failure (OOM, tokenizer,
+    runtime) must also be a 503 carrying the deterministic findings,
+    not a generic 500 that discards them."""
+    from unittest.mock import patch
+
+    with patch(
+        "app.api.cyberllm.generate",
+        side_effect=RuntimeError("CUDA out of memory"),
+    ):
+        r = _post(
+            admin_client,
+            "/api/cyberllm/analyze",
+            {"log_text": BENIGN_TEXT},
+        )
+
+    assert r.status_code == 503
+    detail = r.json()["detail"]
+    assert detail["error"] == "model_error"
+    assert "CUDA out of memory" in detail["reason"]
+    assert isinstance(detail["deterministic_findings"], list)
 
 
 def test_analyze_ssrf_override_with_recorded_generation(admin_client):

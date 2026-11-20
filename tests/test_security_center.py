@@ -49,15 +49,17 @@ def test_demo_case_runs(app, admin):
     assert "fusion" in j and "ground_truth" in j
     assert "evidence" in j
 
-def test_sentinel_structured_fusion(app):
-    from app.services.sentinel_schema import parse_model_text, fuse_structured
-    # empty model -> low confidence, limitations
-    p = parse_model_text("", "empty")
-    assert p["confidence"] == "low" and p["limitations"]
+def test_classifier_fusion(app):
+    from app.services.classifier import fuse_classification
+    # unavailable model -> rules only, no fabricated verdict
+    unavailable = {"source": "cyberllm", "status": "unavailable", "classification": "needs_review", "confidence": "low", "deterministic_findings": []}
+    f = fuse_classification("normal log line", unavailable)
+    assert f["fused_verdict"] == "likely_benign" and f["model_status"] == "unavailable"
     # ok case
-    inf = {"model_a": {"text": "likely_benign no threat", "status":"ok"}, "model_b": {"text": "likely_benign no threat", "status":"ok"}, "agreement": True}
-    f = fuse_structured("normal log line", inf)
-    assert "fused_verdict" in f and "model_a_struct" in f
+    ok = {"source": "cyberllm", "status": "ok", "classification": "likely_benign", "confidence": "high",
+          "summary": "No threat", "indicators": [], "reasoning": "Normal log line.", "deterministic_findings": []}
+    f2 = fuse_classification("normal log line", ok)
+    assert "fused_verdict" in f2 and f2["model_classification"] == "likely_benign"
 
 def test_blocks_not_firewall(app, admin):
     # documentation: blocks are application-layer; is_blocked is via TempBlock, not firewall

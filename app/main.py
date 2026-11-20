@@ -39,11 +39,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         # Content-Security-Policy is a second line of defence behind
         # app/services/sanitize.py: even if markup slipped through, inline
-        # <script> would not execute. 'unsafe-inline' is still required for
-        # style attributes used throughout the templates.
+        # <script> would not execute. All page scripts live in
+        # app/static/js/ (no inline <script> or onclick handlers remain);
+        # 'unsafe-inline' is kept only for style-src, where style
+        # attributes are used throughout the templates.
         response.headers.setdefault("Content-Security-Policy", "; ".join([
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com",
             "img-src 'self' data: https:",
@@ -63,18 +65,33 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
-    # Sentinel: schedule background warm-load so readiness reflects real state
-    # without blocking startup (2-4s / ~1.9 GB). Kept inside lifespan so both
-    # the initial boot and every reload (run.py reload_dirs=["app"]) trigger it.
+    # No model is loaded at startup by design: CyberLLMv1 loads lazily
+    # on explicit load/analyze, so a missing or heavy model can never
+    # block the application or its non-model features. The obsolete
+    # Sentinel background warm-load was removed with its loader.
     # The endpoint POST /api/sentinel/readiness/load remains the explicit sync path.
-    # Fail-open: missing torch/tokenizers must never crash the app.
+    # Automation worker: resume only if an admin left it enabled. This
+    # never loads the model (the worker loads it lazily on first job)
+    # and never blocks startup — a worker failure is logged, not fatal.
     try:
-        from app.services.sentinel_loader import init_sentinel  # local import: loader pulls config/tokenizer lazily
-        init_sentinel(background=True)
-        logger.info("Sentinel background load scheduled")
-    except Exception as exc:  # pragma: no cover — startup must not crash on model issues
-        logger.warning("sentinel background init failed: %s", exc)
+        from app.database import SessionLocal
+        from app.services import automation as _auto
+
+        _db = SessionLocal()
+        try:
+            if _auto.get_settings(_db).enabled:
+                _auto.start_worker()
+        finally:
+            _db.close()
+    except Exception:
+        logger.exception("automation worker auto-start failed; continuing without it")
     yield
+    try:
+        from app.services import automation as _auto
+
+        _auto.stop_worker()
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -99,17 +116,27 @@ def create_app() -> FastAPI:
     from app.middleware.security_events import SecurityEventsMiddleware
     application.add_middleware(SecurityEventsMiddleware)
 
-    application.mount("/static", StaticFiles(directory="app/static"), name="static")
+    # Project-root-relative static dir: launching from another cwd must
+    # not break /static (run.bat already cd's to its own folder, but the
+    # Python entry point alone should not depend on that).
+    from pathlib import Path as _Path
+
+    application.mount(
+        "/static",
+        StaticFiles(directory=str(_Path(__file__).resolve().parent / "static")),
+        name="static",
+    )
 
     from app.api import (
-        admin, auth, blog, community, feed, health, messages, moderation,
-        sentinel, social, users,
+        admin, admin_users, auth, blog, community, feed, health, messages,
+        moderation, sentinel, social, users,
         cyberllm,
     )
     from app.api.security import router as security_router
     from app.api.admin_security import router as admin_security_router
     from app.api.security_lab_api import router as lab_router
     from app.api.theme import router as theme_router
+    from app.api.automation import router as automation_router
     application.include_router(health.router)
     application.include_router(auth.router)
     application.include_router(users.router)
@@ -120,12 +147,14 @@ def create_app() -> FastAPI:
     application.include_router(messages.router)
     application.include_router(moderation.router)
     application.include_router(admin.router)
+    application.include_router(admin_users.router)
     application.include_router(sentinel.router)
     application.include_router(cyberllm.router)
     application.include_router(security_router)
     application.include_router(lab_router)
     application.include_router(admin_security_router)
     application.include_router(theme_router)
+    application.include_router(automation_router)
     # alias /admin/reports/security -> same handler as /admin/security/reports/security (Phase 2 nav)
     from fastapi import Depends as _Dep
     from fastapi import Request as _Req2

@@ -9,6 +9,7 @@ Usage:
     python manage.py reset-db --yes          # DESTRUCTIVE: drop, recreate, seed one admin
 """
 import argparse
+import secrets
 import sys
 from app.database import SessionLocal, init_db
 from app.models.user import User
@@ -17,11 +18,32 @@ from app.services.auth_service import hash_password
 
 VALID_ROLES = ("user", "admin")
 
-# The initial administrator. These are the project's fixed bootstrap credentials;
-# change the password after first sign-in in any real deployment.
+# The initial administrator's username and email. There is NO default
+# password: seed-admin / reset-db generate a fresh random password and print
+# it once (or use --password if the operator supplies one). A fixed bootstrap
+# password that ships in a public repo is a publicly known admin login, so it
+# must not exist. Keep the dev signing key in app/config.py as-is (separate
+# decision, 2026-11-20): it only applies when SECRET_KEY is unset and
+# ENVIRONMENT is not production; production already refuses to start.
 INITIAL_ADMIN_USERNAME = "admin"
 INITIAL_ADMIN_EMAIL = "admin@12345"
-INITIAL_ADMIN_PASSWORD = "admin@12345"
+
+
+def _random_password() -> str:
+    """A fresh, unguessable password for a newly seeded account."""
+    return secrets.token_urlsafe(16)
+
+
+def _resolve_admin_password(args) -> tuple[str, bool]:
+    """Return (password, was_generated).
+
+    --password wins when the operator supplies one; otherwise a random
+    password is generated. The caller prints a generated password once.
+    """
+    supplied = getattr(args, "password", None)
+    if supplied:
+        return supplied, False
+    return _random_password(), True
 
 
 def create_admin(args):
@@ -90,14 +112,19 @@ def list_users(args):
 
 
 def _get_or_create_user(db, username, email, display_name, bio):
-    """Fetch a seed author, creating it as a normal user if absent."""
+    """Fetch a seed author, creating it as a normal user if absent.
+
+    Seed authors get a fresh random password: they are example accounts for
+    blog content, never login accounts, so no one needs to know it and no
+    fixed placeholder password may exist.
+    """
     user = db.query(User).filter(User.username == username).first()
     if user:
         return user
     user = User(
         username=username,
         email=email,
-        password_hash=hash_password("ChangeMe123!"),
+        password_hash=hash_password(_random_password()),
         role="user",
         is_active=True,
         display_name=display_name,
@@ -238,6 +265,9 @@ def seed_admin(args):
     Idempotent: if an account with the admin username already exists it is left
     untouched (its password is not reset), so running this on an existing
     database is safe.
+
+    The admin password is random unless --password is supplied, and a generated
+    password is printed exactly once — save it, there is no other copy.
     """
     init_db()
     db = SessionLocal()
@@ -248,16 +278,20 @@ def seed_admin(args):
         if existing:
             print(f"[SKIP] Admin '{INITIAL_ADMIN_USERNAME}' already exists (id={existing.id}).")
             return
+        password, generated = _resolve_admin_password(args)
         admin = User(
             username=INITIAL_ADMIN_USERNAME,
             email=INITIAL_ADMIN_EMAIL,
-            password_hash=hash_password(INITIAL_ADMIN_PASSWORD),
+            password_hash=hash_password(password),
             role="admin",
             is_active=True,
         )
         db.add(admin)
         db.commit()
         print(f"[OK] Initial admin created: {INITIAL_ADMIN_USERNAME} ({INITIAL_ADMIN_EMAIL})")
+        if generated:
+            print("[IMPORTANT] Generated admin password (shown once — save it now):")
+            print(f"    {password}")
     finally:
         db.close()
 
@@ -299,16 +333,20 @@ def reset_db(args):
 
     db = SessionLocal()
     try:
+        password, generated = _resolve_admin_password(args)
         admin = User(
             username=INITIAL_ADMIN_USERNAME,
             email=INITIAL_ADMIN_EMAIL,
-            password_hash=hash_password(INITIAL_ADMIN_PASSWORD),
+            password_hash=hash_password(password),
             role="admin",
             is_active=True,
         )
         db.add(admin)
         db.commit()
         print(f"[OK] Database reset. Single admin: {INITIAL_ADMIN_USERNAME} ({INITIAL_ADMIN_EMAIL})")
+        if generated:
+            print("[IMPORTANT] Generated admin password (shown once — save it now):")
+            print(f"    {password}")
     finally:
         db.close()
 
@@ -341,6 +379,9 @@ def main():
     # seed-admin
     p_seed_admin = subparsers.add_parser(
         "seed-admin", help="Create the initial admin account (idempotent)")
+    p_seed_admin.add_argument(
+        "--password", default=None,
+        help="Admin password. If omitted, a random one is generated and printed once.")
     p_seed_admin.set_defaults(func=seed_admin)
 
     # remove-all-users
@@ -352,6 +393,9 @@ def main():
     p_reset = subparsers.add_parser(
         "reset-db", help="DESTRUCTIVE: drop, recreate, and seed one admin")
     p_reset.add_argument("--yes", action="store_true", help="Confirm the destructive reset")
+    p_reset.add_argument(
+        "--password", default=None,
+        help="Admin password. If omitted, a random one is generated and printed once.")
     p_reset.set_defaults(func=reset_db)
 
     args = parser.parse_args()
