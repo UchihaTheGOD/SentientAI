@@ -35,9 +35,9 @@ Base, about 4.1 GB, Apache-2.0, ungated, pinned revision — do not use `main`:
 
 ```powershell
 pip install huggingface_hub
-huggingface-cli download Qwen/Qwen3-1.7B `
+hf download Qwen/Qwen3-1.7B `
   --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e `
-  --local-dir cyberLLMv1/base --local-dir-use-symlinks False
+  --local-dir cyberLLMv1/base
 ```
 
 Adapter, about 82 MB, from the private Kaggle dataset

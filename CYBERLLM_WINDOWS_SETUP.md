@@ -154,10 +154,9 @@ weights can change under a moving branch.
 
 ```powershell
 pip install huggingface_hub
-huggingface-cli download Qwen/Qwen3-1.7B `
+hf download Qwen/Qwen3-1.7B `
   --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e `
-  --local-dir D:\CyberLLM\models\Qwen3-1.7B `
-  --local-dir-use-symlinks False
+  --local-dir D:\CyberLLM\models\Qwen3-1.7B
 ```
 
 Files you should end up with (~4.1 GB total):
@@ -293,10 +292,9 @@ checkpoint. Download the 0.6B base and the `adapter_datav2_*` files
 way, and launch with:
 
 ```powershell
-huggingface-cli download Qwen/Qwen3-0.6B `
+hf download Qwen/Qwen3-0.6B `
   --revision c1899de289a04d12100db370d81485cdf75e47ca `
-  --local-dir D:\CyberLLM\models\Qwen3-0.6B `
-  --local-dir-use-symlinks False
+  --local-dir D:\CyberLLM\models\Qwen3-0.6B
 # Kaggle files: adapter_datav2_adapter_config.json, adapter_datav2_adapter_model.safetensors,
 # adapter_datav2_chat_template.jinja, adapter_datav2_tokenizer.json, adapter_datav2_tokenizer_config.json
 # -> rename to adapter_config.json, adapter_model.safetensors, chat_template.jinja, tokenizer.json, tokenizer_config.json

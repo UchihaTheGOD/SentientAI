@@ -205,7 +205,7 @@ python scripts/setup_cyberllm.py --check
 python scripts/setup_cyberllm.py --download-base
 # Adapter — CyberLLM pilot v8 LoRA, ~82 MB.
 # Easiest: public Hugging Face repo, no account, no token:
-huggingface-cli download Uchiha80971/CyberLLM-v8 --local-dir cyberLLMv1/adapter --local-dir-use-symlinks False
+hf download Uchiha80971/CyberLLM-v8 --local-dir cyberLLMv1/adapter
 # Alternative: Kaggle CLI (private dataset uchihamadarum/cyber-llm-artifacts, needs ~/.kaggle/kaggle.json):
 python scripts/setup_cyberllm.py --download-adapter
 # Verify (the loader refuses a SHA mismatch by design):

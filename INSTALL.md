@@ -177,7 +177,7 @@ python scripts/setup_cyberllm.py --download-base
 This downloads `Qwen/Qwen3-1.7B` at the exact pinned revision into
 `cyberLLMv1/base/`. Downloads resume if interrupted — just re-run the
 same command. (Manual equivalent:
-`huggingface-cli download Qwen/Qwen3-1.7B --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e --local-dir cyberLLMv1/base --local-dir-use-symlinks False`.
+`hf download Qwen/Qwen3-1.7B --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e --local-dir cyberLLMv1/base`.
 Do not substitute `main` or another revision — weights can change under
 a moving branch.)
 
@@ -196,7 +196,7 @@ You should end up with these files in `cyberLLMv1/base/`:
 **Easiest — public Hugging Face repo (no account, no token):**
 
 ```bash
-huggingface-cli download Uchiha80971/CyberLLM-v8 --local-dir cyberLLMv1/adapter --local-dir-use-symlinks False
+hf download Uchiha80971/CyberLLM-v8 --local-dir cyberLLMv1/adapter
 ```
 
 The repo hosts the adapter files under their canonical names, so they

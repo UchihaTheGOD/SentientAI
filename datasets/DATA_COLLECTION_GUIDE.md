@@ -15,7 +15,7 @@ All tasks collapse to one LM task (structured moderation JSON / structured analy
 | **CICIDS 2017** (CIC) | PCAPs + labeled flows (Brute Force, DoS, PortScan, Web Attack) | CIC research license — non-commercial, cite Sharafaldin et al. | https://www.unb.ca/cic/datasets/ids-2017.html (form + accept) — **manual** | 50 GB+ (do NOT download full PCAP on this host; flows CSV ~1-3 GB) | Task 6,7 |
 | **KDD Cup 1999 / NSL-KDD** | Legacy IDS, labeled | Public domain / research | `kaggle datasets download -d galaxyh/kdd-cup-1999-data` | ~5 MB / 20 MB | Bootstrap only — biased, must not dominate |
 | **SecRepo / Public S3 web logs** | Sanitized Apache/Nginx logs | Varies — check each file header | Direct HTTP if license permits | Small | Benign + ambiguous |
-| **Hugging Face `huggingface.co/datasets` — `ucberkeley` / `claudette`** | Security documentation (licensed) | As listed per dataset (Apache-2.0 / MIT / CC-BY) | `huggingface-cli download` or python `datasets` | MBs | Not logs — use only for instruction diversity if needed, never as ground-truth labels |
+| **Hugging Face `huggingface.co/datasets` — `ucberkeley` / `claudette`** | Security documentation (licensed) | As listed per dataset (Apache-2.0 / MIT / CC-BY) | `hf download` or python `datasets` | MBs | Not logs — use only for instruction diversity if needed, never as ground-truth labels |
 
 **Not approved until re-checked:** any GitHub repo without LICENSE file, any "kaggle 1M attacks" mirror that rehosts CSIC without attribution, any private paste dump.
 
