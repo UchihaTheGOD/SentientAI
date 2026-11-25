@@ -1,0 +1,121 @@
+{% extends "base_public.html" %}
+{% block title %}Security Dashboard{% endblock %}
+{% block head %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endblock %}
+{% block content %}
+<div class="page-wrap page-wrap--wide">
+  {% include "partials/admin_nav.html" %}
+  <header class="page-head"><div><h1 class="page-title">Security Dashboard</h1><p class="page-lead">Logins, signups, login attacks and attack detections — last {{ days }} days. Read-only analytics; no actions here.</p></div>
+  <div>
+    <a class="btn btn-sm {% if days == 7 %}btn-primary{% else %}btn-ghost{% endif %}" href="/admin/security/dashboard?days=7">7 days</a>
+    <a class="btn btn-sm {% if days == 30 %}btn-primary{% else %}btn-ghost{% endif %}" href="/admin/security/dashboard?days=30">30 days</a>
+    <a class="btn btn-sm {% if days == 90 %}btn-primary{% else %}btn-ghost{% endif %}" href="/admin/security/dashboard?days=90">90 days</a>
+  </div></header>
+
+  <div class="card">
+    <h3>Totals — last {{ days }} days</h3>
+    <table class="data-table"><thead><tr><th>Successful logins</th><th>Failed logins</th><th>Failed-login rate</th><th>Signups</th><th>Brute-force events</th><th>Security events</th><th>Sentinel incidents</th><th>Scanner runs</th><th>CyberLLM analyses</th></tr></thead>
+    <tbody><tr><td>{{ total_logins }}</td><td>{{ total_failed }}</td><td>{{ failed_rate }}%</td><td>{{ total_signups }}</td><td>{{ brute_total }}</td><td>{{ total_events }}</td><td>{{ total_incidents }}</td><td>{{ total_assessments }}</td><td>{{ total_cyb }}</td></tr></tbody></table>
+    <p class="text-sm text-muted">All time: {{ all_time.security_events }} security events, {{ all_time.incidents }} Sentinel incidents, {{ all_time.brute_force }} brute-force events, {{ all_time.cyberllm_analyses }} CyberLLM analyses. Per-call CyberLLM counts start when the per-call record was added; earlier analyses are not backfilled.</p>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Logins per day</h3>
+    <p class="text-sm text-muted"><span style="color:#2563eb">&#9632;</span> Successful logins &nbsp; <span style="color:#dc2626">&#9632;</span> Failed logins</p>
+    {{ login_chart | safe }}
+    <table class="data-table"><thead><tr><th>Day</th><th>Successful</th><th>Failed</th><th>Signups</th></tr></thead>
+    <tbody>{% for i in range(day_labels|length) %}<tr><td>{{ day_labels[i] }}</td><td>{{ logins[i] }}</td><td>{{ failed[i] }}</td><td>{{ signups[i] }}</td></tr>{% endfor %}</tbody></table>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Signups per day</h3>
+    {{ signup_chart | safe }}
+    <table class="data-table"><thead><tr><th>Day</th><th>Signups</th></tr></thead>
+    <tbody>{% for i in range(day_labels|length) %}<tr><td>{{ day_labels[i] }}</td><td>{{ signups[i] }}</td></tr>{% endfor %}</tbody></table>
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Login attacks — brute-force events per day</h3>
+    <p class="text-sm text-muted">A brute-force event is written when 5 or more failed logins come from one IP within 10 minutes. Sources below are salted IP hashes with counts — never raw IP addresses on this page.</p>
+    {{ brute_chart | safe }}
+    <table class="data-table"><thead><tr><th>Day</th><th>Brute-force events</th></tr></thead>
+    <tbody>{% for i in range(day_labels|length) %}<tr><td>{{ day_labels[i] }}</td><td>{{ brute_per_day[i] }}</td></tr>{% endfor %}</tbody></table>
+    {% if brute_top_hashes %}<table class="data-table" style="margin-top:0.5rem"><thead><tr><th>IP hash (first 12 chars)</th><th>Brute-force events</th></tr></thead>
+    <tbody>{% for h, n in brute_top_hashes %}<tr><td class="mono text-sm">{{ h }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="text-sm">No brute-force events in this period.</p>{% endif %}
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Attack detections — security events per day</h3>
+    {{ events_chart | safe }}
+    <table class="data-table"><thead><tr><th>Day</th><th>Security events</th></tr></thead>
+    <tbody>{% for i in range(day_labels|length) %}<tr><td>{{ day_labels[i] }}</td><td>{{ sec_per_day[i] }}</td></tr>{% endfor %}</tbody></table>
+    {% set max_cat = sec_by_category[0][1] if sec_by_category else 1 %}
+    <h4 style="margin-top:1rem">By category</h4>
+    {% if sec_by_category %}{% for label, n in sec_by_category %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:#7c3aed;height:14px;width:{{ (n / max_cat * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No security events in this period.</p>{% endif %}
+    {% set max_sev = sec_by_severity[0][1] if sec_by_severity else 1 %}
+    <h4 style="margin-top:1rem">By severity</h4>
+    {% if sec_by_severity %}{% for label, n in sec_by_severity %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:{% if label == 'high' %}#dc2626{% elif label == 'medium' %}#ea580c{% else %}#16a34a{% endif %};height:14px;width:{{ (n / max_sev * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No security events in this period.</p>{% endif %}
+    {% set max_src = sec_by_source[0][1] if sec_by_source else 1 %}
+    <h4 style="margin-top:1rem">By source</h4>
+    {% if sec_by_source %}{% for label, n in sec_by_source %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:#2563eb;height:14px;width:{{ (n / max_src * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No security events in this period.</p>{% endif %}
+    <h4 style="margin-top:1rem">Top event types</h4>
+    {% if sec_by_type %}<table class="data-table"><thead><tr><th>Event type</th><th>Count</th></tr></thead>
+    <tbody>{% for label, n in sec_by_type %}<tr><td class="mono text-sm">{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="text-sm">No security events in this period.</p>{% endif %}
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Sentinel incidents</h3>
+    {% set max_ver = inc_by_verdict[0][1] if inc_by_verdict else 1 %}
+    <h4>By verdict</h4>
+    {% if inc_by_verdict %}{% for label, n in inc_by_verdict %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:#0d9488;height:14px;width:{{ (n / max_ver * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No Sentinel incidents in this period.</p>{% endif %}
+    {% set max_st = inc_by_status[0][1] if inc_by_status else 1 %}
+    <h4 style="margin-top:1rem">By status</h4>
+    {% if inc_by_status %}{% for label, n in inc_by_status %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:#2563eb;height:14px;width:{{ (n / max_st * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No Sentinel incidents in this period.</p>{% endif %}
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Scanner runs</h3>
+    {% if assess_by_status %}<table class="data-table"><thead><tr><th>Status</th><th>Runs</th></tr></thead>
+    <tbody>{% for label, n in assess_by_status %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="text-sm">No scanner runs in this period.</p>{% endif %}
+    {% if finding_by_severity %}<table class="data-table" style="margin-top:0.5rem"><thead><tr><th>Finding severity</th><th>Findings</th></tr></thead>
+    <tbody>{% for label, n in finding_by_severity %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>CyberLLM analyses per day</h3>
+    <p class="text-sm text-muted">Per-call counts from the analysis record (one row per analyze call — outcome and timing only, no log text, no raw output).</p>
+    {{ cyb_chart | safe }}
+    <table class="data-table"><thead><tr><th>Day</th><th>CyberLLM analyses</th></tr></thead>
+    <tbody>{% for i in range(day_labels|length) %}<tr><td>{{ day_labels[i] }}</td><td>{{ cyb_per_day[i] }}</td></tr>{% endfor %}</tbody></table>
+    {% set max_cl = cyb_by_class[0][1] if cyb_by_class else 1 %}
+    <h4 style="margin-top:1rem">By classification</h4>
+    {% if cyb_by_class %}{% for label, n in cyb_by_class %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:{% if label == 'likely_threat' %}#dc2626{% elif label == 'needs_review' %}#ea580c{% else %}#16a34a{% endif %};height:14px;width:{{ (n / max_cl * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No CyberLLM analyses in this period.</p>{% endif %}
+    {% set max_ds = cyb_by_source[0][1] if cyb_by_source else 1 %}
+    <h4 style="margin-top:1rem">By decision source</h4>
+    {% if cyb_by_source %}{% for label, n in cyb_by_source %}<div style="display:flex;align-items:center;gap:0.5rem;margin:2px 0"><span class="text-sm" style="width:220px">{{ label }}</span><div style="flex:1;background:#e2e8f0;height:14px"><div style="background:#0d9488;height:14px;width:{{ (n / max_ds * 100) | round(1) }}%"></div></div><span class="text-sm" style="width:48px;text-align:right">{{ n }}</span></div>{% endfor %}
+    {% else %}<p class="text-sm">No CyberLLM analyses in this period.</p>{% endif %}
+    <h4 style="margin-top:1rem">Reviewed analyses only</h4>
+    <p class="text-sm text-muted">{{ reviewed_total }} human-reviewed CyberLLM analyses in this period (source cyberllm_feedback). These are the only analyses a human has checked; per-call counts above cover every call.</p>
+    {% if reviewed_by_status %}<table class="data-table"><thead><tr><th>Review status</th><th>Count</th></tr></thead>
+    <tbody>{% for label, n in reviewed_by_status %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    {% if reviewed_by_prediction %}<table class="data-table" style="margin-top:0.5rem"><thead><tr><th>Model prediction</th><th>Count</th></tr></thead>
+    <tbody>{% for label, n in reviewed_by_prediction %}<tr><td>{{ label }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+  </div>
+
+  <div class="card" style="margin-top:1rem">
+    <h3>Recent security events</h3>
+    {% if recent %}<table class="data-table"><thead><tr><th>When</th><th>Type</th><th>Sev</th><th>Source</th><th>Evidence</th></tr></thead>
+    <tbody>{% for e in recent %}<tr><td class="text-sm">{{ e.created_at }}</td><td class="mono text-sm">{{ e.event_type }}</td><td>{{ e.severity }}</td><td>{{ e.source }}</td><td class="text-sm" style="max-width:400px;white-space:pre-wrap">{{ (e.evidence or "")[:350] }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<p class="text-sm">No events.</p>{% endif %}
+    <p class="text-sm" style="margin-top:0.5rem"><a href="/admin/security">Security Center</a> — full event list, filters, and detail pages.</p>
+  </div>
+</div>
+{% endblock %}

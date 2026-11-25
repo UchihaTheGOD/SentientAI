@@ -83,15 +83,22 @@ def test_e2e_cyberllm_oversize_input_is_rejected(admin_client):
     assert r.status_code == 422
 
 
-def test_e2e_classifier_readiness_is_honest(client):
+def test_e2e_classifier_readiness_is_honest(client, admin_client):
+    # Tiered readiness: anonymous callers get liveness fields only.
     r = client.get("/api/sentinel/readiness")
     assert r.status_code == 200
     body = r.json()
     assert body["ready"] is False
     assert body["classifier"] == "cyberllm"
-    assert body["legacy_models"] == "removed"
     assert body["rules_available"] is True
     assert "missing_files" not in body  # no obsolete checkpoints are required any more
+    assert "base_model" not in body
+    assert "legacy_models" not in body
+    # Authenticated callers get the full operational detail.
+    r = admin_client._client.get("/api/sentinel/readiness")
+    assert r.status_code == 200
+    assert r.json()["legacy_models"] == "removed"
+    assert "base_model" in r.json()
 
 
 def test_e2e_cyberllm_analyze_is_rate_limited(admin_client):

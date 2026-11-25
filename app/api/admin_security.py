@@ -29,6 +29,283 @@ def admin_security(request: Request, category: str | None = None, severity: str 
     blocks = db.query(TempBlock).order_by(TempBlock.created_at.desc()).limit(20).all()
     return templates.TemplateResponse("admin_security.html", {"request": request, "current_user": user, "user": user, "assessments": assessments, "incidents": incidents, "events": events, "blocks": blocks, "demo_cases": catalog(), "filters": {"category": category, "severity": severity, "ip": ip}})
 
+
+def _per_day_series(day_labels: list[str], rows) -> list[int]:
+    """Bucket SQL (day, count) rows onto the full day-label list, filling
+    missing days with 0. ``rows`` come from func.date(created_at) GROUP BY,
+    so the day is already a "YYYY-MM-DD" string."""
+    counts = {label: 0 for label in day_labels}
+    for day, n in rows:
+        if day in counts:
+            counts[day] = int(n)
+    return [counts[label] for label in day_labels]
+
+
+def _svg_grouped_bars(day_labels: list[str], series, *, height: int = 120) -> str:
+    """Render a grouped vertical bar chart as inline SVG.
+
+    ``day_labels`` is the x axis ("YYYY-MM-DD", oldest first); ``series`` is
+    a list of (name, color, values) with one value per day. Server-generated
+    (not user content), so the template renders it with ``| safe``. Every
+    chart is accompanied by a table with the exact numbers.
+    """
+    n = len(day_labels)
+    if n == 0 or not series:
+        return ""
+    max_v = max((v for _name, _color, values in series for v in values), default=0) or 1
+    slot = 20  # px per day
+    bar_w = max(3, (slot - 4) // max(1, len(series)))
+    width = n * slot
+    top = 8
+    base = height - 22
+    parts = [
+        f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+        f'role="img" aria-label="Bar chart, {n} days">'
+    ]
+    for i, label in enumerate(day_labels):
+        for j, (name, color, values) in enumerate(series):
+            v = values[i]
+            if v <= 0:
+                continue
+            bar_h = max(2, int(v / max_v * (base - top)))
+            x = i * slot + 2 + j * bar_w
+            y = base - bar_h
+            parts.append(
+                f'<rect x="{x}" y="{y}" width="{bar_w}" height="{bar_h}" fill="{color}">'
+                f"<title>{label} {name}: {v}</title></rect>"
+            )
+    parts.append(
+        f'<line x1="0" y1="{base}" x2="{width}" y2="{base}" stroke="#94a3b8" stroke-width="1"/>'
+    )
+    for i in (0, n // 2, n - 1):
+        x = i * slot + 2
+        parts.append(
+            f'<text x="{x}" y="{height - 6}" font-size="9" fill="#64748b">{day_labels[i][5:]}</text>'
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def admin_security_dashboard(
+    request: Request,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    """Admin-only security dashboard: logins, signups, login attacks and
+    attack detections over the last N days (default 30), plus Sentinel,
+    scanner and CyberLLM counts.
+
+    Read-only analytics — no actions, no auto-remediation, no new auth.
+    Charts are server-rendered (no JavaScript library, no new dependency);
+    every chart has its numbers in an adjacent table. IP addresses are
+    never listed here: brute-force sources are shown as salted IP hashes
+    with counts, and the Security Center detail pages already show IPs to
+    admins.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func
+
+    from app.models.audit import AuditEvent
+    from app.models.cyberllm_analysis import CyberLLMAnalysisEvent
+    from app.models.training_example import TrainingExample
+    from app.models.attact_assessment import AttactFinding
+
+    days = days if days in (7, 30, 90) else 30
+    now = datetime.now(timezone.utc)
+    # Calendar-day window: the last `days` days including today. `since`
+    # is midnight at the start of the first day, so the SQL window and the
+    # day labels cover exactly the same days.
+    today = now.date()
+    first_day = today - timedelta(days=days - 1)
+    since = datetime.combine(first_day, datetime.min.time(), tzinfo=timezone.utc)
+    day_labels = [(first_day + timedelta(days=i)).isoformat() for i in range(days)]
+
+    # -- Logins / signups (AuditEvent; IP stored as salted hash only) ------
+    login_rows = (
+        db.query(func.date(AuditEvent.created_at).label("day"), AuditEvent.event_type, func.count().label("n"))
+        .filter(
+            AuditEvent.created_at >= since,
+            AuditEvent.event_type.in_(["auth.login", "auth.login_failed", "auth.register"]),
+        )
+        .group_by("day", AuditEvent.event_type)
+        .all()
+    )
+    per_day: dict[str, dict[str, int]] = {
+        label: {"auth.login": 0, "auth.login_failed": 0, "auth.register": 0}
+        for label in day_labels
+    }
+    for day, event_type, n in login_rows:
+        if day in per_day and event_type in per_day[day]:
+            per_day[day][event_type] = int(n)
+    logins = [per_day[d]["auth.login"] for d in day_labels]
+    failed = [per_day[d]["auth.login_failed"] for d in day_labels]
+    signups = [per_day[d]["auth.register"] for d in day_labels]
+    total_logins = sum(logins)
+    total_failed = sum(failed)
+    total_signups = sum(signups)
+    login_attempts = total_logins + total_failed
+    failed_rate = (total_failed / login_attempts * 100) if login_attempts else 0.0
+
+    # -- Security events (detections) ---------------------------------------
+    def _grouped(model_col, *, event_type: str | None = None):
+        q = db.query(model_col, func.count()).filter(SecurityEvent.created_at >= since)
+        if event_type is not None:
+            q = q.filter(SecurityEvent.event_type == event_type)
+        return [(str(k) if k is not None else "(none)", int(n)) for k, n in q.group_by(model_col).all()]
+
+    sec_by_category = sorted(_grouped(SecurityEvent.category), key=lambda kv: -kv[1])
+    sec_by_severity = sorted(_grouped(SecurityEvent.severity), key=lambda kv: -kv[1])
+    sec_by_source = sorted(_grouped(SecurityEvent.source), key=lambda kv: -kv[1])
+    sec_by_type = sorted(_grouped(SecurityEvent.event_type), key=lambda kv: -kv[1])[:10]
+    sec_per_day = _per_day_series(
+        day_labels,
+        db.query(func.date(SecurityEvent.created_at), func.count())
+        .filter(SecurityEvent.created_at >= since)
+        .group_by(func.date(SecurityEvent.created_at)).all(),
+    )
+    total_events = sum(v for _k, v in sec_by_category)
+
+    # -- Login attacks: brute-force events ----------------------------------
+    brute_total = (
+        db.query(func.count(SecurityEvent.id))
+        .filter(SecurityEvent.created_at >= since, SecurityEvent.event_type == "auth.brute_force")
+        .scalar()
+        or 0
+    )
+    brute_per_day = _per_day_series(
+        day_labels,
+        db.query(func.date(SecurityEvent.created_at), func.count())
+        .filter(SecurityEvent.created_at >= since, SecurityEvent.event_type == "auth.brute_force")
+        .group_by(func.date(SecurityEvent.created_at)).all(),
+    )
+    # Top sources as salted IP hashes with counts — never raw IPs here.
+    brute_top_hashes = [
+        (str(h)[:12] if h else "(none)", int(n))
+        for h, n in (
+            db.query(SecurityEvent.ip_hash, func.count())
+            .filter(SecurityEvent.created_at >= since, SecurityEvent.event_type == "auth.brute_force")
+            .group_by(SecurityEvent.ip_hash)
+            .order_by(func.count().desc()).limit(10).all()
+        )
+    ]
+
+    # -- Sentinel incidents --------------------------------------------------
+    inc_by_verdict = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(SentinelIncident.fused_verdict, func.count())
+        .filter(SentinelIncident.created_at >= since)
+        .group_by(SentinelIncident.fused_verdict).all()
+    ], key=lambda kv: -kv[1])
+    inc_by_status = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(SentinelIncident.status, func.count())
+        .filter(SentinelIncident.created_at >= since)
+        .group_by(SentinelIncident.status).all()
+    ], key=lambda kv: -kv[1])
+    total_incidents = sum(v for _k, v in inc_by_verdict)
+
+    # -- Scanner runs and findings ------------------------------------------
+    assess_by_status = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(AttactAssessment.status, func.count())
+        .filter(AttactAssessment.created_at >= since)
+        .group_by(AttactAssessment.status).all()
+    ], key=lambda kv: -kv[1])
+    finding_by_severity = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(AttactFinding.severity, func.count())
+        .filter(AttactFinding.created_at >= since)
+        .group_by(AttactFinding.severity).all()
+    ], key=lambda kv: -kv[1])
+    total_assessments = sum(v for _k, v in assess_by_status)
+
+    # -- CyberLLM: per-call records (no log text, no raw output) ------------
+    cyb_by_class = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(CyberLLMAnalysisEvent.classification, func.count())
+        .filter(CyberLLMAnalysisEvent.created_at >= since)
+        .group_by(CyberLLMAnalysisEvent.classification).all()
+    ], key=lambda kv: -kv[1])
+    cyb_by_source = sorted([
+        (str(k) if k is not None else "(none)", int(n))
+        for k, n in db.query(CyberLLMAnalysisEvent.decision_source, func.count())
+        .filter(CyberLLMAnalysisEvent.created_at >= since)
+        .group_by(CyberLLMAnalysisEvent.decision_source).all()
+    ], key=lambda kv: -kv[1])
+    cyb_per_day = _per_day_series(
+        day_labels,
+        db.query(func.date(CyberLLMAnalysisEvent.created_at), func.count())
+        .filter(CyberLLMAnalysisEvent.created_at >= since)
+        .group_by(func.date(CyberLLMAnalysisEvent.created_at)).all(),
+    )
+    total_cyb = sum(v for _k, v in cyb_by_class)
+
+    # -- CyberLLM reviewed-only counts (human-reviewed analyses) -----------
+    reviewed = (
+        db.query(TrainingExample)
+        .filter(
+            TrainingExample.source == "cyberllm_feedback",
+            TrainingExample.created_at >= since,
+        )
+        .all()
+    )
+    reviewed_by_status: dict[str, int] = {}
+    reviewed_by_prediction: dict[str, int] = {}
+    for row in reviewed:
+        reviewed_by_status[row.status or "(none)"] = reviewed_by_status.get(row.status or "(none)", 0) + 1
+        key = row.model_prediction or "(none)"
+        reviewed_by_prediction[key] = reviewed_by_prediction.get(key, 0) + 1
+
+    # -- Recent events -------------------------------------------------------
+    recent = db.query(SecurityEvent).order_by(SecurityEvent.created_at.desc()).limit(50).all()
+
+    # -- All-time totals -----------------------------------------------------
+    all_time = {
+        "security_events": db.query(func.count(SecurityEvent.id)).scalar() or 0,
+        "incidents": db.query(func.count(SentinelIncident.id)).scalar() or 0,
+        "brute_force": db.query(func.count(SecurityEvent.id)).filter(SecurityEvent.event_type == "auth.brute_force").scalar() or 0,
+        "cyberllm_analyses": db.query(func.count(CyberLLMAnalysisEvent.id)).scalar() or 0,
+    }
+
+    login_chart = _svg_grouped_bars(day_labels, [
+        ("Successful logins", "#2563eb", logins),
+        ("Failed logins", "#dc2626", failed),
+    ])
+    signup_chart = _svg_grouped_bars(day_labels, [("Signups", "#16a34a", signups)])
+    brute_chart = _svg_grouped_bars(day_labels, [("Brute-force events", "#ea580c", brute_per_day)])
+    events_chart = _svg_grouped_bars(day_labels, [("Security events", "#7c3aed", sec_per_day)])
+    cyb_chart = _svg_grouped_bars(day_labels, [("CyberLLM analyses", "#0d9488", cyb_per_day)])
+
+    return templates.TemplateResponse("admin_security_dashboard.html", {
+        "request": request, "current_user": user, "user": user,
+        "days": days, "day_labels": day_labels,
+        "logins": logins, "failed": failed, "signups": signups,
+        "brute_per_day": brute_per_day, "sec_per_day": sec_per_day,
+        "cyb_per_day": cyb_per_day,
+        "total_logins": total_logins, "total_failed": total_failed,
+        "total_signups": total_signups, "failed_rate": round(failed_rate, 1),
+        "login_chart": login_chart, "signup_chart": signup_chart,
+        "brute_total": int(brute_total), "brute_chart": brute_chart,
+        "brute_top_hashes": brute_top_hashes,
+        "total_events": total_events, "events_chart": events_chart,
+        "sec_by_category": sec_by_category, "sec_by_severity": sec_by_severity,
+        "sec_by_source": sec_by_source, "sec_by_type": sec_by_type,
+        "total_incidents": total_incidents,
+        "inc_by_verdict": inc_by_verdict, "inc_by_status": inc_by_status,
+        "total_assessments": total_assessments,
+        "assess_by_status": assess_by_status,
+        "finding_by_severity": finding_by_severity,
+        "total_cyb": total_cyb, "cyb_chart": cyb_chart,
+        "cyb_by_class": cyb_by_class, "cyb_by_source": cyb_by_source,
+        "reviewed_total": len(reviewed),
+        "reviewed_by_status": sorted(reviewed_by_status.items(), key=lambda kv: -kv[1]),
+        "reviewed_by_prediction": sorted(reviewed_by_prediction.items(), key=lambda kv: -kv[1]),
+        "recent": recent, "all_time": all_time,
+    })
+
 @router.get("/reports/security", response_class=HTMLResponse)
 def admin_security_reports(request: Request, test_type: str | None = None, status: str | None = None, severity: str | None = None, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     return templates.TemplateResponse("admin_reports_security.html", {"request": request, "current_user": user, "user": user, "filters": {"test_type": test_type or "", "status": status or "", "severity": severity or ""}})
