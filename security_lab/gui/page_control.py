@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
 from .. import backend as backend_mod
 from ..config import save_settings
 from ..tunnel import (OFFICIAL_DOWNLOADS, PROVIDER_AUTH, build_command,
-                      detect_providers, start_tunnel)
+                      detect_providers, save_ngrok_authtoken, start_tunnel)
 from .context import AppContext
 from .workers import BackendWorker, InferenceWorker
 
@@ -171,7 +171,7 @@ class ControlCenterPage(QWidget):
         self.cb_tunnel_provider.addItems(
             ["cloudflared", "ngrok", "pinggy", "zrok"])
         self.cb_tunnel_provider.currentTextChanged.connect(
-            self._refresh_tunnel_auth_note)
+            self._on_tunnel_provider_changed)
         self.cb_tunnel_mode = QComboBox()
         self.cb_tunnel_mode.addItems(["temporary", "persistent"])
         self.ed_tunnel_name = QLineEdit()
@@ -181,12 +181,17 @@ class ControlCenterPage(QWidget):
         self.ed_tunnel_token.setEchoMode(QLineEdit.Password)
         self.ed_tunnel_token.setPlaceholderText(
             "Pinggy Pro token (persistent Pinggy only — never saved)")
+        self.btn_tunnel_save_ngrok = QPushButton("Save ngrok authtoken")
+        self.btn_tunnel_save_ngrok.setToolTip(
+            "Runs `ngrok config add-authtoken <token>` once. The token is "
+            "stored in ngrok's own config, never by this app.")
         self.btn_tunnel_start = QPushButton("Start tunnel")
         self.btn_tunnel_stop = QPushButton("Stop tunnel")
         self.btn_tunnel_stop.setEnabled(False)
         for w in (QLabel("Provider:"), self.cb_tunnel_provider,
                   QLabel("Mode:"), self.cb_tunnel_mode,
                   self.ed_tunnel_name, self.ed_tunnel_token,
+                  self.btn_tunnel_save_ngrok,
                   self.btn_tunnel_start, self.btn_tunnel_stop):
             t_row.addWidget(w)
         t_row.addStretch()
@@ -197,9 +202,18 @@ class ControlCenterPage(QWidget):
         t_layout.addWidget(self.lbl_tunnel_url)
         layout.addWidget(tunnel_box)
         self._tunnel = None
+        # Watchdog: polls the tunnel process on the GUI thread and reports
+        # it the moment it dies, so the label never waits forever for a
+        # URL from a dead provider. Started when a tunnel starts, stopped
+        # when it stops.
+        self._tunnel_watchdog = QTimer(self)
+        self._tunnel_watchdog.setInterval(1000)
+        self._tunnel_watchdog.timeout.connect(self._check_tunnel_alive)
+        self.btn_tunnel_save_ngrok.clicked.connect(self._save_ngrok_authtoken)
         self.btn_tunnel_start.clicked.connect(self._start_tunnel)
         self.btn_tunnel_stop.clicked.connect(self._stop_tunnel)
         self._refresh_tunnel_providers()
+        self._refresh_tunnel_token_ui()
 
         # -- logs ----------------------------------------------------------
         log_box = QGroupBox("Backend logs")
@@ -429,6 +443,93 @@ class ControlCenterPage(QWidget):
         self.lbl_tunnel_auth.setText(
             PROVIDER_AUTH.get(provider, ""))
 
+    def _on_tunnel_provider_changed(self) -> None:
+        self._refresh_tunnel_auth_note()
+        self._refresh_tunnel_token_ui()
+
+    def _refresh_tunnel_token_ui(self) -> None:
+        """Label the token field for the selected provider, so a pasted
+        token is never silently ignored.
+
+        The token field means something different per provider: for
+        ngrok it is the authtoken to save (via the Save button, into
+        ngrok's own config); for Pinggy Pro it is the SSH username for
+        that one tunnel; for Cloudflare/zrok there is no token field
+        at all — their setup happens once outside this app.
+        """
+        provider = self.cb_tunnel_provider.currentText()
+        self.btn_tunnel_save_ngrok.setVisible(provider == "ngrok")
+        if provider == "ngrok":
+            self.ed_tunnel_token.setPlaceholderText(
+                "ngrok authtoken — click 'Save ngrok authtoken' first "
+                "(stored in ngrok's config, not by this app)")
+            self.ed_tunnel_token.setEnabled(True)
+        elif provider == "pinggy":
+            self.ed_tunnel_token.setPlaceholderText(
+                "Pinggy Pro token (persistent Pinggy only — never saved)")
+            self.ed_tunnel_token.setEnabled(True)
+        elif provider == "cloudflared":
+            self.ed_tunnel_token.setPlaceholderText(
+                "No token field for Cloudflare (run "
+                "`cloudflared tunnel login` once)")
+            self.ed_tunnel_token.setEnabled(False)
+        else:  # zrok
+            self.ed_tunnel_token.setPlaceholderText(
+                "No token field for zrok (run `zrok enable <token>` once)")
+            self.ed_tunnel_token.setEnabled(False)
+
+    def _save_ngrok_authtoken(self) -> None:
+        token = self.ed_tunnel_token.text().strip()
+        if not token:
+            self.lbl_tunnel_url.setText(
+                "Paste your ngrok authtoken in the token field first, "
+                "then click 'Save ngrok authtoken'.")
+            return
+        try:
+            saved = save_ngrok_authtoken(token)
+        except Exception as exc:
+            self.lbl_tunnel_url.setText(
+                f"Could not save the ngrok authtoken: {exc}")
+            return
+        # The token now lives in ngrok's own config, never in this app.
+        self.ed_tunnel_token.clear()
+        self.lbl_tunnel_url.setText(
+            "ngrok authtoken saved"
+            + (f" ({saved})" if saved else "")
+            + ". Start the tunnel with the token field empty.")
+
+    def _check_tunnel_alive(self) -> None:
+        """Watchdog (GUI thread): if the tunnel process died, say so.
+
+        The provider only gets ~1s to fail fast in start_tunnel; a
+        later death (e.g. ngrok failing auth) used to leave the label
+        stuck on "Waiting for the provider to report its public URL…"
+        forever. The tunnel module records the exit code and last
+        output lines in Tunnel.failure_reason; this reads it.
+        """
+        tunnel = self._tunnel
+        if tunnel is None:
+            self._tunnel_watchdog.stop()
+            return
+        if tunnel.running:
+            return
+        self._tunnel_watchdog.stop()
+        self._tunnel = None
+        self.btn_tunnel_stop.setEnabled(False)
+        self.btn_tunnel_start.setEnabled(True)
+        if tunnel.public_url:
+            self.lbl_tunnel_url.setText(
+                f"Tunnel stopped — the public URL {tunnel.public_url} no "
+                "longer works (the tunnel process exited).")
+        elif tunnel.failure_reason:
+            self.lbl_tunnel_url.setText(
+                f"Tunnel stopped: {tunnel.failure_reason}")
+        else:
+            self.lbl_tunnel_url.setText(
+                f"Tunnel stopped (provider: {tunnel.provider}, mode: "
+                f"{tunnel.mode}). The tunnel process exited without "
+                "reporting a public URL.")
+
     def _start_tunnel(self) -> None:
         from PySide6.QtWidgets import QMessageBox
 
@@ -439,6 +540,16 @@ class ControlCenterPage(QWidget):
         mode = self.cb_tunnel_mode.currentText()
         name = self.ed_tunnel_name.text().strip()
         token = self.ed_tunnel_token.text().strip()
+        if provider == "ngrok" and token:
+            # The token field is never passed to ngrok on start — ngrok
+            # only reads its own saved config. Refuse rather than
+            # silently ignore the pasted token (the trap that left a
+            # tunnel stuck on "Waiting…" with no error).
+            self.lbl_tunnel_url.setText(
+                "That token is not used for ngrok tunnels. Click 'Save "
+                "ngrok authtoken' to save it to ngrok's own config "
+                "(once), then start the tunnel with the field empty.")
+            return
         if mode == "persistent" and not name and provider != "pinggy":
             self.lbl_tunnel_url.setText(
                 "Persistent mode needs a tunnel/domain name. For Cloudflare, "
@@ -478,6 +589,9 @@ class ControlCenterPage(QWidget):
         # only by the running process, never stored in the app.
         self.ed_tunnel_token.clear()
         self.btn_tunnel_stop.setEnabled(True)
+        # Watch the process: if it dies later without a URL, the
+        # watchdog reports the exit instead of waiting forever.
+        self._tunnel_watchdog.start()
         if tunnel.public_url:
             self.lbl_tunnel_url.setText(
                 f"Public URL: {tunnel.public_url}  (provider: {provider}, "
@@ -489,6 +603,7 @@ class ControlCenterPage(QWidget):
                 "its public URL…")
 
     def _stop_tunnel(self) -> None:
+        self._tunnel_watchdog.stop()
         if self._tunnel is not None:
             try:
                 self._tunnel.stop()

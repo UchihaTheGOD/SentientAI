@@ -13,12 +13,19 @@ Design rules (from the v2 task):
 - Never hardcode tokens or credentials, and never write one to disk.
   Authentication belongs to the provider's own flow:
   * cloudflared: `cloudflared tunnel login` (once, outside this app).
-  * ngrok: `ngrok config add-authtoken <token>` (once, outside this app).
+  * ngrok: `ngrok config add-authtoken <token>` (once). The app may run
+    that command for the user on request (see save_ngrok_authtoken);
+    it never stores the token itself — ngrok writes it to its own
+    config file.
   * zrok: `zrok enable <account_token>` (once, outside this app).
   * Pinggy free tier: no token at all. Pinggy Pro: the token is passed
     as the SSH username (`<token>@a.pinggy.io`) for that tunnel process
     only — it is held in memory for the session, never saved, and the
     free tier works without it.
+- A tunnel that dies after starting must be reported, not left looking
+  alive: start_tunnel reports the provider's exit code and its last
+  output lines (via on_failure / Tunnel.failure_reason) instead of
+  waiting forever for a URL that will never arrive.
 - Two modes:
   * "temporary" — a quick share (cloudflared `tunnel --url`, ngrok
     `http <port>`, Pinggy free `ssh ... free@a.pinggy.io`, zrok
@@ -113,6 +120,34 @@ def detect_providers() -> list[ProviderStatus]:
     return out
 
 
+def save_ngrok_authtoken(token: str) -> str:
+    """Save an ngrok authtoken using ngrok's own config command.
+
+    Runs `ngrok config add-authtoken <token>` once. The app never stores
+    the token itself — ngrok writes it to its own config file, exactly
+    as if the user ran the command by hand. Raises RuntimeError if
+    ngrok is not installed or the command fails, ValueError if the
+    token is empty. Returns ngrok's output line (the config path it
+    saved to), when ngrok prints one.
+    """
+    token = (token or "").strip()
+    if not token:
+        raise ValueError("authtoken is empty — paste your ngrok authtoken first.")
+    if shutil.which("ngrok") is None:
+        raise RuntimeError(
+            "ngrok is not installed. Get it from the official "
+            f"download: {OFFICIAL_DOWNLOADS.get('ngrok', '')}")
+    res = subprocess.run(
+        ["ngrok", "config", "add-authtoken", token],
+        capture_output=True, text=True, timeout=30)
+    if res.returncode != 0:
+        detail = (res.stderr or res.stdout or "").strip()
+        raise RuntimeError(
+            f"ngrok config add-authtoken failed (code {res.returncode})"
+            + (f": {detail[:200]}" if detail else "."))
+    return (res.stdout or "").strip()
+
+
 @dataclass
 class Tunnel:
     provider: str
@@ -121,6 +156,9 @@ class Tunnel:
     public_url: str = ""
     pid: int | None = None
     started_at: float = 0.0
+    # Set when the provider process exits without reporting a public URL
+    # (e.g. ngrok failing auth): "exited (code N). Last output: ...".
+    failure_reason: str = ""
     _proc: subprocess.Popen | None = field(default=None, repr=False)
     _reader: threading.Thread | None = field(default=None, repr=False)
     _stop_reader: threading.Event = field(
@@ -201,10 +239,17 @@ def build_command(provider: str, mode: str, local_url: str,
 
 def start_tunnel(provider: str, mode: str, local_url: str,
                  tunnel_name: str = "", token: str = "",
-                 on_url: Optional[callable] = None) -> Tunnel:
+                 on_url: Optional[callable] = None,
+                 on_failure: Optional[callable] = None) -> Tunnel:
     """Start a tunnel and return the Tunnel object. Raises on failure.
 
     on_url(public_url) is called (once) when the provider prints its URL.
+    on_failure(reason) is called (once) if the provider process exits
+    without ever reporting a URL — the reason carries its exit code and
+    its last output lines, so a failed tunnel is reported instead of
+    looking alive forever. The same reason is stored on
+    Tunnel.failure_reason. Neither callback fires when the tunnel is
+    stopped deliberately (Tunnel.stop sets the stop flag first).
     `token` is only used for Pinggy Pro and is never written to disk.
     """
     binary = _PROVIDER_BINARY.get(provider, provider)
@@ -223,6 +268,7 @@ def start_tunnel(provider: str, mode: str, local_url: str,
     tunnel = Tunnel(provider=provider, mode=mode, local_url=local_url,
                     pid=proc.pid, started_at=time.time(), _proc=proc)
     pattern = _URL_PATTERNS.get(provider)
+    last_lines: list[str] = []
 
     def _read() -> None:
         try:
@@ -230,6 +276,8 @@ def start_tunnel(provider: str, mode: str, local_url: str,
             for line in proc.stdout:
                 if tunnel._stop_reader.is_set():
                     break
+                last_lines.append(line.rstrip())
+                del last_lines[:-10]
                 if pattern and not tunnel.public_url:
                     m = pattern.search(line)
                     if m:
@@ -238,6 +286,22 @@ def start_tunnel(provider: str, mode: str, local_url: str,
                             on_url(tunnel.public_url)
         except Exception:
             pass
+        # stdout closed: the provider process exited (or was stopped).
+        # If it died on its own without a URL, report it — never leave
+        # the caller waiting for a URL that will never arrive.
+        if tunnel._stop_reader.is_set():
+            return
+        code = proc.poll()
+        if code is not None and not tunnel.public_url:
+            tail = " | ".join(last_lines[-3:]) if last_lines else "(no output)"
+            reason = (f"{provider} exited (code {code}) before reporting "
+                      f"a public URL. Last output: {tail}")
+            tunnel.failure_reason = reason
+            if on_failure is not None:
+                try:
+                    on_failure(reason)
+                except Exception:
+                    pass
 
     tunnel._reader = threading.Thread(target=_read, daemon=True)
     tunnel._reader.start()
