@@ -10,11 +10,9 @@ if [ -x ".venv/bin/python" ]; then
 elif [ -x "venv/bin/python" ]; then
   PY="venv/bin/python"
 else
-  echo "[run] Python venv not found (.venv or venv)"
-  echo "[run] Create it and install deps first:"
-  echo "  python3 -m venv .venv"
-  echo "  .venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt"
-  exit 1
+  # No virtual environment - use the system Python. Dependencies are
+  # installed into the main Python (see INSTALL.md).
+  PY="python3"
 fi
 
 CMD="${1:-help}"

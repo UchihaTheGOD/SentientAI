@@ -53,7 +53,7 @@ Verified on Linux (this branch, 2026-10-28): website suite 635 passed + 1 skippe
 
 **Who it is for:** Developers and reviewers who want a runnable local app with real auth, moderation, and evaluation harnesses.
 
-**What currently works:** Public site, auth, admin moderation queue, deterministic brute-force/port-scan rules, CyberLLMv1 classification + rules fusion, ATTACT checks, rate limiting, CSRF, audit log, training review queue, native desktop Security Lab GUI (Control Center, authorized scanner, model testing, user management, reports, cases, demo, diagnostics, settings), admin users API with backend-enforced guards, portable Windows runtime (`run.bat`/`run.sh`, `.venv` or `venv`). (The obsolete Sentinel Model A/B pipeline was removed on 2026-10-27; see §12.)
+**What currently works:** Public site, auth, admin moderation queue, deterministic brute-force/port-scan rules, CyberLLMv1 classification + rules fusion, ATTACT checks, rate limiting, CSRF, audit log, training review queue, native desktop Security Lab GUI (Control Center, authorized scanner, model testing, user management, reports, cases, demo, diagnostics, settings), admin users API with backend-enforced guards, portable Windows runtime (`run.bat`/`run.sh`; uses `.venv`/`venv` if present, else the system Python). (The obsolete Sentinel Model A/B pipeline was removed on 2026-10-27; see §12.)
 
 **What remains experimental:** Per-category detection beyond rules, automated training. CyberLLMv1 classification is validated JSON with evidence checks, but it is not a deployable detector on its own — human review is still required for consequential decisions.
 
@@ -91,7 +91,7 @@ Do NOT treat any single model output as a reliable detector; do NOT claim automa
 | Security events + ATTACT persistence | Implemented | `services/security_events.py` |
 | Desktop Security Lab GUI (9 pages) | Implemented (source runs; exe unbuilt on Windows) | `security_lab/` |
 | Admin users API (role/active/suspend/create/reset/audit) | Implemented | `app/api/admin_users.py` |
-| Portable runtime (`run.bat`/`run.sh`, `.venv` or `venv`) | Implemented | `run.bat`, `run.sh` |
+| Portable runtime (`run.bat`/`run.sh`; uses `.venv`/`venv` if present, else the system Python) | Implemented | `run.bat`, `run.sh` |
 
 ## 4. Architecture
 
@@ -144,7 +144,7 @@ SentientAI/
 ## 7. System Requirements
 
 - Python 3.11 or 3.12 (3.12 used on the reference Windows PC)
-- pip + venv (`.venv` or `venv`; `run.bat`/`run.sh` try `.venv` first)
+- pip (install into the main Python — no virtual environment needed; `run.bat`/`run.sh` use `.venv`/`venv` if one exists, else the system Python)
 - CyberLLMv1 1.7B: base ~4.1 GB + adapter ~82 MB on disk; CPU load measured 4.53 GB peak RSS in a 2-CPU VM (2026-10-24); GPU peak VRAM ~4.5 GB is an unverified estimate. The site runs rules-only without the model; no GPU required.
 - Windows/Linux/macOS; SQLite needs no service. psutil optional for RSS reporting.
 
@@ -162,23 +162,12 @@ git clone https://github.com/UchihaTheGOD/SentientAI.git
 cd SentientAI
 ```
 
-### 8.2 Create and activate a virtual environment
+### 8.2 Install dependencies
 
-```bash
-python -m venv venv
-# Windows PowerShell:
-.\venv\Scripts\Activate.ps1
-# Linux/macOS:
-source venv/bin/activate
-```
-
-(`.venv` works too — `run.bat` / `run.sh` look for `.venv` first, then
-`venv`. If a `venv` folder already exists, reuse it; no need to recreate
-it.) If PowerShell blocks activation, run
-`Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` for
-the current window, then activate again.
-
-### 8.3 Install dependencies
+Install straight into the main Python — no virtual environment is
+needed. (If you already have a `.venv` or `venv` folder in the
+project, `run.bat` / `run.sh` still use it when it exists; otherwise
+they use the system Python.)
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
@@ -193,7 +182,7 @@ pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0 huggingface_hub
 Skip `torch` entirely if you do not want the model — the website starts
 and works in rules-only mode without it.
 
-### 8.4 Download the model (~4.2 GB total)
+### 8.3 Download the model (~4.2 GB total)
 
 Two parts, into the project-local folders `cyberLLMv1/base/` and
 `cyberLLMv1/adapter/` (weights are never committed to Git):
@@ -218,7 +207,7 @@ Do not substitute another base revision, `adapter_17b_datav2_*` (pilot
 v4), or `adapter_datav2_*` (pilot v3, 0.6B) — those are different
 checkpoints. Details: `cyberLLMv1/README.md`, `CYBERLLM_PORTABLE_SETUP.md`.
 
-### 8.5 Configure
+### 8.4 Configure
 
 ```bash
 # Windows PowerShell:
@@ -235,7 +224,7 @@ CPU), `DATABASE_URL=sqlite:///./app.db` (the `app.db` file is created on
 first run), and the `CYBERLLM_*` paths unset — the loader defaults to
 `cyberLLMv1/` inside the project. Full table: §10.
 
-### 8.6 Start the server
+### 8.5 Start the server
 
 ```bash
 python run.py  # or: run.bat start (Windows) / ./run.sh start (Linux/macOS)
@@ -246,7 +235,7 @@ http://127.0.0.1:8000/api/docs. The database is created automatically
 on first start; the model loads lazily on the first analysis, so the
 site works even without it.
 
-### 8.7 Create the admin account
+### 8.6 Create the admin account
 
 There is **no default password** — `seed-admin` generates a fresh random
 one and prints it exactly once, so save it immediately:
@@ -265,13 +254,13 @@ is at http://127.0.0.1:8000/admin. Change the password right after first
 login. Other commands: `create-admin`, `set-role`, `list-users`,
 `seed-blog`, `reset-db --yes` (destructive — see §17).
 
-### 8.8 Check it works
+### 8.7 Check it works
 
 - `python scripts/setup_cyberllm.py --check` → `OK: base + adapter present; adapter SHA-256 matches (d624ed79…).`
 - http://127.0.0.1:8000/api/cyberllm/readiness → `state: not_loaded` before any analysis is normal (lazy load); after loading, `ready: true`.
 - Log in, open http://127.0.0.1:8000/cyberllm, analyze one log line — a single failed login should return `needs_review` (one line is not enough evidence, and that honest uncertainty is correct).
 
-### 8.9 Desktop Security Lab (optional)
+### 8.8 Desktop Security Lab (optional)
 
 ```bash
 pip install -r security_lab/packaging/requirements-gui.txt
@@ -314,7 +303,7 @@ Prerequisites (do §8 first — code, dependencies, model, `.env`):
 
 1. Python 3.11 or 3.12 from python.org, with **"Add python to PATH"**
    checked.
-2. The SentientAI project with its venv and dependencies installed.
+2. The SentientAI project with its dependencies installed.
 3. Model files downloaded (or download them later from inside the exe —
    see §9.4).
 
@@ -344,7 +333,7 @@ fallback if one-file packaging trips antivirus tooling.
 
 1. Double-click `dist\CyberLLMv1-Security-Lab.exe`.
 2. On first run it asks for (or auto-detects) the **project root** and
-   the **backend Python** (the project venv's `python.exe`). Settings are
+   the **backend Python** (the main Python, `python.exe`). Settings are
    saved in your per-user data folder, not in the repo.
 3. Open the **Control Center** and confirm: Project root, Backend
    Python, API host `127.0.0.1`, API port `8000` (the backend's default
@@ -362,8 +351,8 @@ fallback if one-file packaging trips antivirus tooling.
 7. User Management needs a real admin session (the lab account is a
    normal user). From the project folder:
    ```bat
-   .\venv\Scripts\python.exe manage.py create-admin --username <name> --email <mail> --password <pass>
-   .\venv\Scripts\python.exe manage.py set-role --username <name> --role admin
+   python manage.py create-admin --username <name> --email <mail> --password <pass>
+   python manage.py set-role --username <name> --role admin
    ```
    Then sign in on the User Management page with those credentials
    (kept in memory only, never saved). The backend enforces every
@@ -499,10 +488,10 @@ Future retrain prerequisites (gated): properly labeled moderation dataset 80/20 
 ## 15. Testing
 
 ```bash
-.\venv\Scripts\python.exe -m pytest tests/ -q
-.\venv\Scripts\python.exe -m pytest security_lab/tests/ -q
-.\venv\Scripts\python.exe -m pytest tests/test_sentinel_moderation_contract.py tests/test_evaluation_matrix.py tests/test_bruteforce_regression.py -v
-.\venv\Scripts\python.exe -m pytest tests/test_e2e_review_queue_verification.py -v
+python -m pytest tests/ -q
+python -m pytest security_lab/tests/ -q
+python -m pytest tests/test_sentinel_moderation_contract.py tests/test_evaluation_matrix.py tests/test_bruteforce_regression.py -v
+python -m pytest tests/test_e2e_review_queue_verification.py -v
 ```
 
 Baseline on this branch (2026-10-28, Linux): website 635 passed + 1 skipped (pre-existing template skip); Security Lab 86 passed + 1 skipped (real-model smoke, needs weights + `CYBERLLM_REAL_MODEL=1`).
@@ -527,14 +516,13 @@ Do not expose admin credentials in logs or docs. Default bootstrap credentials a
 
 ## 18. Troubleshooting
 
-- Missing deps: `pip install -r requirements.txt -r requirements-dev.txt` in activated venv; verify with `.\venv\Scripts\python.exe -c "import app.main; app.main.create_app(); print('ok')"`
-- venv activation: PowerShell `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` for current process
+- Missing deps: `pip install -r requirements.txt -r requirements-dev.txt` from the project folder; verify with `python -c "import app.main; app.main.create_app(); print('ok')"`
 - Startup errors: check `.env` (`SECRET_KEY` required when `ENVIRONMENT=production`), `DATABASE_URL`, `python run.py` logs; `init_db()` is idempotent
 - DB `no such column`: `init_db` migration should auto-add; if old DB still fails: restart app or `python manage.py reset-db --yes` (destructive, loses data)
 - Model not ready: `GET /api/sentinel/readiness` (or `GET /api/cyberllm/readiness`); `POST /api/sentinel/readiness/load` as admin; check `cyberLLMv1/base/` and `cyberLLMv1/adapter/` exist and the adapter SHA matches, `torch`/`transformers`/`peft` installed. The app starts and works rules-only without the model; the CyberLLM endpoint returns 503 `model_unavailable` honestly.
 - Unparseable model output: downgraded to `needs_review` — human review required; inspect the raw output pane (GUI Model Testing) and `decision_source` (`unparseable_output`)
 - Invalid model JSON: `cyberllm_schema.parse_model_output` rejects malformed output; the adapter returns `needs_review` with the raw text preserved for a human.
-- Test failures: ensure clean venv, no running server needed (`tests/conftest.py` uses throwaway SQLite file), `ratelimit.reset()` per test; `pytest.ini` (`testpaths = tests`)
+- Test failures: ensure dependencies are installed and no server is running (`tests/conftest.py` uses throwaway SQLite file), `ratelimit.reset()` per test; `pytest.ini` (`testpaths = tests`)
 
 ## 19. Security and Responsible Use
 
@@ -548,7 +536,7 @@ Roadmap (future work): Windows battery (exe build + double-click, GPU fit/latenc
 
 ## 21. Contributing and Development
 
-- Use venv, run `pytest` before committing, keep `.env` and model weights out of git (see `.gitignore`).
+- Run `pytest` before committing, keep `.env` and model weights out of git (see `.gitignore`).
 - Work on `feature/cyberllm-desktop-portable`; do not force-push, rewrite history, or push to other branches.
 - Follow existing conventions; add tests for new behavior; document limits honestly.
 
