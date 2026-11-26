@@ -31,11 +31,20 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.models.cyberllm_analysis import CyberLLMAnalysisEvent
 from app.models.user import User
 from app.services import cyberllm_rules
 from app.services.cyberllm_evidence import check_evidence
-from app.services.auth_service import get_current_user, require_admin
+from app.services.auth_service import get_current_user, get_current_user_optional, require_admin
+from app.services.cyberllm_identity import (
+    identity_answer,
+    is_identity_question,
+    sanitize_cleaned_fields,
+    sanitize_identity_text,
+)
 from app.template_env import templates
 from app.services.cyberllm_inference import ModelUnavailable, generate
 from app.services.cyberllm_loader import ensure_loaded, get_status
@@ -47,9 +56,58 @@ logger = logging.getLogger("sentientai.cyberllm.api")
 router = APIRouter(tags=["cyberllm"])
 
 
+def _record_analysis_event(
+    db: Session | None,
+    *,
+    kind: str,
+    classification: str | None,
+    confidence: str | None,
+    decision_source: str,
+    truncated: bool,
+    latency_ms: int | None,
+    user_id: int | None,
+) -> None:
+    """Best-effort per-call record for the admin Security Dashboard.
+
+    One row per analyze call: outcome + timing only, no log text, no raw
+    model output. A failed write must never break the analysis response.
+    """
+    if db is None:
+        return
+    try:
+        db.add(CyberLLMAnalysisEvent(
+            kind=kind,
+            classification=classification,
+            confidence=confidence,
+            decision_source=decision_source,
+            truncated=1 if truncated else 0,
+            latency_ms=latency_ms,
+            user_id=user_id,
+        ))
+        db.commit()
+    except Exception:
+        logger.warning("CyberLLM analysis event record failed", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 @router.get("/api/cyberllm/readiness")
-def readiness():
+def readiness(user: User | None = Depends(get_current_user_optional)):
+    """Model liveness for everyone, operational detail for signed-in users.
+
+    The Security Lab's backend manager polls this endpoint without a
+    session only to learn whether the backend answers (HTTP 200), so
+    anonymous callers still get a 200 with liveness fields. Server
+    paths, device, memory, adapter hash, and load time are private
+    operational information and are returned only to authenticated
+    callers — the base model name is not disclosed to anonymous callers.
+    Model loading itself stays admin-only.
+    """
     s = get_status()
+    if user is None:
+        return {"ready": s.ready, "state": s.state}
     return {
         "ready": s.ready,
         "state": s.state,
@@ -111,6 +169,7 @@ def analyze(
     req: AnalyzeRequest,
     user: User = Depends(get_current_user),
     _rate: None = Depends(limit_cyberllm_analyze),
+    db: Session = Depends(get_db),
 ):
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -119,10 +178,40 @@ def analyze(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     findings = cyberllm_rules.screen(text)
+    # Deterministic identity path (no model call): the classification
+    # template wraps every input, so an identity question would otherwise
+    # be analysed as if it were a log line. Answer it directly with the
+    # canonical identity ("CyberLLM developed by Gaurav Singh Bisht").
+    # Shape-preserving: the same response fields as a normal analysis.
+    if is_identity_question(text):
+        latency_ms = 0
+        _record_analysis_event(
+            db, kind=req.kind, classification="likely_benign",
+            confidence="high", decision_source="identity_rule",
+            truncated=False, latency_ms=latency_ms, user_id=user.id,
+        )
+        return {
+            "kind": req.kind, "classification": "likely_benign",
+            "model_classification": None, "confidence": "high",
+            "needs_review": False, "decision_source": "identity_rule",
+            "summary": identity_answer(),
+            "indicators": [], "reasoning": identity_answer(),
+            "limitations": [], "recommended_actions": [],
+            "deterministic_findings": findings, "parse_ok": True,
+            "truncated": False, "output_tokens": 0,
+            "latency_ms": latency_ms, "raw_output": None,
+            "note": "Identity question answered directly; no model call.",
+        }
     start = time.perf_counter()
     try:
         gen = generate(req.kind, text, max_new_tokens=req.max_new_tokens)
     except ModelUnavailable as exc:
+        _record_analysis_event(
+            db, kind=req.kind, classification=None, confidence=None,
+            decision_source="model_unavailable", truncated=False,
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            user_id=user.id,
+        )
         raise HTTPException(status_code=503, detail={
             "error": "model_unavailable",
             "reason": str(exc),
@@ -136,6 +225,12 @@ def analyze(
         # through to the generic 500 handler, which would discard
         # the deterministic findings computed above.
         logger.exception("CyberLLM inference failed")
+        _record_analysis_event(
+            db, kind=req.kind, classification=None, confidence=None,
+            decision_source="model_error", truncated=False,
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            user_id=user.id,
+        )
         raise HTTPException(status_code=503, detail={
             "error": "model_error",
             "reason": f"{type(exc).__name__}: {exc}",
@@ -144,8 +239,22 @@ def analyze(
                     "rules still apply. Check the server log.",
         }) from exc
     latency_ms = int((time.perf_counter() - start) * 1000)
+    # Defence in depth: generate() already sanitizes the raw output at the
+    # choke point; apply the identity sanitizer again here (idempotent) so
+    # the raw passthrough below can never leak a base-model identity claim.
+    gen = {**gen, "raw": sanitize_identity_text(gen["raw"])[0]}
     cleaned, parse_ok = parse_model_output(gen["raw"])
+    if parse_ok:
+        # Sanitize the cleaned string fields as well, so no identity claim
+        # survives inside summary/reasoning/indicators/limitations/actions.
+        cleaned = sanitize_cleaned_fields(cleaned)
     if not parse_ok:
+        _record_analysis_event(
+            db, kind=req.kind, classification="needs_review",
+            confidence="low", decision_source="unparseable_output",
+            truncated=gen["truncated"], latency_ms=latency_ms,
+            user_id=user.id,
+        )
         return {
             "kind": req.kind, "classification": "needs_review",
             "model_classification": None, "confidence": "low",
@@ -186,6 +295,13 @@ def analyze(
             reasons.append("model output hit its token budget (truncated)")
         high_for_mismatch = [f for f in findings if f["severity"] == "high"]
         if not high_for_mismatch:
+            _record_analysis_event(
+                db, kind=req.kind, classification="needs_review",
+                confidence="low",
+                decision_source="evidence_mismatch" if mismatches else "truncated_output",
+                truncated=gen["truncated"], latency_ms=latency_ms,
+                user_id=user.id,
+            )
             return {
                 "kind": req.kind, "classification": "needs_review",
                 "model_classification": model_cls, "confidence": "low",
@@ -210,6 +326,12 @@ def analyze(
         # High-severity deterministic patterns (metadata SSRF, credential
         # probing) are narrow and evidence-cited; they escalate a benign or
         # uncertain model verdict to likely_threat, transparently.
+        _record_analysis_event(
+            db, kind=req.kind, classification="likely_threat",
+            confidence="high", decision_source="deterministic_override",
+            truncated=gen["truncated"], latency_ms=latency_ms,
+            user_id=user.id,
+        )
         return {
             "kind": req.kind, "classification": "likely_threat",
             "model_classification": model_cls, "confidence": "high",
@@ -223,6 +345,12 @@ def analyze(
                     "preserved in model_classification for audit.",
         }
     needs_review = model_cls == "needs_review" or cleaned["confidence"] == "low"
+    _record_analysis_event(
+        db, kind=req.kind, classification=model_cls,
+        confidence=cleaned["confidence"], decision_source="model",
+        truncated=gen["truncated"], latency_ms=latency_ms,
+        user_id=user.id,
+    )
     return {
         "kind": req.kind, "classification": model_cls,
         "model_classification": model_cls, "confidence": cleaned["confidence"],

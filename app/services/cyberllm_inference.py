@@ -16,6 +16,7 @@ import threading
 import time
 from typing import Any
 
+from .cyberllm_identity import sanitize_identity_text
 from .cyberllm_loader import ensure_loaded, get_bundle
 
 SYSTEM_PROMPT = (
@@ -153,6 +154,17 @@ def generate(
     # Only count newly generated tokens, excluding the original prompt.
     new_tokens = out[0][input_ids.shape[1]:]
     raw = tok.decode(new_tokens, skip_special_tokens=True)
+
+    # Identity hardening (single choke point): the adapter was trained on
+    # rows naming "Gaurav Bisht" while the deployment prompt names
+    # "Gaurav Singh", and the base weights know Qwen — so generated text
+    # can claim the wrong developer. Rewrite identity claims in the
+    # generated text to the canonical identity ("CyberLLM developed by
+    # Gaurav Singh Bisht") before anything returns it. The replacements
+    # contain no braces or quotes, so they cannot break the JSON structure
+    # parse_model_output() extracts. Only generated text is touched —
+    # never stored data, logs, or user input.
+    raw, _identity_changed = sanitize_identity_text(raw)
 
     return {
         "raw": raw,

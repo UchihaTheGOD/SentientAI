@@ -22,6 +22,8 @@
      href="/admin/settings">Settings</a>
   <a class="filter-chip {% if path.startswith('/admin/security') or path.startswith('/admin/sentinel') %}filter-chip--active{% endif %}"
      href="/admin/security">Security</a>
+  <a class="filter-chip {% if path == '/admin/security/dashboard' %}filter-chip--active{% endif %}"
+     href="/admin/security/dashboard">Security Dashboard</a>
   <a class="filter-chip {% if path.startswith('/admin/security/reports') %}filter-chip--active{% endif %}"
      href="/admin/security/reports/security">Security Reports</a>
   <a class="filter-chip {% if path.startswith('/admin/automation') %}filter-chip--active{% endif %}"

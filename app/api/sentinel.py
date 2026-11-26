@@ -18,21 +18,31 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.log_validation import validate_log_text, MAX_LOG_CHARS
 from app.services.cyberllm_loader import get_status as cyberllm_status, ensure_loaded as cyberllm_ensure_loaded
-from app.services.auth_service import get_current_user, require_admin
+from app.services.auth_service import get_current_user, get_current_user_optional, require_admin
 from app.models.user import User
 from app.template_env import templates
 logger = logging.getLogger("sentientai.sentinel.api")
 router = APIRouter(tags=["sentinel"])
 
 @router.get("/api/sentinel/readiness")
-def readiness():
+def readiness(user: User | None = Depends(get_current_user_optional)):
     """Classifier readiness: CyberLLMv1 status + deterministic rules availability.
 
     Rules are always available (model-independent). ``ready`` here means
     the CyberLLMv1 model is loaded; when it is not, analysis still works
     rules-only and honestly reports model_status=unavailable.
+
+    Tiered like /api/cyberllm/readiness: anonymous callers get liveness
+    facts only; server paths, device, memory, and load reasons are
+    private operational information for authenticated callers.
     """
     s = cyberllm_status()
+    if user is None:
+        return {
+            "ready": bool(s.ready),
+            "classifier": "cyberllm",
+            "rules_available": True,
+        }
     return {
         "ready": bool(s.ready),
         "classifier": "cyberllm",

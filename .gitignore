@@ -27,10 +27,15 @@ logs/
 local_models/
 # Project-local CyberLLM artifacts: weights stay local, but the small
 # manifest + README inside cyberLLMv1/ are tracked. Note the pattern:
-# cyberLLMv1/* (not cyberLLMv1/**) so the two exceptions below can work.
+# cyberLLMv1/* (not cyberLLMv1/**) so the exceptions below can work.
+# The prompts folder is small Markdown documentation (no weights), so it
+# is tracked too.
 cyberLLMv1/*
 !cyberLLMv1/manifest.json
 !cyberLLMv1/README.md
+!cyberLLMv1/MODEL_CARD.md
+!cyberLLMv1/prompts/
+!cyberLLMv1/prompts/**
 *.pt
 *.safetensors
 *.bin

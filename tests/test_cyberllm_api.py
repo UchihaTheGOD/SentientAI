@@ -29,8 +29,11 @@ def _post(c, url, payload):
     return c._client.post(url, json=payload, headers={"X-CSRF-Token": c._csrf()})
 
 
-def test_readiness_reports_state(client):
-    r = client._client.get("/api/cyberllm/readiness")
+def test_readiness_reports_state(admin_client):
+    # Tiered readiness: authenticated callers get the full detail.
+    # (Anonymous callers get liveness fields only — see
+    # tests/test_cyberllm_identity.py.)
+    r = admin_client._client.get("/api/cyberllm/readiness")
     assert r.status_code == 200
     body = r.json()
     assert body["state"] in ("not_loaded", "loaded", "failed")
@@ -38,8 +41,8 @@ def test_readiness_reports_state(client):
     assert "adapter_sha256" in body
 
 
-def test_readiness_reports_quantization(client):
-    r = client._client.get("/api/cyberllm/readiness")
+def test_readiness_reports_quantization(admin_client):
+    r = admin_client._client.get("/api/cyberllm/readiness")
     assert r.status_code == 200
     assert r.json()["quantization"] in ("none", "8bit")
 
