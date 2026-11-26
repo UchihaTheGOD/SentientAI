@@ -3,16 +3,12 @@ REM SentientAI development task runner. Usage: run ^<task^> [args]
 setlocal
 cd /d "%~dp0"
 
-REM The project supports both .venv (the current dev environment) and venv.
+REM Python resolution: prefer .venv, then venv, then the system Python
+REM on PATH. No virtual environment is required -- dependencies are
+REM installed into the main Python (see INSTALL.md).
 set "PY=.venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=venv\Scripts\python.exe"
-if not exist "%PY%" (
-    echo [run] Python venv not found (.venv or venv)
-    echo [run] Create it and install deps first:
-    echo        python -m venv .venv
-    echo        .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
-    exit /b 1
-)
+if not exist "%PY%" set "PY=python"
 
 set "CMD=%~1"
 if "%CMD%"=="" set "CMD=help"
