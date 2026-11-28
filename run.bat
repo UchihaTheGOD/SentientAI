@@ -11,7 +11,9 @@ if not exist "%PY%" set "PY=venv\Scripts\python.exe"
 if not exist "%PY%" set "PY=python"
 
 set "CMD=%~1"
-if "%CMD%"=="" set "CMD=help"
+REM Double-clicking run.bat (no argument) starts the server. Use
+REM "run.bat help" to see the task list instead.
+if "%CMD%"=="" set "CMD=start"
 
 if /i "%CMD%"=="start"       goto :start
 if /i "%CMD%"=="test"        goto :test
@@ -24,7 +26,14 @@ goto :help
 :start
 echo [run] Starting SentientAI at http://127.0.0.1:8000  (Ctrl+C to stop)
 "%PY%" run.py
-exit /b %errorlevel%
+if errorlevel 1 (
+    echo.
+    echo [run] The server stopped with an error. See the message above.
+    echo [run] If Python was not found, install Python 3.11/3.12 and tick "Add Python to PATH" during setup.
+    echo [run] Press any key to close this window.
+    pause
+)
+exit /b 0
 
 :test
 "%PY%" -m pytest %2 %3 %4 %5 %6
@@ -50,6 +59,7 @@ exit /b %errorlevel%
 
 :help
 echo SentientAI development tasks:
+echo   run                       Start the app (same as: run start)
 echo   run start               Start the app (http://127.0.0.1:8000)
 echo   run test [args]         Run the pytest suite (extra args passed through)
 echo   run status              Show training-pipeline counts

@@ -15,7 +15,9 @@ else
   PY="python3"
 fi
 
-CMD="${1:-help}"
+# No argument starts the server (same as run.bat double-click).
+# Use "./run.sh help" to see the task list instead.
+CMD="${1:-start}"
 case "$CMD" in
   start)
     echo "[run] Starting SentientAI at http://127.0.0.1:8000 (Ctrl+C to stop)"
