@@ -117,7 +117,7 @@ class ModelTestingPage(QWidget):
         self.ed_input.setPlaceholderText(
             "Paste a security log, HTTP request, URL, or vulnerability "
             "description…")
-        s_layout.addWidget(self.ed_input)
+        s_layout.addWidget(self.ed_input, 1)
         run_row = QHBoxLayout()
         self.btn_run = QPushButton("Run Inference")
         self.btn_abstain = QPushButton("Mark abstained (insufficient evidence)")
@@ -138,10 +138,13 @@ class ModelTestingPage(QWidget):
         self.out_parsed.setReadOnly(True)
         self.out_parsed.setPlaceholderText("Parsed structured output appears here.")
         s_layout.addWidget(QLabel("Raw model response:"))
-        s_layout.addWidget(self.out_raw)
+        s_layout.addWidget(self.out_raw, 1)
         s_layout.addWidget(QLabel("Parsed structured output:"))
-        s_layout.addWidget(self.out_parsed)
-        layout.addWidget(single)
+        s_layout.addWidget(self.out_parsed, 1)
+        # The Single box takes twice the extra space of the Batch box, and
+        # the trailing addStretch is gone, so the input/output text areas
+        # grow with the window instead of staying at minimum size.
+        layout.addWidget(single, 2)
 
         # -- batch ---------------------------------------------------------------
         batch = QGroupBox("Batch evaluation (JSONL or CSV with expected labels)")
@@ -162,7 +165,7 @@ class ModelTestingPage(QWidget):
         self.out_metrics.setPlaceholderText(
             "Metrics appear here. Without ground-truth labels the result "
             "is reported as 'not evaluated', never as a fabricated score.")
-        b_layout.addWidget(self.out_metrics)
+        b_layout.addWidget(self.out_metrics, 1)
         brow2 = QHBoxLayout()
         self.btn_exp_eval_json = QPushButton("Export evaluation JSON")
         self.btn_exp_eval_csv = QPushButton("Export evaluation CSV")
@@ -173,7 +176,7 @@ class ModelTestingPage(QWidget):
             brow2.addWidget(btn)
         brow2.addStretch()
         b_layout.addLayout(brow2)
-        layout.addWidget(batch)
+        layout.addWidget(batch, 1)
         self._batch_path: Path | None = None
         self.btn_pick.clicked.connect(self._pick_batch)
         self.btn_batch.clicked.connect(self._run_batch)
@@ -183,7 +186,6 @@ class ModelTestingPage(QWidget):
             lambda: self._export_eval("csv"))
         self.btn_save_base.clicked.connect(self._save_baseline)
         self.btn_cmp_base.clicked.connect(self._compare_baseline)
-        layout.addStretch()
 
     # -- auth -------------------------------------------------------------------
     def _ensure_client(self) -> BackendClient:

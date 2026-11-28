@@ -216,20 +216,22 @@ class ControlCenterPage(QWidget):
         self._refresh_tunnel_token_ui()
 
         # -- logs ----------------------------------------------------------
+        # The log box takes the stretch (and the trailing addStretch below
+        # is gone), so the log view grows when the window grows instead of
+        # staying at its minimum height while empty space piles up below.
         log_box = QGroupBox("Backend logs")
         log_layout = QVBoxLayout(log_box)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(500)
-        log_layout.addWidget(self.log_view)
+        log_layout.addWidget(self.log_view, 1)
         self.btn_log = QPushButton("Refresh logs")
         self.btn_log.clicked.connect(self.refresh_logs)
         log_layout.addWidget(self.btn_log)
-        layout.addWidget(log_box)
+        layout.addWidget(log_box, 1)
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(2000)
         self._log_timer.timeout.connect(self.refresh_logs)
-        layout.addStretch()
 
     def showEvent(self, event):  # noqa: N802 - Qt naming
         super().showEvent(event)

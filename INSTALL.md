@@ -72,43 +72,14 @@ every command below.
 
 ## 4. Step 2 — Install Python dependencies
 
-### 4a. Create a virtual environment
+Install everything into your **main Python** — no virtual environment
+is needed. From inside the `SentientAI` folder, run the commands
+below. (If you already have a `.venv` or `venv` folder in the project,
+the task runners `run.bat` / `run.sh` still use it when it exists;
+otherwise they use the system Python. Either way, the install commands
+are the same.)
 
-A virtual environment keeps the project's Python packages separate from
-the rest of your computer. From inside the `SentientAI` folder:
-
-```bash
-python -m venv venv
-```
-
-(`.venv` works too — `run.bat` / `run.sh` look for `.venv` first, then
-`venv`. If a `venv` folder already exists, reuse it; do not recreate it.)
-
-### 4b. Activate it
-
-**Windows (PowerShell):**
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-If PowerShell blocks activation, run this once for the current window
-only, then try again:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-```
-
-**Linux / macOS:**
-
-```bash
-source venv/bin/activate
-```
-
-Your prompt should now start with `(venv)`. Keep this terminal open —
-every command below runs in it.
-
-### 4c. Install the website dependencies
+### 4a. Install the website dependencies
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
@@ -118,7 +89,7 @@ This installs FastAPI, Uvicorn, SQLAlchemy, Jinja2, Argon2 password
 hashing, and the test tools (pytest, httpx). It does **not** install
 `torch` — that is a large, platform-specific install, handled next.
 
-### 4d. Install torch (needed only for the AI model)
+### 4b. Install torch (needed only for the AI model)
 
 **With an NVIDIA GPU (CUDA 12.1 wheel — supports Turing cards like the
 GTX 1660):**
@@ -136,7 +107,7 @@ pip install torch
 > If you do not want the AI model at all, you can skip torch entirely —
 > the website starts and works in rules-only mode without it.
 
-### 4e. Install the model runtime libraries
+### 4c. Install the model runtime libraries
 
 These are needed only to load and run the CyberLLM model:
 
@@ -318,7 +289,7 @@ printed to the console instead of emailed.
 
 ## 7. Step 5 — Start the server
 
-From the project folder, in your activated virtual environment:
+From the project folder:
 
 ```bash
 python run.py
@@ -358,7 +329,7 @@ publicly known admin login, so the command generates a fresh random one
 and prints it exactly once.
 
 In a **second** terminal (keep the server running in the first), from
-the project folder with the venv activated:
+the project folder:
 
 ```bash
 python manage.py seed-admin
@@ -440,7 +411,7 @@ the file properties (expected for a locally built PyInstaller app).
 ### 9b. Set it up (first run)
 
 1. On first run it asks for (or auto-detects) the **project root** and
-   the **backend Python** (the project venv's `python.exe`).
+   the **backend Python** (the main Python, `python.exe`).
 2. In the **Control Center**, confirm: Project root, Backend Python, API
    host `127.0.0.1`, API port `8000`.
 3. Click **"Verify adapter SHA + artifacts"** — it must report OK.
@@ -554,15 +525,13 @@ Run through this list after installing:
 
 ## 12. If something goes wrong
 
-- **PowerShell blocks venv activation:** run
-  `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
-  in that PowerShell window, then activate again.
 - **"No module named app" / import errors:** you are not in the
-  project folder, or the venv is not activated. `cd` into `SentientAI`
-  and activate the venv first.
+  project folder, or the packages are not installed. `cd` into
+  `SentientAI` and run `pip install -r requirements.txt
+  -r requirements-dev.txt`.
 - **Missing packages:** re-run
-  `pip install -r requirements.txt -r requirements-dev.txt` in the
-  activated venv.
+  `pip install -r requirements.txt -r requirements-dev.txt` from the
+  project folder.
 - **App will not start in production:** set a real `SECRET_KEY` in
   `.env` — production refuses to start without one.
 - **Database error (`no such column`):** restart the app (migrations

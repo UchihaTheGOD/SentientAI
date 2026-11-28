@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QDesktopServices
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
                                QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QPushButton, QTableWidget,
-                               QTableWidgetItem, QTextEdit, QVBoxLayout,
-                               QWidget)
+                               QListWidget, QPushButton, QSplitter,
+                               QTableWidget, QTableWidgetItem, QTextEdit,
+                               QVBoxLayout, QWidget)
 
 from ..config import save_settings
 from ..diagnostics import run_diagnostics
@@ -35,15 +35,22 @@ class ReportsPage(QWidget):
             "Exported scan reports and evaluations saved under the data "
             "directory. Open a file to review it; nothing here contains "
             "credentials or tokens."))
+        # The file list and the event timeline share a vertical splitter
+        # so the user can drag the divider to give either pane more room.
+        # The list takes extra space when the window grows; the timeline
+        # keeps its height when dragged.
+        top = QWidget()
+        top_layout = QVBoxLayout(top)
+        top_layout.setContentsMargins(0, 0, 0, 0)
         self.list_widget = QListWidget()
-        layout.addWidget(self.list_widget, 1)
+        top_layout.addWidget(self.list_widget, 1)
         row = QHBoxLayout()
         self.btn_refresh = QPushButton("Refresh")
         self.btn_open = QPushButton("Open selected")
         row.addWidget(self.btn_refresh)
         row.addWidget(self.btn_open)
         row.addStretch()
-        layout.addLayout(row)
+        top_layout.addLayout(row)
         self.btn_refresh.clicked.connect(self.refresh)
         self.btn_open.clicked.connect(self._open_selected)
 
@@ -52,7 +59,12 @@ class ReportsPage(QWidget):
         self.timeline_view = QTextEdit()
         self.timeline_view.setReadOnly(True)
         t_layout.addWidget(self.timeline_view)
-        layout.addWidget(timeline_box)
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(top)
+        split.addWidget(timeline_box)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 0)
+        layout.addWidget(split, 1)
 
     def showEvent(self, event):  # noqa: N802 - Qt naming
         super().showEvent(event)
@@ -94,11 +106,18 @@ class CasesPage(QWidget):
         self.table.setSelectionBehavior(
             self.table.SelectionBehavior.SelectRows)
         self.table.itemSelectionChanged.connect(self._show_detail)
-        layout.addWidget(self.table, 1)
         self.detail = QTextEdit()
         self.detail.setReadOnly(True)
-        self.detail.setMaximumHeight(180)
-        layout.addWidget(self.detail)
+        # Table and detail share a vertical splitter instead of the old
+        # fixed 180 px cap, so the user can drag the divider to give
+        # either pane more room. The table takes extra space when the
+        # window grows; the detail keeps its height when dragged.
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(self.table)
+        split.addWidget(self.detail)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 0)
+        layout.addWidget(split, 1)
         row = QHBoxLayout()
         self.btn_status = QPushButton("Change status…")
         self.btn_note = QPushButton("Add note…")

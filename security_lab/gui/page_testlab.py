@@ -24,6 +24,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel,
                                QMessageBox, QPlainTextEdit, QPushButton,
                                QSpinBox, QSplitter, QTableWidget,
@@ -137,7 +138,6 @@ class TestLabPage(QWidget):
         split.addWidget(left)
         split.addWidget(right)
         r_layout.addWidget(split)
-        layout.addWidget(res, 1)
 
         # -- history ---------------------------------------------------------
         hist = QGroupBox("History (stored locally only)")
@@ -155,7 +155,15 @@ class TestLabPage(QWidget):
         cmp_row.addWidget(self.btn_compare)
         cmp_row.addWidget(self.lbl_compare, 1)
         h_layout.addLayout(cmp_row)
-        layout.addWidget(hist)
+        # Result and History share a vertical splitter so the user can drag
+        # the divider to give the history table more room. The Result group
+        # takes extra space when the window grows.
+        vsplit = QSplitter(Qt.Vertical)
+        vsplit.addWidget(res)
+        vsplit.addWidget(hist)
+        vsplit.setStretchFactor(0, 1)
+        vsplit.setStretchFactor(1, 0)
+        layout.addWidget(vsplit, 1)
         self.btn_compare.clicked.connect(self._compare_selected)
         self._refresh_table()
 

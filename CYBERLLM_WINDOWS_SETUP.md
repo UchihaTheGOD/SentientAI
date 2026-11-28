@@ -117,11 +117,10 @@ the two-line change in `app/main.py`.
 
 ## 5. Install Python dependencies (PowerShell)
 
-Python 3.12 is recommended. From the `SentientAI` directory:
+Python 3.12 is recommended. From the `SentientAI` directory, install
+into your main Python — no virtual environment is needed:
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install torch --index-url https://download.pytorch.org/whl/cu121
 pip install transformers==5.16.1 peft==0.20.0 accelerate==1.14.0 psutil httpx pytest
@@ -226,7 +225,6 @@ if you want them persistent (a new terminal is then required).
 
 ```powershell
 cd SentientAI
-.\.venv\Scripts\Activate.ps1
 $env:CYBERLLM_BASE_DIR = "D:\CyberLLM\models\Qwen3-1.7B"
 $env:CYBERLLM_ADAPTER_DIR = "D:\CyberLLM\models\cyberllm-v8"
 $env:CYBERLLM_ADAPTER_SHA256 = "d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1"

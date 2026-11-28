@@ -8,8 +8,9 @@ machine-specific folder is a runtime dependency.
 ## 1. What you need
 
 - A clone/copy of this project (any folder, including a path with spaces).
-- Python 3.12, a virtual environment, and the project requirements
-  (`requirements.txt`, `requirements-dev.txt` for tests).
+- Python 3.12 and the project requirements
+  (`requirements.txt`, `requirements-dev.txt` for tests) — install
+  them into your main Python, no virtual environment needed.
 - About **4.2 GB** free disk for the model, plus RAM/VRAM:
   - Base: Qwen/Qwen3-1.7B @ `70d244cc86ccca08cf5af4e1e306ecf908b1ad5e`
     - `model-00001-of-00002.safetensors` 3,441,185,608 bytes
@@ -62,30 +63,29 @@ never a silent multi-GB download.
 ## 3. Windows commands (exact)
 
 Run these from the project folder (PowerShell). `run.bat` already
-does `cd /d "%~dp0"`, so its `venv\` path is relative to the batch
-file, not to the caller's folder.
+does `cd /d "%~dp0"`, so it finds the project folder from the batch
+file's location, not from the caller's folder.
 
 ```powershell
 # 1. Clone / copy the project, then enter it
 cd SentientAI
 
-# 2. Python venv + dependencies
-python -m venv venv
-.\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
+# 2. Python dependencies (into the main Python, no venv needed)
+python -m pip install -r requirements.txt -r requirements-dev.txt
 
 # torch is deliberately not in requirements.txt: it is a large,
 # platform-specific install. The CUDA 12.1 wheel supports Turing
 # (compute 7.5), e.g. the GTX 1660 SUPER.
-.\venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
 
 # 3. Check what is missing (no download, no credentials needed)
-.\venv\Scripts\python.exe scripts\setup_cyberllm.py --check
+python scripts\setup_cyberllm.py --check
 
 # 4. Download the base model (~4.1 GB, resumable via huggingface_hub)
-.\venv\Scripts\python.exe scripts\setup_cyberllm.py --download-base
+python scripts\setup_cyberllm.py --download-base
 
 # 5. Download the adapter (~82 MB, Kaggle CLI, then canonical renames)
-.\venv\Scripts\python.exe scripts\setup_cyberllm.py --download-adapter
+python scripts\setup_cyberllm.py --download-adapter
 #    -- or manually, per cyberLLMv1/README.md, then verify:
 #    Get-FileHash cyberLLMv1\adapter\adapter_model.safetensors -Algorithm SHA256
 #    must equal d624ed793a45a64cb541577441c87c7d2feb83c37a84da057d1c15e58e45a5b1

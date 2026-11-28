@@ -12,11 +12,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QProgressBar, QPushButton, QTableWidget,
-                               QTableWidgetItem, QTextEdit, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout,
+                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                               QMessageBox, QProgressBar, QPushButton,
+                               QSplitter, QTableWidget, QTableWidgetItem,
+                               QTextEdit, QVBoxLayout, QWidget)
 
 from ..lab_server import start_lab_server, stop_lab_server
 from ..reports import (export_scan_csv, export_scan_html, export_scan_json,
@@ -86,14 +86,16 @@ class ScannerPage(QWidget):
         self.btn_lab_stop.clicked.connect(self.stop_lab)
 
         # -- categories ------------------------------------------------------
+        # Two columns so the checklist takes half the vertical space it
+        # did as a single column, leaving more room for the findings table.
         cat_box = QGroupBox("Check categories (all selected by default)")
-        cat_layout = QVBoxLayout(cat_box)
+        cat_layout = QGridLayout(cat_box)
         self.cat_checks: dict[str, QCheckBox] = {}
-        for check in ALL_CHECKS:
+        for idx, check in enumerate(ALL_CHECKS):
             box = QCheckBox(f"{check['name']} ({check['id']})")
             box.setChecked(True)
             self.cat_checks[check["id"]] = box
-            cat_layout.addWidget(box)
+            cat_layout.addWidget(box, idx // 2, idx % 2)
         layout.addWidget(cat_box)
 
         # -- run controls -----------------------------------------------------
@@ -152,12 +154,19 @@ class ScannerPage(QWidget):
         self.table.setSelectionBehavior(
             self.table.SelectionBehavior.SelectRows)
         self.table.itemSelectionChanged.connect(self._show_detail)
-        layout.addWidget(self.table, 1)
 
         self.detail = QTextEdit()
         self.detail.setReadOnly(True)
-        self.detail.setMaximumHeight(220)
-        layout.addWidget(self.detail)
+        # Table and detail share a vertical splitter instead of the old
+        # fixed 220 px cap, so the user can drag the divider to give
+        # either pane more room. The table takes extra space when the
+        # window grows; the detail keeps its height when dragged.
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(self.table)
+        split.addWidget(self.detail)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 0)
+        layout.addWidget(split, 1)
 
         exp_row = QHBoxLayout()
         self.btn_exp_html = QPushButton("Export HTML")

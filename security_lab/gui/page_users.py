@@ -9,12 +9,12 @@ request shows the backend's error.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
                                QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QTableWidget,
-                               QTableWidgetItem, QTextEdit, QVBoxLayout,
-                               QWidget)
+                               QMessageBox, QPushButton, QSplitter,
+                               QTableWidget, QTableWidgetItem, QTextEdit,
+                               QVBoxLayout, QWidget)
 
 from ..client import AdminRequiredError, AuthError
 from .context import AppContext
@@ -134,11 +134,18 @@ class UserManagementPage(QWidget):
         self.table.setSelectionBehavior(
             self.table.SelectionBehavior.SelectRows)
         self.table.itemSelectionChanged.connect(self._show_detail)
-        layout.addWidget(self.table, 1)
         self.detail = QTextEdit()
         self.detail.setReadOnly(True)
-        self.detail.setMaximumHeight(180)
-        layout.addWidget(self.detail)
+        # Table and detail share a vertical splitter instead of the old
+        # fixed 180 px cap, so the user can drag the divider to give
+        # either pane more room. The table takes extra space when the
+        # window grows; the detail keeps its height when dragged.
+        split = QSplitter(Qt.Vertical)
+        split.addWidget(self.table)
+        split.addWidget(self.detail)
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 0)
+        layout.addWidget(split, 1)
 
         # -- actions -----------------------------------------------------------
         act = QHBoxLayout()
